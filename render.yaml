@@ -3,9 +3,7 @@
 databases:
   - name: gold-factory-db
     databaseName: gold_factory
-    user: postgres
     plan: starter
-    region: singapore
 
 services:
   # Backend API
@@ -48,7 +46,6 @@ services:
   - type: web
     name: gold-factory-frontend
     runtime: static
-    region: singapore
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
