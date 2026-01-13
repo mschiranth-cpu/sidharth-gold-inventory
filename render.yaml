@@ -1,29 +1,17 @@
-# Render Infrastructure as Code
-# This file defines all services needed for the Gold Factory Inventory System
+# Render Blueprint for Gold Factory Inventory System
+
+databases:
+  - name: gold-factory-db
+    databaseName: gold_factory
+    user: postgres
+    plan: starter
+    region: singapore
 
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: gold-factory-db
-    env: docker
-    plan: starter
-    region: singapore
-    databases:
-      - name: gold_factory
-        user: postgres
-
-  # Redis Cache
-  - type: redis
-    name: gold-factory-redis
-    env: docker
-    plan: starter
-    region: singapore
-    maxmemoryPolicy: allkeys-lru
-
   # Backend API
   - type: web
     name: gold-factory-backend
-    env: node
+    runtime: node
     region: singapore
     plan: starter
     buildCommand: cd backend && npm install && npx prisma generate && npm run build
@@ -38,41 +26,28 @@ services:
         fromDatabase:
           name: gold-factory-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: gold-factory-redis
-          type: redis
-          property: connectionString
       - key: JWT_SECRET
         generateValue: true
-        sync: false
       - key: JWT_REFRESH_SECRET
         generateValue: true
-        sync: false
       - key: JWT_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
       - key: CORS_ORIGIN
-        fromService:
-          name: gold-factory-frontend
-          type: web
-          property: host
+        sync: false
       - key: FRONTEND_URL
-        fromService:
-          name: gold-factory-frontend
-          type: web
-          property: host
+        sync: false
     autoDeploy: true
     disk:
       name: uploads
       mountPath: /app/backend/uploads
       sizeGB: 10
 
-  # Frontend Web App
+  # Frontend Static Site
   - type: web
     name: gold-factory-frontend
-    env: static
+    runtime: static
     region: singapore
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
@@ -94,12 +69,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: gold-factory-backend
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
       - key: VITE_WS_URL
-        fromService:
-          name: gold-factory-backend
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
