@@ -1,0 +1,129 @@
+/**
+ * ============================================
+ * NOTIFICATION ROUTES
+ * ============================================
+ *
+ * REST API endpoints for notification management.
+ *
+ * @author Gold Factory Dev Team
+ * @version 1.0.0
+ */
+
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticate } from '../auth/auth.middleware';
+import { AuthenticatedRequest } from '../auth/auth.types';
+import notificationService from './notification.service';
+import { NotificationType } from './notification.types';
+
+const router = Router();
+
+// All routes require authentication
+router.use(authenticate);
+
+/**
+ * GET /api/notifications
+ *
+ * Get notifications for the current user.
+ *
+ * Query Parameters:
+ * - unreadOnly: boolean (default: false)
+ * - type: NotificationType
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ */
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const { unreadOnly = 'false', type, limit = '50', offset = '0' } = req.query;
+
+    const result = await notificationService.getUserNotifications(userId, {
+      unreadOnly: unreadOnly === 'true',
+      type: type as NotificationType | undefined,
+      limit: Math.min(parseInt(limit as string, 10) || 50, 100),
+      offset: parseInt(offset as string, 10) || 0,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/notifications/unread-count
+ *
+ * Get count of unread notifications.
+ */
+router.get('/unread-count', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+
+    const { unreadCount } = await notificationService.getUserNotifications(userId, {
+      limit: 0,
+    });
+
+    res.json({
+      success: true,
+      data: { unreadCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/notifications/:id/read
+ *
+ * Mark a single notification as read.
+ */
+router.put('/:id/read', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const { id } = req.params;
+
+    const notification = await notificationService.markAsRead(id, userId);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        error: 'Notification not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: notification,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/notifications/read-all
+ *
+ * Mark all notifications as read for the current user.
+ */
+router.put('/read-all', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+
+    const count = await notificationService.markAllAsRead(userId);
+
+    res.json({
+      success: true,
+      data: { markedCount: count },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;

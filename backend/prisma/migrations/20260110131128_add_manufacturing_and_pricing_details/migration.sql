@@ -1,0 +1,18 @@
+-- AlterTable
+ALTER TABLE "order_details" ADD COLUMN     "bisHallmark" TEXT,
+ADD COLUMN     "cadFiles" TEXT[],
+ADD COLUMN     "certificationRequired" TEXT,
+ADD COLUMN     "claspType" TEXT,
+ADD COLUMN     "customerGoldPurity" DOUBLE PRECISION,
+ADD COLUMN     "customerGoldWeight" DOUBLE PRECISION,
+ADD COLUMN     "engravingText" TEXT,
+ADD COLUMN     "hallmarkRequired" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "huidNumber" TEXT,
+ADD COLUMN     "laborCharges" DOUBLE PRECISION,
+ADD COLUMN     "makingChargeType" TEXT,
+ADD COLUMN     "makingChargeValue" DOUBLE PRECISION,
+ADD COLUMN     "meltingInstructions" TEXT,
+ADD COLUMN     "polishType" TEXT,
+ADD COLUMN     "rhodiumPlating" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "usingCustomerGold" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "wastagePercentage" DOUBLE PRECISION;

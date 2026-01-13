@@ -1,0 +1,335 @@
+# =============================================================================
+# Deploy to Production Workflow
+# =============================================================================
+# Trigger: Release tag (v*.*.*)
+# - Runs all tests
+# - Builds optimized Docker images
+# - Blue-green deployment
+# - Health checks and auto-rollback
+# - Team notifications
+# =============================================================================
+
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validate Release
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Validate tag format
+        run: |
+          if [[ ! "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format. Expected: v*.*.* (e.g., v1.2.3)"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Test Job
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run All Tests
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: gold_factory_test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test backend
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/gold_factory_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_secret
+          JWT_REFRESH_SECRET: test_refresh
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run test:coverage
+
+      - name: Test frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run test:coverage
+
+  # ---------------------------------------------------------------------------
+  # Build Production Images
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build Production Images
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    
+    outputs:
+      backend_digest: ${{ steps.build-backend.outputs.digest }}
+      frontend_digest: ${{ steps.build-frontend.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        id: build-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ needs.validate.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest
+          labels: |
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        id: build-frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ needs.validate.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
+          build-args: |
+            VITE_API_URL=/api
+            VITE_APP_NAME=Gold Factory Inventory
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Deploy Production (Blue-Green)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    environment: production
+    
+    outputs:
+      deployment_id: ${{ steps.deploy.outputs.deployment_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create deployment
+        id: deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/gold-factory
+            
+            VERSION=${{ needs.validate.outputs.version }}
+            DEPLOYMENT_ID=$(date +%Y%m%d%H%M%S)
+            
+            echo "Starting deployment $DEPLOYMENT_ID for version $VERSION"
+            
+            # Backup database
+            ./scripts/backup.sh production pre-deploy-$DEPLOYMENT_ID
+            
+            # Store current version for rollback
+            docker-compose ps -q backend > /tmp/previous_backend_container || true
+            
+            # Pull new images
+            export IMAGE_TAG=$VERSION
+            docker-compose pull
+            
+            # Blue-green deployment
+            # Start new containers alongside old ones
+            docker-compose up -d --no-deps --scale backend=2 backend
+            
+            # Wait for new container to be healthy
+            sleep 45
+            
+            # Health check new deployment
+            NEW_CONTAINER=$(docker-compose ps -q backend | head -1)
+            docker exec $NEW_CONTAINER curl -f http://localhost:5000/api/health
+            
+            # If healthy, remove old container
+            docker-compose up -d --no-deps --scale backend=1 backend
+            
+            # Deploy frontend
+            docker-compose up -d frontend
+            
+            echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------------------------
+  # Health Check and Verification
+  # ---------------------------------------------------------------------------
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [validate, deploy]
+
+    steps:
+      - name: Wait for stabilization
+        run: sleep 30
+
+      - name: Health checks
+        run: |
+          # API health
+          curl -f https://${{ secrets.PRODUCTION_DOMAIN }}/api/health
+          
+          # Frontend accessible
+          curl -f https://${{ secrets.PRODUCTION_DOMAIN }}/
+          
+          echo "✅ All health checks passed"
+
+      - name: Verify version
+        run: |
+          DEPLOYED_VERSION=$(curl -s https://${{ secrets.PRODUCTION_DOMAIN }}/api/health | jq -r '.version // empty')
+          EXPECTED_VERSION="${{ needs.validate.outputs.version }}"
+          
+          if [ "$DEPLOYED_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "⚠️ Version mismatch: deployed=$DEPLOYED_VERSION, expected=$EXPECTED_VERSION"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Rollback on Failure
+  # ---------------------------------------------------------------------------
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: failure()
+
+    steps:
+      - name: Execute rollback
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/gold-factory
+            
+            echo "⚠️ Deployment failed, executing rollback..."
+            
+            # Rollback to previous version
+            ./scripts/rollback.sh production
+            
+            echo "✅ Rollback completed"
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: |
+            🚨 PRODUCTION ROLLBACK EXECUTED
+            Version: ${{ needs.validate.outputs.version }}
+            Triggered by: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ---------------------------------------------------------------------------
+  # Notifications
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [validate, deploy, verify]
+    if: always()
+
+    steps:
+      - name: Slack success notification
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: |
+            ✅ PRODUCTION DEPLOYMENT SUCCESSFUL
+            Version: v${{ needs.validate.outputs.version }}
+            Deployed by: ${{ github.actor }}
+            Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack failure notification
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: |
+            ❌ PRODUCTION DEPLOYMENT FAILED
+            Version: v${{ needs.validate.outputs.version }}
+            Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Create GitHub deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const success = '${{ needs.verify.result }}' === 'success';
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.runId,
+              state: success ? 'success' : 'failure',
+              environment_url: 'https://${{ secrets.PRODUCTION_DOMAIN }}',
+              description: success ? 'Deployment successful' : 'Deployment failed'
+            });

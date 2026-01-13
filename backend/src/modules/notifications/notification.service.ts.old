@@ -1,0 +1,367 @@
+/**
+ * ============================================
+ * NOTIFICATION SERVICE
+ * ============================================
+ * 
+ * Service for creating and managing notifications.
+ * Integrates with Socket.io for real-time delivery.
+ * 
+ * @author Gold Factory Dev Team
+ * @version 1.0.0
+ */
+
+import { PrismaClient, UserRole } from '@prisma/client';
+import { Server as SocketServer } from 'socket.io';
+import { logger } from '../../utils/logger';
+import {
+  NotificationType,
+  CreateNotificationDto,
+  BroadcastNotificationDto,
+  NotificationResponse,
+  NotificationFilters,
+  SOCKET_EVENTS,
+  NOTIFICATION_CONFIG,
+} from './notification.types';
+
+const prisma = new PrismaClient();
+
+// Socket.io server instance (set by socket setup)
+let io: SocketServer | null = null;
+
+/**
+ * Set the Socket.io server instance
+ */
+export const setSocketServer = (socketServer: SocketServer): void => {
+  io = socketServer;
+  logger.info('Socket.io server connected to notification service');
+};
+
+/**
+ * Get the Socket.io server instance
+ */
+export const getSocketServer = (): SocketServer | null => {
+  return io;
+};
+
+/**
+ * Create a notification for a single user
+ */
+export const createNotification = async (
+  dto: CreateNotificationDto
+): Promise<NotificationResponse> => {
+  const notification = await prisma.notification.create({
+    data: {
+      userId: dto.userId,
+      type: dto.type,
+      title: dto.title,
+      message: dto.message,
+      relatedId: dto.relatedId,
+    },
+  });
+
+  // Emit real-time notification via Socket.io
+  if (io) {
+    io.to(`user:${dto.userId}`).emit(SOCKET_EVENTS.NEW_NOTIFICATION, {
+      ...notification,
+      config: NOTIFICATION_CONFIG[dto.type as NotificationType],
+      metadata: dto.metadata,
+    });
+    logger.debug(`Notification emitted to user:${dto.userId}`);
+  }
+
+  return notification;
+};
+
+/**
+ * Create notifications for multiple users (broadcast)
+ */
+export const broadcastNotification = async (
+  dto: BroadcastNotificationDto
+): Promise<NotificationResponse[]> => {
+  const notifications = await Promise.all(
+    dto.userIds.map((userId) =>
+      createNotification({
+        userId,
+        type: dto.type,
+        title: dto.title,
+        message: dto.message,
+        relatedId: dto.relatedId,
+        metadata: dto.metadata,
+      })
+    )
+  );
+
+  return notifications;
+};
+
+/**
+ * Create notification for all users with specific role(s)
+ */
+export const notifyByRole = async (
+  roles: UserRole[],
+  dto: Omit<CreateNotificationDto, 'userId'>
+): Promise<NotificationResponse[]> => {
+  const users = await prisma.user.findMany({
+    where: {
+      role: { in: roles },
+      isActive: true,
+    },
+    select: { id: true },
+  });
+
+  return broadcastNotification({
+    userIds: users.map((u) => u.id),
+    type: dto.type,
+    title: dto.title,
+    message: dto.message,
+    relatedId: dto.relatedId,
+    metadata: dto.metadata,
+  });
+};
+
+/**
+ * Get notifications for a user
+ */
+export const getUserNotifications = async (
+  userId: string,
+  filters: NotificationFilters = {}
+): Promise<{ notifications: NotificationResponse[]; unreadCount: number }> => {
+  const { unreadOnly = false, type, limit = 50, offset = 0 } = filters;
+
+  const where: any = { userId };
+  if (unreadOnly) where.isRead = false;
+  if (type) where.type = type;
+
+  const [notifications, unreadCount] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.notification.count({
+      where: { userId, isRead: false },
+    }),
+  ]);
+
+  return { notifications, unreadCount };
+};
+
+/**
+ * Mark a notification as read
+ */
+export const markAsRead = async (
+  notificationId: string,
+  userId: string
+): Promise<NotificationResponse | null> => {
+  const notification = await prisma.notification.updateMany({
+    where: { id: notificationId, userId },
+    data: { isRead: true, readAt: new Date() },
+  });
+
+  if (notification.count === 0) {
+    return null;
+  }
+
+  const updated = await prisma.notification.findUnique({
+    where: { id: notificationId },
+  });
+
+  // Emit read event
+  if (io && updated) {
+    io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
+      notificationId,
+    });
+  }
+
+  return updated;
+};
+
+/**
+ * Mark all notifications as read for a user
+ */
+export const markAllAsRead = async (userId: string): Promise<number> => {
+  const result = await prisma.notification.updateMany({
+    where: { userId, isRead: false },
+    data: { isRead: true, readAt: new Date() },
+  });
+
+  // Emit clear event
+  if (io) {
+    io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATIONS_CLEAR, {
+      userId,
+    });
+  }
+
+  return result.count;
+};
+
+/**
+ * Delete old notifications (cleanup job)
+ */
+export const cleanupOldNotifications = async (
+  daysOld: number = 30
+): Promise<number> => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+  const result = await prisma.notification.deleteMany({
+    where: {
+      createdAt: { lt: cutoffDate },
+      isRead: true,
+    },
+  });
+
+  logger.info(`Cleaned up ${result.count} old notifications`);
+  return result.count;
+};
+
+// ============================================
+// ORDER EVENT NOTIFICATION HELPERS
+// ============================================
+
+/**
+ * Notify when an order is assigned to a department
+ */
+export const notifyOrderAssigned = async (
+  orderId: string,
+  orderNumber: string,
+  departmentName: string,
+  assignedToUserId?: string
+): Promise<void> => {
+  const message = `Order ${orderNumber} has been assigned to ${departmentName}`;
+
+  // Notify the assigned worker if specified
+  if (assignedToUserId) {
+    await createNotification({
+      userId: assignedToUserId,
+      type: NotificationType.ORDER_ASSIGNED,
+      title: 'New Order Assigned',
+      message,
+      relatedId: orderId,
+      metadata: { departmentName, orderNumber },
+    });
+  }
+
+  // Notify factory managers
+  await notifyByRole([UserRole.FACTORY_MANAGER], {
+    type: NotificationType.ORDER_ASSIGNED,
+    title: 'Order Assigned',
+    message,
+    relatedId: orderId,
+    metadata: { departmentName, orderNumber },
+  });
+};
+
+/**
+ * Notify when a department completes their work
+ */
+export const notifyDepartmentCompleted = async (
+  orderId: string,
+  orderNumber: string,
+  departmentName: string,
+  completedByUserId: string
+): Promise<void> => {
+  const message = `${departmentName} work completed for order ${orderNumber}`;
+
+  // Notify office staff and admins
+  await notifyByRole([UserRole.ADMIN, UserRole.OFFICE_STAFF], {
+    type: NotificationType.DEPARTMENT_COMPLETED,
+    title: 'Department Work Completed',
+    message,
+    relatedId: orderId,
+    metadata: { departmentName, orderNumber, completedBy: completedByUserId },
+  });
+};
+
+/**
+ * Notify when an order is overdue
+ */
+export const notifyOrderOverdue = async (
+  orderId: string,
+  orderNumber: string,
+  daysOverdue: number
+): Promise<void> => {
+  const message = `Order ${orderNumber} is ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue`;
+
+  // Notify admins, office staff, and factory managers
+  await notifyByRole(
+    [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    {
+      type: NotificationType.ORDER_OVERDUE,
+      title: 'Order Overdue',
+      message,
+      relatedId: orderId,
+      metadata: { orderNumber, daysOverdue },
+    }
+  );
+};
+
+/**
+ * Notify when an order is submitted from factory
+ */
+export const notifyOrderSubmitted = async (
+  orderId: string,
+  orderNumber: string,
+  submittedByUserId: string
+): Promise<void> => {
+  const message = `Order ${orderNumber} has been submitted from factory`;
+
+  // Notify office staff and admins
+  await notifyByRole([UserRole.ADMIN, UserRole.OFFICE_STAFF], {
+    type: NotificationType.ORDER_SUBMITTED,
+    title: 'Order Submitted',
+    message,
+    relatedId: orderId,
+    metadata: { orderNumber, submittedBy: submittedByUserId },
+  });
+};
+
+/**
+ * Notify due date reminder
+ */
+export const notifyDueDateReminder = async (
+  orderId: string,
+  orderNumber: string,
+  dueInDays: number,
+  currentDepartment: string
+): Promise<void> => {
+  const message =
+    dueInDays === 0
+      ? `Order ${orderNumber} is due today!`
+      : `Order ${orderNumber} is due in ${dueInDays} day${dueInDays > 1 ? 's' : ''}`;
+
+  const type =
+    dueInDays === 0
+      ? NotificationType.DUE_DATE_TODAY
+      : NotificationType.DUE_DATE_REMINDER;
+
+  // Notify everyone involved
+  await notifyByRole(
+    [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    {
+      type,
+      title: dueInDays === 0 ? 'Due Today!' : 'Due Date Reminder',
+      message,
+      relatedId: orderId,
+      metadata: { orderNumber, dueInDays, currentDepartment },
+    }
+  );
+};
+
+export default {
+  setSocketServer,
+  getSocketServer,
+  createNotification,
+  broadcastNotification,
+  notifyByRole,
+  getUserNotifications,
+  markAsRead,
+  markAllAsRead,
+  cleanupOldNotifications,
+  notifyOrderAssigned,
+  notifyDepartmentCompleted,
+  notifyOrderOverdue,
+  notifyOrderSubmitted,
+  notifyDueDateReminder,
+};

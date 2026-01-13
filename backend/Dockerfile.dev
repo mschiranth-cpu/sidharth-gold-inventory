@@ -1,0 +1,36 @@
+# =============================================================================
+# Gold Factory Inventory - Backend Development Dockerfile
+# =============================================================================
+# Development image with hot reload support
+# =============================================================================
+
+FROM node:20-alpine
+
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++ libc6-compat curl
+
+# Install development tools
+RUN npm install -g nodemon ts-node
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Expose ports
+# 5000 - API
+# 9229 - Node.js debugger
+EXPOSE 5000 9229
+
+# Development command with hot reload
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,783 @@
+openapi: 3.0.3
+info:
+  title: Gold Factory Inventory API
+  version: 1.0.0
+  description: |
+    RESTful API for the Gold Factory Inventory Tracking System.
+
+    ## Authentication
+    Most endpoints require JWT authentication via Bearer token.
+
+    ## Rate Limiting
+    - General: 100 requests/15 min
+    - Auth: 10 requests/15 min
+  contact:
+    name: Gold Factory Support
+    email: support@goldfactory.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: https://staging-api.goldfactory.com/api
+    description: Staging
+  - url: https://api.goldfactory.com/api
+    description: Production
+
+tags:
+  - name: Authentication
+  - name: Users
+  - name: Orders
+  - name: Departments
+  - name: Factory
+  - name: Notifications
+  - name: Reports
+
+paths:
+  # ============================================================================
+  # AUTHENTICATION
+  # ============================================================================
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      description: Authenticate user and receive JWT tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@goldfactory.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          description: Too many login attempts
+
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New tokens issued
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ============================================================================
+  # USERS
+  # ============================================================================
+  /users:
+    get:
+      tags: [Users]
+      summary: Get all users
+      description: Retrieve paginated list of users (Admin/Manager only)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [ADMIN, MANAGER, WORKER]
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Create a new user (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags: [Users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated
+    delete:
+      tags: [Users]
+      summary: Delete user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: User deleted
+
+  # ============================================================================
+  # ORDERS
+  # ============================================================================
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Get all orders
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, IN_PROGRESS, QUALITY_CHECK, COMPLETED, DELIVERED]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, URGENT]
+        - name: departmentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Search by order number or customer name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrders'
+    post:
+      tags: [Orders]
+      summary: Create order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+            example:
+              customerName: ABC Jewelers
+              product: Gold Necklace 22K
+              quantity: 5
+              goldWeight: 45.5
+              purity: '22K'
+              priority: HIGH
+              dueDate: '2024-02-15T00:00:00Z'
+              notes: Rush order - customer VIP
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+    put:
+      tags: [Orders]
+      summary: Update order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUpdate'
+      responses:
+        '200':
+          description: Order updated
+    delete:
+      tags: [Orders]
+      summary: Delete order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Order deleted
+
+  /orders/{id}/move:
+    post:
+      tags: [Orders]
+      summary: Move order to department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [departmentId]
+              properties:
+                departmentId:
+                  type: string
+                  format: uuid
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Order moved
+
+  # ============================================================================
+  # DEPARTMENTS
+  # ============================================================================
+  /departments:
+    get:
+      tags: [Departments]
+      summary: Get all departments
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+    post:
+      tags: [Departments]
+      summary: Create department
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, sequence]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                sequence:
+                  type: integer
+      responses:
+        '201':
+          description: Department created
+
+  # ============================================================================
+  # FACTORY TRACKING
+  # ============================================================================
+  /factory/kanban:
+    get:
+      tags: [Factory]
+      summary: Get Kanban board data
+      description: Get orders grouped by department for Kanban view
+      responses:
+        '200':
+          description: Kanban board data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Order'
+
+  /factory/inventory:
+    get:
+      tags: [Factory]
+      summary: Get inventory status
+      responses:
+        '200':
+          description: Current inventory
+
+  # ============================================================================
+  # NOTIFICATIONS
+  # ============================================================================
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Get user notifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of notifications
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+
+  # ============================================================================
+  # REPORTS
+  # ============================================================================
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      summary: Get dashboard statistics
+      responses:
+        '200':
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalOrders:
+                    type: integer
+                  pendingOrders:
+                    type: integer
+                  completedToday:
+                    type: integer
+                  totalGoldWeight:
+                    type: number
+
+  /reports/orders:
+    get:
+      tags: [Reports]
+      summary: Get orders report
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv, pdf]
+      responses:
+        '200':
+          description: Orders report
+
+  # ============================================================================
+  # HEALTH CHECK
+  # ============================================================================
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+
+# ============================================================================
+# COMPONENTS
+# ============================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, MANAGER, WORKER]
+        departmentId:
+          type: string
+          format: uuid
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UserCreate:
+      type: object
+      required: [email, password, name, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, MANAGER, WORKER]
+        departmentId:
+          type: string
+          format: uuid
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        departmentId:
+          type: string
+        isActive:
+          type: boolean
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        customerName:
+          type: string
+        product:
+          type: string
+        quantity:
+          type: integer
+        goldWeight:
+          type: number
+        purity:
+          type: string
+          enum: ['24K', '22K', '18K', '14K']
+        status:
+          type: string
+          enum: [PENDING, IN_PROGRESS, QUALITY_CHECK, COMPLETED, DELIVERED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, URGENT]
+        dueDate:
+          type: string
+          format: date-time
+        currentDepartmentId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderCreate:
+      type: object
+      required: [customerName, product, quantity, goldWeight, purity, dueDate]
+      properties:
+        customerName:
+          type: string
+        product:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        goldWeight:
+          type: number
+          minimum: 0.1
+        purity:
+          type: string
+          enum: ['24K', '22K', '18K', '14K']
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, URGENT]
+          default: MEDIUM
+        dueDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    OrderUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        priority:
+          type: string
+        notes:
+          type: string
+        currentDepartmentId:
+          type: string
+
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        sequence:
+          type: integer
+        isActive:
+          type: boolean
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    PaginatedOrders:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 10
+    SortParam:
+      name: sort
+      in: query
+      schema:
+        type: string
+
+security:
+  - bearerAuth: []

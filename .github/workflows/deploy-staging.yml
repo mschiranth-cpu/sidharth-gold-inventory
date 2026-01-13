@@ -1,0 +1,213 @@
+# =============================================================================
+# Deploy to Staging Workflow
+# =============================================================================
+# Trigger: Push to develop branch
+# - Runs tests
+# - Builds Docker images
+# - Pushes to container registry
+# - Deploys to staging server
+# - Runs smoke tests
+# - Sends Slack notification
+# =============================================================================
+
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  STAGING_HOST: ${{ secrets.STAGING_HOST }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Test Job
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: gold_factory_test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install and test backend
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/gold_factory_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_secret
+          JWT_REFRESH_SECRET: test_refresh
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          npm test
+
+      - name: Install and test frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm test
+
+  # ---------------------------------------------------------------------------
+  # Build and Push Job
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    
+    outputs:
+      backend_image: ${{ steps.meta-backend.outputs.tags }}
+      frontend_image: ${{ steps.meta-frontend.outputs.tags }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract backend metadata
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=staging-
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract frontend metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=staging-
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          build-args: |
+            VITE_API_URL=/api
+            VITE_APP_NAME=Gold Factory (Staging)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Deploy Job
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/gold-factory
+            
+            # Pull latest images
+            docker-compose pull
+            
+            # Backup database before deployment
+            ./scripts/backup.sh staging
+            
+            # Deploy with zero downtime
+            docker-compose up -d --remove-orphans
+            
+            # Wait for services to be healthy
+            sleep 30
+            
+            # Verify deployment
+            curl -f http://localhost:5000/api/health || exit 1
+
+      - name: Run smoke tests
+        run: |
+          # Wait for deployment to stabilize
+          sleep 10
+          
+          # Health check
+          curl -f https://${{ secrets.STAGING_DOMAIN }}/api/health
+          
+          # Basic endpoint checks
+          curl -f https://${{ secrets.STAGING_DOMAIN }}/api/auth/status || true
+
+  # ---------------------------------------------------------------------------
+  # Notify Job
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy]
+    if: always()
+
+    steps:
+      - name: Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+          text: |
+            Staging Deployment: ${{ needs.deploy.result }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()

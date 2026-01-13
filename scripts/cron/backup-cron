@@ -1,0 +1,35 @@
+# Gold Factory Backup Cron Configuration
+# Copy to /etc/cron.d/gold-factory-backup
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+BACKUP_DIR=/opt/gold-factory/backups
+SCRIPT_DIR=/opt/gold-factory/scripts
+
+# Environment variables
+BACKUP_S3_BUCKET=your-bucket-name
+CLOUD_PROVIDER=s3
+DB_HOST=localhost
+DB_NAME=gold_factory
+DB_USER=postgres
+
+# Daily database backup at 2:00 AM
+0 2 * * * root $SCRIPT_DIR/backup-db.sh production daily >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Weekly database backup on Sundays at 3:00 AM
+0 3 * * 0 root $SCRIPT_DIR/backup-db.sh production weekly >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Monthly database backup on 1st at 4:00 AM
+0 4 1 * * root $SCRIPT_DIR/backup-db.sh production monthly >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Daily files backup at 3:30 AM
+30 3 * * * root $SCRIPT_DIR/backup-files.sh production >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Backup verification daily at 6:00 AM
+0 6 * * * root $SCRIPT_DIR/backup-check.sh >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Monthly backup restore test on 15th at 5:00 AM
+0 5 15 * * root $SCRIPT_DIR/backup-test.sh staging >> $BACKUP_DIR/logs/cron.log 2>&1
+
+# Cleanup old logs weekly
+0 0 * * 0 root find $BACKUP_DIR/logs -name "*.log" -mtime +30 -delete

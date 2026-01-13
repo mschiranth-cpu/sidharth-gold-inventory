@@ -1,0 +1,53 @@
+{
+  "name": "gold-factory-inventory",
+  "version": "1.0.0",
+  "description": "Gold Factory Inventory Tracking System",
+  "private": true,
+  "scripts": {
+    "------- DOCKER COMMANDS -------": "",
+    "docker:build": "docker-compose build",
+    "docker:build:no-cache": "docker-compose build --no-cache",
+    "docker:up": "docker-compose up -d",
+    "docker:up:build": "docker-compose up -d --build",
+    "docker:down": "docker-compose down",
+    "docker:down:volumes": "docker-compose down -v",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:backend": "docker-compose logs -f backend",
+    "docker:logs:frontend": "docker-compose logs -f frontend",
+    "docker:ps": "docker-compose ps",
+    "docker:restart": "docker-compose restart",
+    "docker:stop": "docker-compose stop",
+    
+    "------- DOCKER DEV COMMANDS -------": "",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "docker:dev:tools": "docker-compose -f docker-compose.dev.yml --profile tools up",
+    
+    "------- DATABASE COMMANDS -------": "",
+    "docker:db:migrate": "docker-compose exec backend npx prisma migrate deploy",
+    "docker:db:studio": "docker-compose exec backend npx prisma studio",
+    "docker:db:seed": "docker-compose exec backend npx prisma db seed",
+    "docker:db:reset": "docker-compose exec backend npx prisma migrate reset --force",
+    
+    "------- MAINTENANCE COMMANDS -------": "",
+    "docker:clean": "docker system prune -f",
+    "docker:clean:all": "docker system prune -a -f --volumes",
+    "docker:shell:backend": "docker-compose exec backend sh",
+    "docker:shell:frontend": "docker-compose exec frontend sh",
+    "docker:shell:postgres": "docker-compose exec postgres psql -U postgres -d gold_factory"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/gold-factory-inventory.git"
+  },
+  "keywords": [
+    "gold",
+    "factory",
+    "inventory",
+    "tracking"
+  ],
+  "author": "Gold Factory Team",
+  "license": "MIT"
+}

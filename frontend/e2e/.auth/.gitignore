@@ -1,0 +1,4 @@
+# This directory stores authentication state for E2E tests
+# Do not commit actual auth files
+*.json
+!.gitkeep

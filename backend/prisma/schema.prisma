@@ -1,0 +1,580 @@
+// ============================================
+// GOLD JEWELRY ORDER TRACKING SYSTEM
+// Prisma Schema - PostgreSQL
+// Production Optimized with Indexes
+// ============================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  ADMIN
+  OFFICE_STAFF
+  FACTORY_MANAGER
+  DEPARTMENT_WORKER
+}
+
+enum OrderStatus {
+  DRAFT
+  IN_FACTORY
+  COMPLETED
+}
+
+enum DepartmentName {
+  CAD
+  PRINT
+  CASTING
+  FILLING
+  MEENA
+  POLISH_1
+  SETTING
+  POLISH_2
+  ADDITIONAL
+}
+
+enum DepartmentStatus {
+  PENDING_ASSIGNMENT
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum StoneType {
+  DIAMOND
+  RUBY
+  EMERALD
+  SAPPHIRE
+  PEARL
+  KUNDAN
+  POLKI
+  CZ
+  AMERICAN_DIAMOND
+  SEMI_PRECIOUS
+  OTHER
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id                    String               @id @default(uuid())
+  name                  String
+  email                 String               @unique
+  password              String               // Hashed password
+  role                  UserRole             @default(DEPARTMENT_WORKER)
+  department            DepartmentName?      // Which department they belong to (for workers)
+  phone                 String?
+  avatar                String?              // Profile photo URL
+  isActive              Boolean              @default(true)
+  lastLoginAt           DateTime?
+  availabilityStatus    String               @default("AVAILABLE") // AVAILABLE, BUSY, ON_LEAVE
+  lastAssignedAt        DateTime?            // When worker was last assigned an order
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relations
+  ordersCreated         Order[]              @relation("OrderCreatedBy")
+  orderDetailsEntered   OrderDetails[]       @relation("OrderDetailsEnteredBy")
+  departmentAssignments DepartmentTracking[] @relation("DepartmentAssignedTo")
+  finalSubmissions      FinalSubmission[]    @relation("FinalSubmittedBy")
+  activities            OrderActivity[]
+  notifications         Notification[]
+
+  // Indexes for frequent queries
+  @@index([email])
+  @@index([role])
+  @@index([department])
+  @@index([isActive])
+  @@index([role, isActive])
+  @@index([department, isActive])
+  @@index([createdAt(sort: Desc)])
+  @@map("users")
+}
+
+// ============================================
+// ORDER MANAGEMENT
+// ============================================
+
+model Order {
+  id              String       @id @default(uuid())
+  orderNumber     String       @unique // Auto-generated unique order number (e.g., ORD-2026-00001)
+  customerName    String
+  customerPhone   String?
+  customerEmail   String?
+  productPhotoUrl String?      // Main product reference photo
+  status          OrderStatus  @default(DRAFT)
+  priority        Int          @default(0) // Higher number = higher priority
+  
+  // Current department tracking
+  currentDepartment DepartmentName?  // Current department the order is in
+  
+  // Creator reference
+  createdById     String
+  createdBy       User         @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  
+  // Timestamps
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  completedAt     DateTime?    // When the order was completed
+
+  // Relations
+  orderDetails        OrderDetails?
+  stones              Stone[]
+  departmentTracking  DepartmentTracking[]
+  finalSubmission     FinalSubmission?
+  activities          OrderActivity[]
+  notifications       Notification[]
+
+  // Indexes for frequent queries
+  @@index([orderNumber])
+  @@index([status])
+  @@index([customerName])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([priority(sort: Desc)])
+  @@index([status, priority(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([createdById, status])
+  @@index([updatedAt(sort: Desc)])
+  @@index([currentDepartment])
+  @@index([completedAt])
+  @@map("orders")
+}
+
+// ============================================
+// ORDER DETAILS
+// ============================================
+
+model OrderDetails {
+  id                    String   @id @default(uuid())
+  
+  // Order reference
+  orderId               String   @unique
+  order                 Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Gold specifications
+  goldWeightInitial     Float?   // Initial gold weight in grams (optional - can be filled later)
+  purity                Float    // Purity in karats (e.g., 22, 18, 14)
+  goldColor             String?  // Yellow, White, Rose, etc.
+  metalType             String?  @default("GOLD") // GOLD, SILVER, PLATINUM
+  metalFinish           String?  // GoldFinish, SilverFinish, or PlatinumFinish enum value
+  customFinish          String?  // For "Other" finish option
+  
+  // Product specifications
+  size                  String?  // Ring size, bangle size, chain length, etc.
+  quantity              Int      @default(1)
+  productType           String?  // Ring, Necklace, Bangle, etc.
+  customProductType     String?  // For "Other" product type option
+  
+  // CAD/Design files
+  cadFiles              String[] // Array of CAD file URLs (.STL, .3DM, .DWG)
+  
+  // Hallmark Details (Legal requirement in India)
+  hallmarkRequired      Boolean  @default(true)
+  huidNumber            String?  // Hallmark Unique ID
+  bisHallmark           String?  // BIS Hallmark number
+  
+  // Pricing Details
+  makingChargeType      String?  // PER_GRAM, FLAT_RATE, PERCENTAGE
+  makingChargeValue     Float?   // Value based on type
+  wastagePercentage     Float?   // Estimated gold wastage %
+  laborCharges          Float?   // Additional labor costs
+  
+  // Manufacturing Instructions
+  meltingInstructions   String?  @db.Text // Alloy composition requirements
+  claspType             String?  // SPRING_RING, LOBSTER, TOGGLE, etc.
+  engravingText         String?  // Custom engraving text
+  polishType            String?  // HIGH_POLISH, MATTE, SANDBLAST, MIX
+  rhodiumPlating        Boolean  @default(false) // For white gold items
+  
+  // Certification
+  certificationRequired String?  // NONE, IGI, GIA, INTERNAL
+  
+  // Customer's Old Gold
+  usingCustomerGold     Boolean  @default(false)
+  customerGoldWeight    Float?   // Weight of customer's gold
+  customerGoldPurity    Float?   // Purity of customer's gold
+
+  // Logistics & Classification
+  deliveryMethod        String?  // STORE_PICKUP, COURIER, CUSTOMER_VISIT, HOME_DELIVERY
+  customerAddress       String?  @db.Text // Full delivery address
+  occasion              String?  // WEDDING, ENGAGEMENT, DAILY_WEAR, GIFT, ANNIVERSARY, FESTIVAL, OTHER
+  designCategory        String?  // TRADITIONAL, MODERN, FUSION, ANTIQUE, CONTEMPORARY, OTHER
+  warrantyPeriod        String?  // NONE, SIX_MONTHS, ONE_YEAR, TWO_YEARS, LIFETIME
+  exchangeAllowed       Boolean  @default(false)
+  paymentTerms          String?  // ADVANCE_FULL, ADVANCE_50, ON_DELIVERY, CUSTOM
+  advancePercentage     Float?   // Percentage advance if applicable
+  goldRateLocked        Boolean  @default(false)
+  expectedGoldRate      Float?   // Locked gold rate if applicable
+
+  // Price Estimation
+  estimatedGoldCost     Float?   // Estimated cost of gold
+  estimatedStoneCost    Float?   // Estimated cost of stones
+  estimatedMakingCharges Float?  // Estimated making charges
+  estimatedOtherCharges Float?   // Other charges (certification, etc.)
+  estimatedTotalCost    Float?   // Total estimated cost
+
+  // Template & Cloning
+  templateName          String?  // If saved as template
+  clonedFromOrderId     String?  // Reference to original order if cloned
+  
+  // Timeline
+  dueDate               DateTime
+  
+  // Additional info
+  additionalDescription String?  @db.Text
+  specialInstructions   String?  @db.Text
+  referenceImages       String[] // Array of reference image URLs
+  
+  // Tracking
+  enteredById           String
+  enteredBy             User     @relation("OrderDetailsEnteredBy", fields: [enteredById], references: [id])
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Indexes for frequent queries
+  @@index([orderId])
+  @@index([dueDate])
+  @@index([productType])
+  @@index([purity])
+  @@index([enteredById])
+  @@map("order_details")
+}
+
+// ============================================
+// STONES
+// ============================================
+
+model Stone {
+  id            String    @id @default(uuid())
+  
+  // Order reference
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Stone details
+  stoneType     StoneType
+  stoneName     String?   // Specific name if needed
+  customType    String?   // For "Other" stone type
+  weight        Float     // Weight in carats
+  quantity      Int       @default(1)
+  color         String?
+  clarity       String?
+  cut           String?
+  shape         String?   // Round, Princess, Oval, etc.
+  customShape   String?   // For "Other" shape
+  setting       String?   // Prong, Bezel, Channel, etc.
+  customSetting String?   // For "Other" setting
+  
+  // Notes
+  notes         String?   @db.Text
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([stoneType])
+  @@index([orderId, stoneType])
+  @@index([shape])
+  @@index([setting])
+  @@map("stones")
+}
+
+// ============================================
+// DEPARTMENT TRACKING
+// ============================================
+
+model DepartmentTracking {
+  id              String           @id @default(uuid())
+  
+  // Order reference
+  orderId         String
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Department info
+  departmentName  DepartmentName
+  sequenceOrder   Int              // Order of processing (1 = first department)
+  status          DepartmentStatus @default(NOT_STARTED)
+  
+  // Assignment
+  assignedToId    String?
+  assignedTo      User?            @relation("DepartmentAssignedTo", fields: [assignedToId], references: [id])
+  
+  // Queue management for auto-assignment
+  queuePosition   Int?             // Position in department queue (null = not queued)
+  queuedAt        DateTime?        // When order was added to queue
+  
+  // Gold tracking within department
+  goldWeightIn    Float?           // Gold weight when entering department
+  goldWeightOut   Float?           // Gold weight when leaving department
+  goldLoss        Float?           // Calculated loss (if any)
+  
+  // Timing
+  estimatedHours  Float?           // Estimated time to complete
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // Notes and photos
+  notes           String?          @db.Text
+  photos          String[]         // Array of work-in-progress photo URLs
+  issues          String?          @db.Text // Any issues encountered
+  
+  // Relation to work data
+  workData        DepartmentWorkData?
+  
+  // Timestamps
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([orderId, departmentName]) // Each department can only have one entry per order
+  // Indexes for frequent queries
+  @@index([orderId])
+  @@index([departmentName])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([startedAt])
+  @@index([departmentName, status])
+  @@index([assignedToId, status])
+  @@index([status, startedAt])
+  @@index([completedAt])
+  @@index([queuePosition])
+  @@index([departmentName, queuePosition])
+  @@map("department_tracking")
+}
+
+// ============================================
+// DEPARTMENT WORK DATA
+// ============================================
+
+model DepartmentWorkData {
+  id                    String             @id @default(uuid())
+  
+  // References
+  departmentTrackingId  String             @unique // One-to-one with DepartmentTracking
+  departmentTracking    DepartmentTracking @relation(fields: [departmentTrackingId], references: [id], onDelete: Cascade)
+  
+  // Form data (stored as JSON for flexibility)
+  formData              Json?              // All form field values
+  
+  // File uploads
+  uploadedFiles         Json?              // Array of file objects: [{name, url, type, size, uploadedAt}]
+  
+  // Photo uploads
+  uploadedPhotos        Json?              // Array of photo objects: [{name, url, type, uploadedAt}]
+  
+  // Work metadata
+  workStartedAt         DateTime?
+  workCompletedAt       DateTime?
+  timeSpent             Float?             // in hours
+  
+  // Validation and status
+  isComplete            Boolean            @default(false) // All required fields filled
+  isDraft               Boolean            @default(true)  // Still in draft mode
+  validationErrors      Json?              // Array of validation error messages
+  
+  // Auto-save
+  lastSavedAt           DateTime?
+  autoSaveData          Json?              // Temporary auto-saved data
+  
+  // Timestamps
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([departmentTrackingId])
+  @@index([isComplete])
+  @@index([isDraft])
+  @@index([workCompletedAt])
+  @@map("department_work_data")
+}
+
+// ============================================
+// FINAL SUBMISSION
+// ============================================
+
+model FinalSubmission {
+  id                 String   @id @default(uuid())
+  
+  // Order reference
+  orderId            String   @unique
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Final weights
+  finalGoldWeight    Float    // Final gold weight in grams
+  finalStoneWeight   Float    // Total stone weight in carats
+  finalPurity        Float    // Final purity in karats
+  
+  // Piece info
+  numberOfPieces     Int      @default(1)
+  totalWeight        Float?   // Total weight of finished piece(s)
+  
+  // Quality check
+  qualityGrade       String?  // A, B, C or custom grading
+  qualityNotes       String?  @db.Text
+  
+  // Photos
+  completionPhotos   String[] // Array of final product photo URLs
+  certificateUrl     String?  // Quality certificate if any
+  
+  // Submission info
+  submittedById      String
+  submittedBy        User     @relation("FinalSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt        DateTime @default(now())
+  
+  // Customer approval
+  customerApproved   Boolean  @default(false)
+  approvalDate       DateTime?
+  approvalNotes      String?
+  
+  // Timestamps
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([submittedById])
+  @@index([submittedAt(sort: Desc)])
+  @@index([customerApproved])
+  @@index([qualityGrade])
+  @@index([submittedById, submittedAt(sort: Desc)])
+  @@map("final_submissions")
+}
+
+// ============================================
+// ORDER ACTIVITY LOG (for order-specific tracking)
+// ============================================
+
+model OrderActivity {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  action      String   // 'STATUS_CHANGE', 'DEPT_MOVE', 'WORKER_ASSIGNED', 'FILE_UPLOADED'
+  title       String   // Human-readable action title
+  description String?  // Detailed description of what happened
+  userId      String?  // Who performed the action
+  user        User?    @relation(fields: [userId], references: [id])
+  metadata    Json?    // Additional data (old value, new value, etc.)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@index([orderId, createdAt(sort: Desc)])
+  @@map("order_activities")
+}
+
+// ============================================
+// AUDIT LOG (Optional - for tracking changes)
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   // 'Order', 'DepartmentTracking', etc.
+  entityId    String
+  action      String   // 'CREATE', 'UPDATE', 'DELETE'
+  userId      String
+  oldValues   Json?    // Previous values
+  newValues   Json?    // New values
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([action])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+// ============================================
+// NOTIFICATIONS SYSTEM
+// ============================================
+
+enum NotificationType {
+  // Worker notifications
+  NEW_ASSIGNMENT
+  WORK_APPROVED
+  WORK_REJECTED
+  URGENT_ASSIGNMENT
+  ORDER_CANCELLED
+  COMMENT_ADDED
+  
+  // Admin notifications
+  NEW_ORDER_CREATED
+  ORDER_COMPLETED
+  WORK_SUBMITTED
+  QUALITY_ISSUE
+  ORDER_DELAYED
+  DEPARTMENT_BLOCKED
+  WORKER_IDLE
+  PAYMENT_RECEIVED
+  DAILY_SUMMARY
+  
+  // Office Staff
+  CUSTOMER_INQUIRY
+  ORDER_READY
+  DUE_DATE_APPROACHING
+  PAYMENT_PENDING
+  DELIVERY_SCHEDULED
+  
+  // Factory Manager
+  DEPARTMENT_OVERLOAD
+  EQUIPMENT_ISSUE
+  WORKFLOW_CHANGE
+}
+
+enum NotificationPriority {
+  CRITICAL
+  IMPORTANT
+  INFO
+  SUCCESS
+}
+
+model Notification {
+  id          String               @id @default(uuid())
+  userId      String               // Who should receive the notification
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  priority    NotificationPriority @default(INFO)
+  title       String
+  message     String
+  orderId     String?              // Related order ID
+  order       Order?               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actionUrl   String?              // URL to navigate to when clicked
+  actionLabel String?              // "View Order", "Start Work", "Review", etc.
+  isRead      Boolean              @default(false)
+  readAt      DateTime?
+  createdAt   DateTime             @default(now())
+  expiresAt   DateTime?            // Auto-delete after this date
+  metadata    Json?                // Extra data (departmentId, workerId, etc.)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type])
+  @@index([orderId])
+  @@index([priority])
+  @@map("notifications")
+}

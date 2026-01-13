@@ -1,0 +1,111 @@
+/**
+ * ============================================
+ * NOTIFICATION TYPES
+ * ============================================
+ * 
+ * Type definitions for the notification system.
+ * 
+ * @author Gold Factory Dev Team
+ * @version 1.0.0
+ */
+
+export enum NotificationType {
+  // Order Events
+  ORDER_CREATED = 'ORDER_CREATED',
+  ORDER_ASSIGNED = 'ORDER_ASSIGNED',
+  ORDER_COMPLETED = 'ORDER_COMPLETED',
+  ORDER_OVERDUE = 'ORDER_OVERDUE',
+  ORDER_SUBMITTED = 'ORDER_SUBMITTED',
+  
+  // Department Events
+  DEPARTMENT_STARTED = 'DEPARTMENT_STARTED',
+  DEPARTMENT_COMPLETED = 'DEPARTMENT_COMPLETED',
+  DEPARTMENT_ASSIGNED = 'DEPARTMENT_ASSIGNED',
+  
+  // Due Date Events
+  DUE_DATE_REMINDER = 'DUE_DATE_REMINDER',
+  DUE_DATE_TODAY = 'DUE_DATE_TODAY',
+  
+  // System Events
+  SYSTEM_ALERT = 'SYSTEM_ALERT',
+}
+
+export interface NotificationPayload {
+  type: NotificationType;
+  title: string;
+  message: string;
+  relatedId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CreateNotificationDto {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  relatedId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface BroadcastNotificationDto {
+  userIds: string[];
+  type: NotificationType;
+  title: string;
+  message: string;
+  relatedId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationResponse {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedId: string | null;
+  isRead: boolean;
+  readAt: Date | null;
+  createdAt: Date;
+}
+
+export interface NotificationFilters {
+  unreadOnly?: boolean;
+  type?: NotificationType;
+  limit?: number;
+  offset?: number;
+}
+
+// Socket Events
+export const SOCKET_EVENTS = {
+  // Connection events
+  CONNECTION: 'connection',
+  DISCONNECT: 'disconnect',
+  
+  // Notification events
+  NEW_NOTIFICATION: 'new_notification',
+  NOTIFICATION_READ: 'notification_read',
+  NOTIFICATIONS_CLEAR: 'notifications_clear',
+  
+  // Room events
+  JOIN_USER_ROOM: 'join_user_room',
+  LEAVE_USER_ROOM: 'leave_user_room',
+  
+  // Order events (for real-time updates)
+  ORDER_UPDATED: 'order_updated',
+  DEPARTMENT_STATUS_CHANGED: 'department_status_changed',
+} as const;
+
+// Notification Icon and Color mapping
+export const NOTIFICATION_CONFIG: Record<NotificationType, { icon: string; color: string; priority: number }> = {
+  [NotificationType.ORDER_CREATED]: { icon: 'plus-circle', color: 'green', priority: 1 },
+  [NotificationType.ORDER_ASSIGNED]: { icon: 'user-plus', color: 'blue', priority: 2 },
+  [NotificationType.ORDER_COMPLETED]: { icon: 'check-circle', color: 'green', priority: 2 },
+  [NotificationType.ORDER_OVERDUE]: { icon: 'alert-triangle', color: 'red', priority: 5 },
+  [NotificationType.ORDER_SUBMITTED]: { icon: 'send', color: 'purple', priority: 3 },
+  [NotificationType.DEPARTMENT_STARTED]: { icon: 'play', color: 'amber', priority: 2 },
+  [NotificationType.DEPARTMENT_COMPLETED]: { icon: 'check', color: 'green', priority: 2 },
+  [NotificationType.DEPARTMENT_ASSIGNED]: { icon: 'user', color: 'blue', priority: 3 },
+  [NotificationType.DUE_DATE_REMINDER]: { icon: 'clock', color: 'orange', priority: 4 },
+  [NotificationType.DUE_DATE_TODAY]: { icon: 'calendar', color: 'red', priority: 5 },
+  [NotificationType.SYSTEM_ALERT]: { icon: 'info', color: 'gray', priority: 1 },
+};
