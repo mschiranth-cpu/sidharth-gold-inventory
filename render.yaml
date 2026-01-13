@@ -3,7 +3,6 @@
 databases:
   - name: gold-factory-db
     databaseName: gold_factory
-    plan: starter
 
 services:
   # Backend API
@@ -11,7 +10,7 @@ services:
     name: gold-factory-backend
     runtime: node
     region: singapore
-    plan: starter
+    plan: free
     buildCommand: cd backend && npm install && npx prisma generate && npm run build
     startCommand: cd backend && npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
@@ -37,16 +36,11 @@ services:
       - key: FRONTEND_URL
         sync: false
     autoDeploy: true
-    disk:
-      name: uploads
-      mountPath: /app/backend/uploads
-      sizeGB: 10
 
   # Frontend Static Site
   - type: web
     name: gold-factory-frontend
     runtime: static
-    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     pullRequestPreviewsEnabled: true
