@@ -73,6 +73,8 @@ export interface DepartmentRequirement {
   commonMistakes: string[];
   estimatedTime?: string; // e.g., "2-3 hours"
   requiredTools?: string[];
+  isComingSoon?: boolean; // Feature flag for departments under development
+  comingSoonMessage?: string; // Custom message to display when feature is disabled
 }
 
 // ============================================
@@ -98,14 +100,6 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
         required: true,
         options: ['Rhino 3D', 'Matrix', 'JewelCAD', 'Blender', 'Other'],
         helpText: 'Select the primary software used for this design',
-      },
-      {
-        name: 'designComplexity',
-        label: 'Design Complexity',
-        type: 'select',
-        required: true,
-        options: ['Simple', 'Medium', 'Complex', 'Very Complex'],
-        helpText: 'Rate the complexity of the design',
       },
       {
         name: 'modelWeight',
@@ -230,7 +224,7 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
         name: 'technicalDrawing',
         label: 'Technical Drawing (PDF)',
         description: 'Detailed technical drawing with dimensions',
-        required: true,
+        required: false,
         acceptedFormats: ['.pdf'],
         maxSize: 10,
       },
@@ -256,123 +250,65 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
   },
 
   // ============================================
-  // 2. 3D PRINTING LAB
+  // 2. 3D PRINTING LAB (OUTSOURCED)
   // ============================================
   '3D_PRINTING': {
     departmentId: '3D_PRINTING',
     departmentName: '3D Printing Lab',
-    description: 'Print wax models or resin patterns using 3D printing technology',
-    estimatedTime: '4-8 hours (including print time)',
-    requiredTools: ['3D Printer', 'Resin/Wax Material', 'Supports', 'Cleaning Solution'],
+    description: 'Outsource 3D printing to external printing company',
+    estimatedTime: '1-2 days (outsourced)',
+    requiredTools: [],
+    isComingSoon: true, // Feature flag - when enabled, shows advanced in-house printing fields
+    comingSoonMessage:
+      'Advanced in-house 3D printing features (printer settings, materials, etc.) are coming soon. Currently using simplified outsourcing workflow.',
 
     formFields: [
       {
-        name: 'printerUsed',
-        label: 'Printer Model',
-        type: 'select',
+        name: 'outsourcedCompany',
+        label: 'Printing Company Name',
+        type: 'text',
         required: true,
-        options: ['Formlabs Form 3', 'EnvisionTEC', 'Solidscape', 'Other'],
-        helpText: 'Which 3D printer was used',
+        placeholder: 'Enter the name of the printing company',
+        helpText: 'Name of the external company handling the 3D printing',
       },
       {
-        name: 'material',
-        label: 'Material Type',
-        type: 'select',
-        required: true,
-        options: ['Castable Resin', 'Castable Wax', 'Standard Resin', 'Other'],
-        helpText: 'Type of printing material used',
-      },
-      {
-        name: 'layerHeight',
-        label: 'Layer Height (microns)',
+        name: 'receivedWeight',
+        label: 'Received Model Weight (grams)',
         type: 'number',
         required: true,
-        min: 10,
-        max: 100,
-        placeholder: 'e.g., 50',
-        helpText: 'Layer resolution used for printing',
-      },
-      {
-        name: 'printTime',
-        label: 'Total Print Time (hours)',
-        type: 'number',
-        required: true,
-        min: 0.5,
-        max: 48,
-        placeholder: 'e.g., 6.5',
-      },
-      {
-        name: 'supportStructure',
-        label: 'Support Structure',
-        type: 'select',
-        required: true,
-        options: ['Auto-generated', 'Manual', 'Minimal', 'Heavy'],
-        helpText: 'Type of support structure used',
-      },
-      {
-        name: 'postProcessing',
-        label: 'Post-Processing Steps',
-        type: 'textarea',
-        required: true,
-        placeholder: 'Describe cleaning, curing, support removal...',
-        minLength: 20,
-        maxLength: 500,
-      },
-      {
-        name: 'qualityCheck',
-        label: 'Quality Check Passed',
-        type: 'checkbox',
-        required: true,
-        helpText: 'Confirm model printed without defects',
+        min: 0.1,
+        max: 1000,
+        placeholder: 'e.g., 25.5',
+        helpText: 'Weight of the printed model after receiving from vendor',
       },
     ],
 
     photoRequirements: [
       {
-        name: 'printedModel',
-        label: 'Printed Model',
-        description: 'Photo of the completed 3D printed model',
+        name: 'receivedModel',
+        label: 'Received Printed Model',
+        description: 'Photos of the printed model received from the vendor',
         required: true,
         minCount: 2,
-        maxCount: 4,
-      },
-      {
-        name: 'detailShots',
-        label: 'Detail Shots',
-        description: 'Close-up photos showing print quality and details',
-        required: true,
-        minCount: 1,
-        maxCount: 3,
+        maxCount: 2,
       },
     ],
 
-    fileRequirements: [
-      {
-        name: 'printSettings',
-        label: 'Print Settings File',
-        description: 'Export of printer settings used (.form, .config, or PDF)',
-        required: false,
-        acceptedFormats: ['.form', '.config', '.pdf', '.txt'],
-        maxSize: 5,
-      },
-    ],
+    fileRequirements: [],
 
     tips: [
-      'Always check resin levels before starting long prints',
-      'Verify model orientation for minimal supports',
-      'Clean the print immediately after completion',
-      'Cure resin models properly (UV chamber)',
-      'Inspect for print failures before removing supports',
-      'Document any print issues for future reference',
+      'Verify the printing company has good reviews and quality standards',
+      'Check the received model for any defects or damage',
+      'Weigh the model accurately upon receipt',
+      'Take clear photos from multiple angles',
+      'Communicate any quality issues to the vendor immediately',
     ],
 
     commonMistakes: [
-      'Not orienting model optimally for supports',
-      'Using expired or contaminated resin',
-      'Insufficient post-curing time',
-      'Damaging model during support removal',
-      'Not cleaning IPA residue properly',
-      'Skipping quality inspection',
+      'Not inspecting the model thoroughly upon receipt',
+      'Forgetting to document the vendor name',
+      'Not taking required photos before proceeding',
+      'Accepting damaged or defective prints',
     ],
   },
 
@@ -415,15 +351,16 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
       {
         name: 'flaskSize',
         label: 'Flask Size',
-        type: 'select',
+        type: 'text',
         required: true,
-        options: ['Small (2.5")', 'Medium (3")', 'Large (4")', 'Extra Large (5")'],
+        placeholder: 'e.g., 3" or Medium',
+        helpText: 'Enter the flask size used for casting',
       },
       {
         name: 'burnoutTemp',
         label: 'Burnout Temperature (°C)',
         type: 'number',
-        required: true,
+        required: false,
         min: 400,
         max: 800,
         placeholder: 'e.g., 650',
@@ -432,7 +369,7 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
         name: 'burnoutTime',
         label: 'Burnout Time (hours)',
         type: 'number',
-        required: true,
+        required: false,
         min: 4,
         max: 24,
         placeholder: 'e.g., 8',
@@ -441,7 +378,7 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
         name: 'castingTemp',
         label: 'Casting Temperature (°C)',
         type: 'number',
-        required: true,
+        required: false,
         min: 800,
         max: 1200,
         placeholder: 'e.g., 1050',
@@ -450,9 +387,8 @@ export const DEPARTMENT_REQUIREMENTS: Record<string, DepartmentRequirement> = {
         name: 'castingNotes',
         label: 'Casting Notes',
         type: 'textarea',
-        required: true,
+        required: false,
         placeholder: 'Any issues, observations, or special procedures...',
-        minLength: 20,
         maxLength: 500,
       },
       {

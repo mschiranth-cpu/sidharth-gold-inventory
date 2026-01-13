@@ -46,6 +46,7 @@ export interface StoneInput {
  */
 export interface OrderDetailsInput {
   goldWeightInitial?: number;
+  netWeight?: number;
   purity: number;
   goldColor?: string;
   metalType?: 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -55,6 +56,7 @@ export interface OrderDetailsInput {
   quantity?: number;
   productType?: string;
   customProductType?: string;
+  productSpecifications?: ProductSpecifications;
   dueDate: string | Date;
   additionalDescription?: string;
   specialInstructions?: string;
@@ -103,6 +105,212 @@ export interface OrderDetailsInput {
   templateName?: string;
   clonedFromOrderId?: string;
 }
+
+// ============================================
+// PRODUCT SPECIFICATIONS TYPES
+// ============================================
+
+/**
+ * Ring specifications
+ */
+export interface RingSpecifications {
+  size?: string;
+  customSize?: string;
+  ringStyle?: string;
+  customRingStyle?: string;
+  bandWidth?: number;
+  bandThickness?: number;
+  isResizable?: boolean;
+  engraving?: string;
+}
+
+/**
+ * Necklace specifications
+ */
+export interface NecklaceSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: string;
+  customClaspType?: string;
+  chainThickness?: number;
+  layered?: boolean;
+  numberOfLayers?: number;
+  adjustableLength?: boolean;
+}
+
+/**
+ * Earrings specifications
+ */
+export interface EarringsSpecifications {
+  backType?: string;
+  customBackType?: string;
+  earringsStyle?: string;
+  customEarringsStyle?: string;
+  dropLength?: number;
+  isPair?: boolean;
+  isMatching?: boolean;
+}
+
+/**
+ * Bangles specifications
+ */
+export interface BanglesSpecifications {
+  size?: string;
+  customSize?: string;
+  openingType?: string;
+  customOpeningType?: string;
+  width?: number;
+  thickness?: number;
+  quantity?: number;
+  isSet?: boolean;
+}
+
+/**
+ * Bracelet specifications
+ */
+export interface BraceletSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: string;
+  customClaspType?: string;
+  width?: number;
+  thickness?: number;
+  isAdjustable?: boolean;
+  charmAttachments?: boolean;
+}
+
+/**
+ * Pendant specifications
+ */
+export interface PendantSpecifications {
+  length?: number;
+  width?: number;
+  thickness?: number;
+  bailType?: string;
+  customBailType?: string;
+  includesChain?: boolean;
+  chainLength?: string;
+  customChainLength?: string;
+}
+
+/**
+ * Chain specifications
+ */
+export interface ChainSpecifications {
+  length?: string;
+  customLength?: string;
+  linkStyle?: string;
+  customLinkStyle?: string;
+  thickness?: number;
+  claspType?: string;
+  customClaspType?: string;
+  isAdjustable?: boolean;
+}
+
+/**
+ * Anklet specifications
+ */
+export interface AnkletSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: string;
+  customClaspType?: string;
+  thickness?: number;
+  charmAttachments?: boolean;
+  isAdjustable?: boolean;
+}
+
+/**
+ * Mangalsutra specifications
+ */
+export interface MangalsutraSpecifications {
+  length?: string;
+  customLength?: string;
+  style?: string;
+  customStyle?: string;
+}
+
+/**
+ * Nose Pin specifications
+ */
+export interface NosePinSpecifications {
+  type?: string;
+  customType?: string;
+  gaugeSize?: string;
+  customGaugeSize?: string;
+}
+
+/**
+ * Maang Tikka specifications
+ */
+export interface MaangTikkaSpecifications {
+  style?: string;
+  customStyle?: string;
+  length?: number;
+}
+
+/**
+ * Waist Chain specifications
+ */
+export interface WaistChainSpecifications {
+  length?: string;
+  customLength?: string;
+}
+
+/**
+ * Toe Ring specifications
+ */
+export interface ToeRingSpecifications {
+  size?: string;
+  customSize?: string;
+  isPair?: boolean;
+}
+
+/**
+ * Brooch specifications
+ */
+export interface BroochSpecifications {
+  style?: string;
+  customStyle?: string;
+  size?: number;
+}
+
+/**
+ * Cufflinks specifications
+ */
+export interface CufflinksSpecifications {
+  style?: string;
+  customStyle?: string;
+  size?: number;
+}
+
+/**
+ * Other product specifications
+ */
+export interface OtherSpecifications {
+  description?: string;
+}
+
+/**
+ * Union type for all product specifications
+ */
+export type ProductSpecifications =
+  | RingSpecifications
+  | NecklaceSpecifications
+  | EarringsSpecifications
+  | BanglesSpecifications
+  | BraceletSpecifications
+  | PendantSpecifications
+  | ChainSpecifications
+  | AnkletSpecifications
+  | MangalsutraSpecifications
+  | NosePinSpecifications
+  | MaangTikkaSpecifications
+  | WaistChainSpecifications
+  | ToeRingSpecifications
+  | BroochSpecifications
+  | CufflinksSpecifications
+  | OtherSpecifications;
 
 /**
  * Create order request body
@@ -176,6 +384,7 @@ export interface OrderDetailsResponse {
   quantity: number;
   productType: string | null;
   customProductType: string | null;
+  productSpecifications: ProductSpecifications | null;
   dueDate: Date;
   additionalDescription: string | null;
   specialInstructions: string | null;

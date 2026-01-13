@@ -13,13 +13,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import {
-  XMarkIcon,
-  CloudArrowUpIcon,
-  PhotoIcon,
-  DocumentIcon,
-  TrashIcon,
-} from '@heroicons/react/24/outline';
+import { XMarkIcon, CloudArrowUpIcon, DocumentIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { ordersService } from '../../modules/orders/services';
 
 interface FileUploadModalProps {

@@ -101,13 +101,14 @@ const DepartmentsPage: React.FC = () => {
 
   // Fetch orders to calculate department workload
   // Backend limits to max 100 per request
+  // Include both IN_FACTORY and COMPLETED orders to show full statistics
   const { data: ordersResponse, isLoading } = useQuery({
-    queryKey: ['orders', 'in-factory'],
+    queryKey: ['orders', 'all-factory'],
     queryFn: () =>
       ordersService.getAll({
         page: 1,
         limit: 100,
-        filters: { status: 'IN_FACTORY' },
+        // Don't filter by status - get all orders to show complete statistics
       }),
     refetchInterval: 30000,
   });
@@ -132,11 +133,28 @@ const DepartmentsPage: React.FC = () => {
     });
 
     if (ordersResponse?.data) {
-      ordersResponse.data.forEach((order: { currentDepartment?: string }) => {
-        const currentDept = order.currentDepartment as DepartmentName;
-        if (currentDept && stats[currentDept]) {
-          stats[currentDept].inProgress++;
-          stats[currentDept].totalOrders++;
+      ordersResponse.data.forEach((order: any) => {
+        // Check departmentTracking array for each department
+        if (order.departmentTracking && Array.isArray(order.departmentTracking)) {
+          order.departmentTracking.forEach((tracking: any) => {
+            const deptName = tracking.departmentName as DepartmentName;
+            if (stats[deptName]) {
+              // Count based on department status
+              if (tracking.status === 'IN_PROGRESS') {
+                stats[deptName].inProgress++;
+                stats[deptName].totalOrders++;
+              } else if (tracking.status === 'COMPLETED') {
+                stats[deptName].completed++;
+                stats[deptName].totalOrders++;
+              } else if (
+                tracking.status === 'NOT_STARTED' ||
+                tracking.status === 'PENDING_ASSIGNMENT'
+              ) {
+                stats[deptName].pending++;
+                stats[deptName].totalOrders++;
+              }
+            }
+          });
         }
       });
     }

@@ -360,6 +360,7 @@ const EditOrderPage: React.FC = () => {
           quantity: goldDetails.quantity || 1,
           productType: goldDetails.productType || undefined,
           customProductType: goldDetails.customProductType || undefined,
+          productSpecifications: goldDetails.productSpecifications || undefined,
           dueDate: additionalInfo.dueDate?.toISOString() || undefined,
           additionalDescription: additionalInfo.description || undefined,
           specialInstructions: additionalInfo.specialInstructions || undefined,

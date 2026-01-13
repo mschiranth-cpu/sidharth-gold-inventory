@@ -21,10 +21,12 @@ import {
   XMarkIcon,
   EyeIcon,
   EyeSlashIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import AlertDialog from '../../components/common/AlertDialog';
+import { DepartmentFeatureToggle } from '../../components/admin/DepartmentFeatureToggle';
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -301,6 +303,22 @@ const SettingsPage: React.FC = () => {
                 </option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Department Features (Admin Only) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <Cog6ToothIcon className="h-6 w-6 text-gray-600" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Department Features</h2>
+                <p className="text-xs text-gray-500">Admin controls for department workflows</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <DepartmentFeatureToggle />
           </div>
         </div>
 

@@ -249,6 +249,252 @@ export enum OrderStatus {
 }
 
 // ============================================
+// PRODUCT-SPECIFIC SPECIFICATION ENUMS
+// ============================================
+
+// Ring Specifications
+export enum RingSize {
+  SIZE_4 = '4',
+  SIZE_4_5 = '4.5',
+  SIZE_5 = '5',
+  SIZE_5_5 = '5.5',
+  SIZE_6 = '6',
+  SIZE_6_5 = '6.5',
+  SIZE_7 = '7',
+  SIZE_7_5 = '7.5',
+  SIZE_8 = '8',
+  SIZE_8_5 = '8.5',
+  SIZE_9 = '9',
+  SIZE_9_5 = '9.5',
+  SIZE_10 = '10',
+  SIZE_10_5 = '10.5',
+  SIZE_11 = '11',
+  SIZE_11_5 = '11.5',
+  SIZE_12 = '12',
+  FREE_SIZE = 'FREE_SIZE',
+  ADJUSTABLE = 'ADJUSTABLE',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum RingStyleType {
+  SOLITAIRE = 'SOLITAIRE',
+  HALO = 'HALO',
+  THREE_STONE = 'THREE_STONE',
+  ETERNITY_BAND = 'ETERNITY_BAND',
+  COCKTAIL = 'COCKTAIL',
+  SIGNET = 'SIGNET',
+  STACKABLE = 'STACKABLE',
+  STATEMENT = 'STATEMENT',
+  TRADITIONAL = 'TRADITIONAL',
+  CONTEMPORARY = 'CONTEMPORARY',
+  VINTAGE = 'VINTAGE',
+  CUSTOM = 'CUSTOM',
+}
+
+// Necklace & Chain Specifications
+export enum NecklaceLength {
+  CHOKER_14_16 = '14-16 inches (Choker)',
+  PRINCESS_17_19 = '17-19 inches (Princess)',
+  MATINEE_20_24 = '20-24 inches (Matinee)',
+  OPERA_28_34 = '28-34 inches (Opera)',
+  ROPE_35_PLUS = '35+ inches (Rope)',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum ChainLength {
+  INCHES_16 = '16',
+  INCHES_18 = '18',
+  INCHES_20 = '20',
+  INCHES_22 = '22',
+  INCHES_24 = '24',
+  INCHES_26 = '26',
+  INCHES_28 = '28',
+  INCHES_30 = '30',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum LinkStyle {
+  CABLE = 'CABLE',
+  ROPE = 'ROPE',
+  BOX = 'BOX',
+  FIGARO = 'FIGARO',
+  CURB = 'CURB',
+  SINGAPORE = 'SINGAPORE',
+  WHEAT = 'WHEAT',
+  SNAKE = 'SNAKE',
+  BALL = 'BALL',
+  PAPERCLIP = 'PAPERCLIP',
+  HERRINGBONE = 'HERRINGBONE',
+  BYZANTINE = 'BYZANTINE',
+  CUSTOM = 'CUSTOM',
+}
+
+// Earrings Specifications
+export enum EarringsBackType {
+  PUSH_BACK = 'PUSH_BACK',
+  SCREW_BACK = 'SCREW_BACK',
+  LEVER_BACK = 'LEVER_BACK',
+  HOOK = 'HOOK',
+  HOOP = 'HOOP',
+  CLIP_ON = 'CLIP_ON',
+  MAGNETIC = 'MAGNETIC',
+  HUGGIE = 'HUGGIE',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum EarringsStyle {
+  STUD = 'STUD',
+  DROP = 'DROP',
+  DANGLE = 'DANGLE',
+  HOOP = 'HOOP',
+  HUGGIE = 'HUGGIE',
+  CHANDELIER = 'CHANDELIER',
+  JHUMKA = 'JHUMKA',
+  CLUSTER = 'CLUSTER',
+  CONTEMPORARY = 'CONTEMPORARY',
+  TRADITIONAL = 'TRADITIONAL',
+  CUSTOM = 'CUSTOM',
+}
+
+// Bangles & Bracelet Specifications
+export enum BangleSize {
+  SIZE_2_2 = '2.2',
+  SIZE_2_4 = '2.4',
+  SIZE_2_6 = '2.6',
+  SIZE_2_8 = '2.8',
+  SIZE_2_10 = '2.10',
+  SIZE_2_12 = '2.12',
+  FREE_SIZE = 'FREE_SIZE',
+  ADJUSTABLE = 'ADJUSTABLE',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum BangleOpeningType {
+  SCREW = 'SCREW',
+  HINGE = 'HINGE',
+  HOOK = 'HOOK',
+  CLOSED = 'CLOSED',
+  FLEXIBLE = 'FLEXIBLE',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum BraceletSize {
+  SIZE_6_5 = '6.5',
+  SIZE_7 = '7',
+  SIZE_7_5 = '7.5',
+  SIZE_8 = '8',
+  SIZE_8_5 = '8.5',
+  SIZE_9 = '9',
+  ADJUSTABLE = 'ADJUSTABLE',
+  CUSTOM = 'CUSTOM',
+}
+
+// Pendant & Bail Type
+export enum BailType {
+  FIXED = 'FIXED',
+  SLIDING = 'SLIDING',
+  HINGED = 'HINGED',
+  SCREW_TOP = 'SCREW_TOP',
+  HIDDEN = 'HIDDEN',
+  JUMP_RING = 'JUMP_RING',
+  CUSTOM = 'CUSTOM',
+}
+
+// Nose Pin Specifications
+export enum NosePinType {
+  STUD = 'STUD',
+  L_SHAPE = 'L_SHAPE',
+  SCREW = 'SCREW',
+  HOOP = 'HOOP',
+  BONE = 'BONE',
+  FISHTAIL = 'FISHTAIL',
+  NOSE_RING = 'NOSE_RING',
+  NATH = 'NATH',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum GaugeSize {
+  GAUGE_20 = '20G (0.8mm)',
+  GAUGE_18 = '18G (1.0mm)',
+  GAUGE_16 = '16G (1.2mm)',
+  GAUGE_14 = '14G (1.6mm)',
+  CUSTOM = 'CUSTOM',
+}
+
+// Anklet Specifications
+export enum AnkletLength {
+  INCHES_9 = '9',
+  INCHES_9_5 = '9.5',
+  INCHES_10 = '10',
+  INCHES_10_5 = '10.5',
+  INCHES_11 = '11',
+  ADJUSTABLE = 'ADJUSTABLE',
+  CUSTOM = 'CUSTOM',
+}
+
+// Mangalsutra Specifications
+export enum MangalsutraLength {
+  SHORT_18_20 = '18-20 inches (Short)',
+  MEDIUM_22_24 = '22-24 inches (Medium)',
+  LONG_26_30 = '26-30 inches (Long)',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum MangalsutraStyle {
+  SINGLE_LINE = 'SINGLE_LINE',
+  DOUBLE_LINE = 'DOUBLE_LINE',
+  TRIPLE_LINE = 'TRIPLE_LINE',
+  VATI_STYLE = 'VATI_STYLE',
+  MODERN = 'MODERN',
+  TRADITIONAL = 'TRADITIONAL',
+  CUSTOM = 'CUSTOM',
+}
+
+// Maang Tikka Specifications
+export enum MaangTikkaStyle {
+  TRADITIONAL = 'TRADITIONAL',
+  CONTEMPORARY = 'CONTEMPORARY',
+  CHAND_BALI = 'CHAND_BALI',
+  PASSA_STYLE = 'PASSA_STYLE',
+  MATHA_PATTI = 'MATHA_PATTI',
+  MINIMAL = 'MINIMAL',
+  STATEMENT = 'STATEMENT',
+  CUSTOM = 'CUSTOM',
+}
+
+// Waist Chain Specifications
+export enum WaistChainLength {
+  SMALL_28_32 = '28-32 inches (Small)',
+  MEDIUM_34_38 = '34-38 inches (Medium)',
+  LARGE_40_44 = '40-44 inches (Large)',
+  ADJUSTABLE = 'ADJUSTABLE',
+  CUSTOM = 'CUSTOM',
+}
+
+// Cufflinks Specifications
+export enum CufflinksStyle {
+  CLASSIC_TOGGLE = 'CLASSIC_TOGGLE',
+  BULLET_BACK = 'BULLET_BACK',
+  WHALE_BACK = 'WHALE_BACK',
+  CHAIN_LINK = 'CHAIN_LINK',
+  STUD = 'STUD',
+  MODERN = 'MODERN',
+  TRADITIONAL = 'TRADITIONAL',
+  CUSTOM = 'CUSTOM',
+}
+
+// Brooch Specifications
+export enum BroochStyle {
+  PIN_BACK = 'PIN_BACK',
+  SAFETY_CATCH = 'SAFETY_CATCH',
+  MAGNETIC = 'MAGNETIC',
+  TRADITIONAL = 'TRADITIONAL',
+  CONTEMPORARY = 'CONTEMPORARY',
+  STATEMENT = 'STATEMENT',
+  CUSTOM = 'CUSTOM',
+}
+
+// ============================================
 // FORM STEP TYPES
 // ============================================
 
@@ -257,6 +503,186 @@ export interface ImagePreview {
   file: File;
   preview: string;
 }
+
+// ============================================
+// PRODUCT-SPECIFIC SPECIFICATIONS INTERFACES
+// ============================================
+
+export interface RingSpecifications {
+  size?: string;
+  customSize?: string;
+  ringStyle?: string;
+  customRingStyle?: string;
+  bandWidth?: number;
+  bandThickness?: number;
+  isResizable?: boolean;
+  engraving?: string;
+}
+
+export interface NecklaceSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: ClaspType;
+  customClaspType?: string;
+  chainThickness?: number;
+  layered?: boolean;
+  numberOfLayers?: number;
+  adjustableLength?: boolean;
+}
+
+export interface EarringsSpecifications {
+  backType?: string;
+  customBackType?: string;
+  earringsStyle?: string;
+  customEarringsStyle?: string;
+  dropLength?: number;
+  isPair?: boolean;
+  isMatching?: boolean;
+}
+
+export interface BanglesSpecifications {
+  size?: string;
+  customSize?: string;
+  openingType?: string;
+  customOpeningType?: string;
+  width?: number;
+  thickness?: number;
+  quantity?: number;
+  isSet?: boolean;
+}
+
+export interface BraceletSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: ClaspType;
+  customClaspType?: string;
+  width?: number;
+  thickness?: number;
+  isAdjustable?: boolean;
+  charmAttachments?: boolean;
+}
+
+export interface PendantSpecifications {
+  length?: number;
+  width?: number;
+  thickness?: number;
+  bailType?: string;
+  customBailType?: string;
+  includesChain?: boolean;
+  chainLength?: string;
+  customChainLength?: string;
+}
+
+export interface ChainSpecifications {
+  length?: string;
+  customLength?: string;
+  linkStyle?: string;
+  customLinkStyle?: string;
+  thickness?: number;
+  claspType?: ClaspType;
+  customClaspType?: string;
+  isAdjustable?: boolean;
+}
+
+export interface AnkletSpecifications {
+  length?: string;
+  customLength?: string;
+  claspType?: ClaspType;
+  customClaspType?: string;
+  thickness?: number;
+  charmAttachments?: boolean;
+  isAdjustable?: boolean;
+}
+
+export interface MangalsutraSpecifications {
+  length?: string;
+  customLength?: string;
+  style?: string;
+  customStyle?: string;
+  numberOfVatis?: number;
+  vatiSize?: number;
+  blackBeadsIncluded?: boolean;
+  numberOfBlackBeads?: number;
+}
+
+export interface NosePinSpecifications {
+  type?: string;
+  customType?: string;
+  gaugeSize?: string;
+  customGaugeSize?: string;
+  length?: number;
+  stoneSize?: number;
+}
+
+export interface MaangTikkaSpecifications {
+  style?: string;
+  customStyle?: string;
+  centerPieceLength?: number;
+  centerPieceWidth?: number;
+  chainLength?: number;
+  hasHairHook?: boolean;
+}
+
+export interface WaistChainSpecifications {
+  length?: string;
+  customLength?: string;
+  style?: string;
+  customStyle?: string;
+  numberOfStrands?: number;
+  claspType?: ClaspType;
+  customClaspType?: string;
+  isAdjustable?: boolean;
+}
+
+export interface ToeRingSpecifications {
+  size?: string;
+  customSize?: string;
+  isAdjustable?: boolean;
+  isPair?: boolean;
+  quantity?: number;
+}
+
+export interface BroochSpecifications {
+  style?: string;
+  customStyle?: string;
+  length?: number;
+  width?: number;
+  pinLength?: number;
+  hasSafetyCatch?: boolean;
+}
+
+export interface CufflinksSpecifications {
+  style?: string;
+  customStyle?: string;
+  faceLength?: number;
+  faceWidth?: number;
+  isPair?: boolean;
+  includesBox?: boolean;
+}
+
+export interface OtherSpecifications {
+  description?: string;
+  dimensions?: string;
+  specialFeatures?: string;
+}
+
+export type ProductSpecifications =
+  | RingSpecifications
+  | NecklaceSpecifications
+  | EarringsSpecifications
+  | BanglesSpecifications
+  | BraceletSpecifications
+  | PendantSpecifications
+  | ChainSpecifications
+  | AnkletSpecifications
+  | MangalsutraSpecifications
+  | NosePinSpecifications
+  | MaangTikkaSpecifications
+  | WaistChainSpecifications
+  | ToeRingSpecifications
+  | BroochSpecifications
+  | CufflinksSpecifications
+  | OtherSpecifications;
 
 export interface BasicInfoFormData {
   orderNumber: string;
@@ -280,6 +706,7 @@ export interface GoldDetailsFormData {
   productType: ProductType;
   customProductType?: string; // For "Other" product type
   quantity: number;
+  productSpecifications?: ProductSpecifications; // Product-specific details
 }
 
 export interface StoneItem {

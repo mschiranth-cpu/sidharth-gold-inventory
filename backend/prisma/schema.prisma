@@ -180,6 +180,7 @@ model OrderDetails {
   quantity              Int      @default(1)
   productType           String?  // Ring, Necklace, Bangle, etc.
   customProductType     String?  // For "Other" product type option
+  productSpecifications Json?    // Product-specific specifications (Ring size, Earring back type, Chain length, etc.)
   
   // CAD/Design files
   cadFiles              String[] // Array of CAD file URLs (.STL, .3DM, .DWG)

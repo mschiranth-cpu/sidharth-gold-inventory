@@ -32,6 +32,7 @@ import {
   type FileRequirement,
   type DepartmentRequirement,
 } from '../../config/departmentRequirements';
+import { isDepartmentEnabled } from '../../config/departmentFeatureFlags';
 import { ErrorBoundary } from '../../components/common';
 import {
   useKeyboardShortcuts,
@@ -50,6 +51,32 @@ const departmentNameToConfigId: Record<string, string> = {
   SETTING: 'STONE_SETTING',
   POLISH_2: 'FINAL_POLISH',
   ADDITIONAL: 'FINISHING_TOUCH',
+};
+
+/**
+ * Format specification label from camelCase to Title Case
+ */
+const formatSpecLabel = (key: string): string => {
+  if (key.startsWith('custom')) {
+    return key
+      .replace('custom', '')
+      .replace(/([A-Z])/g, ' $1')
+      .trim();
+  }
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
+
+/**
+ * Format specification value for display
+ */
+const formatSpecValue = (value: any): string => {
+  if (value === null || value === undefined) return 'Not specified';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return value.toString();
+  return value.toString();
 };
 
 interface WorkData {
@@ -98,6 +125,7 @@ interface OrderWorkDetails {
       metalType: string;
       specialInstructions?: string | null;
       referenceImages?: string[] | null;
+      productSpecifications?: Record<string, any>;
     } | null;
   };
   tracking: {
@@ -367,8 +395,17 @@ function WorkSubmissionPage() {
       requirements.formFields.forEach((field: FormField) => {
         if (field.required) {
           const value = formData[field.name];
-          if (value === undefined || value === null || value === '') {
-            errors[field.name] = `${field.label} is required`;
+
+          // Checkbox validation - must be checked (true)
+          if (field.type === 'checkbox') {
+            if (value !== true) {
+              errors[field.name] = `${field.label} must be checked`;
+            }
+          } else {
+            // Other field types - must not be empty
+            if (value === undefined || value === null || value === '') {
+              errors[field.name] = `${field.label} is required`;
+            }
           }
         }
 
@@ -664,7 +701,10 @@ function WorkSubmissionPage() {
               onChange={(e) => handleFieldChange(field.name, e.target.checked)}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-700">{field.label}</span>
+            <span className="text-sm text-gray-700">
+              {field.label}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </span>
           </label>
         );
 
@@ -757,6 +797,11 @@ function WorkSubmissionPage() {
     );
   }
 
+  // Check if advanced features are enabled (for future use)
+  const configId =
+    departmentNameToConfigId[workDetails.departmentName] || workDetails.departmentName;
+  const isFeatureEnabled = isDepartmentEnabled(configId);
+
   const isWorkComplete = workDetails.workData?.isComplete || false;
   const orderDetails = workDetails.order.orderDetails;
 
@@ -839,6 +884,23 @@ function WorkSubmissionPage() {
               <p className="text-sm text-yellow-700">{orderDetails.specialInstructions}</p>
             </div>
           )}
+
+          {orderDetails?.productSpecifications &&
+            Object.keys(orderDetails.productSpecifications).length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-800 mb-3">Product Specifications:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(orderDetails.productSpecifications)
+                    .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+                    .map(([key, value]) => (
+                      <div key={key} className="text-sm">
+                        <p className="text-blue-600 font-medium">{formatSpecLabel(key)}</p>
+                        <p className="text-blue-900">{formatSpecValue(value)}</p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Tips Section */}

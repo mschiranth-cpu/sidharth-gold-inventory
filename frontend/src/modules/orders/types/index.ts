@@ -213,6 +213,9 @@ export interface OrderDetail {
   size?: string;
   quantity?: number;
 
+  // Product-Specific Specifications
+  productSpecifications?: any; // Flexible JSON object based on product type
+
   // Gold/Metal Details
   metalType: 'GOLD' | 'SILVER' | 'PLATINUM';
   metalFinish?: string;

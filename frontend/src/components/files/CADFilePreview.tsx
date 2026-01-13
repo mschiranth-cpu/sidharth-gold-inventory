@@ -37,7 +37,7 @@ function ErrorFallback({ error }: { error?: string }) {
 
 export function CADFilePreview({ fileUrl, fileName }: CADFilePreviewProps) {
   const [error, setError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile] = useState(window.innerWidth < 768);
 
   // Determine file type from extension
   const fileExt = fileName.split('.').pop()?.toLowerCase();

@@ -127,17 +127,204 @@ export const stoneInputSchema = z
 export const stonesArraySchema = z.array(stoneInputSchema).optional();
 
 // ============================================
+// PRODUCT SPECIFICATIONS SCHEMAS
+// ============================================
+
+/**
+ * Ring specifications schema
+ */
+const ringSpecificationsSchema = z.object({
+  ringSize: z.string().max(50).optional(),
+  ringSizeCustom: z.string().max(50).optional(),
+  ringStyleType: z.string().max(100).optional(),
+  ringBandWidth: z.number().positive().max(50).optional(),
+});
+
+/**
+ * Necklace specifications schema
+ */
+const necklaceSpecificationsSchema = z.object({
+  necklaceLength: z.string().max(50).optional(),
+  necklaceLengthCustom: z.string().max(50).optional(),
+  necklaceClaspType: z.string().max(100).optional(),
+  necklaceDesignPattern: z.string().max(500).optional(),
+});
+
+/**
+ * Earrings specifications schema
+ */
+const earringsSpecificationsSchema = z.object({
+  earringsBackType: z.string().max(100).optional(),
+  earringsStyle: z.string().max(100).optional(),
+  earringsHoopDiameter: z.number().positive().max(200).optional(),
+});
+
+/**
+ * Bangles specifications schema
+ */
+const banglesSpecificationsSchema = z.object({
+  bangleSize: z.string().max(50).optional(),
+  bangleSizeCustom: z.string().max(50).optional(),
+  bangleOpeningType: z.string().max(100).optional(),
+  bangleQuantity: z.string().max(50).optional(),
+  bangleWidth: z.number().positive().max(100).optional(),
+});
+
+/**
+ * Bracelet specifications schema
+ */
+const braceletSpecificationsSchema = z.object({
+  braceletLength: z.string().max(50).optional(),
+  braceletLengthCustom: z.string().max(50).optional(),
+  braceletClaspType: z.string().max(100).optional(),
+  braceletWidth: z.number().positive().max(100).optional(),
+});
+
+/**
+ * Pendant specifications schema
+ */
+const pendantSpecificationsSchema = z.object({
+  pendantBailType: z.string().max(100).optional(),
+  pendantHeight: z.number().positive().max(500).optional(),
+  pendantWidth: z.number().positive().max(500).optional(),
+});
+
+/**
+ * Chain specifications schema
+ */
+const chainSpecificationsSchema = z.object({
+  chainLength: z.string().max(50).optional(),
+  chainLengthCustom: z.string().max(50).optional(),
+  chainLinkStyle: z.string().max(100).optional(),
+  chainThickness: z.string().max(50).optional(),
+  chainThicknessCustom: z.string().max(50).optional(),
+});
+
+/**
+ * Anklet specifications schema
+ */
+const ankletSpecificationsSchema = z.object({
+  ankletSize: z.string().max(50).optional(),
+  ankletSizeCustom: z.string().max(50).optional(),
+  ankletClaspType: z.string().max(100).optional(),
+});
+
+/**
+ * Mangalsutra specifications schema
+ */
+const mangalsutraSpecificationsSchema = z.object({
+  mangalsutraLength: z.string().max(50).optional(),
+  mangalsutraLengthCustom: z.string().max(50).optional(),
+  mangalsutraBeadsPattern: z.string().max(100).optional(),
+  mangalsutraBlackBeads: z.number().int().min(0).max(1000).optional(),
+  mangalsutraGoldBeads: z.number().int().min(0).max(1000).optional(),
+  mangalsutraPendantStyle: z.string().max(500).optional(),
+});
+
+/**
+ * Nose Pin specifications schema
+ */
+const nosePinSpecificationsSchema = z.object({
+  nosePinType: z.string().max(100).optional(),
+  nosePinGaugeSize: z.string().max(50).optional(),
+  nosePinPostLength: z.string().max(50).optional(),
+});
+
+/**
+ * Maang Tikka specifications schema
+ */
+const maangTikkaSpecificationsSchema = z.object({
+  maangTikkaHeadChainLength: z.number().positive().max(500).optional(),
+  maangTikkaPendantDropLength: z.number().positive().max(500).optional(),
+  maangTikkaAttachmentType: z.string().max(100).optional(),
+});
+
+/**
+ * Waist Chain specifications schema
+ */
+const waistChainSpecificationsSchema = z.object({
+  waistChainLength: z.string().max(50).optional(),
+  waistChainLengthCustom: z.string().max(50).optional(),
+  waistChainStrands: z.string().max(50).optional(),
+  waistChainClaspType: z.string().max(100).optional(),
+});
+
+/**
+ * Toe Ring specifications schema
+ */
+const toeRingSpecificationsSchema = z.object({
+  toeRingSize: z.string().max(50).optional(),
+  toeRingSizeCustom: z.string().max(50).optional(),
+  toeRingType: z.string().max(100).optional(),
+});
+
+/**
+ * Brooch specifications schema
+ */
+const broochSpecificationsSchema = z.object({
+  broochPinType: z.string().max(100).optional(),
+  broochBackingMechanism: z.string().max(100).optional(),
+  broochHeight: z.number().positive().max(500).optional(),
+  broochWidth: z.number().positive().max(500).optional(),
+});
+
+/**
+ * Cufflinks specifications schema
+ */
+const cufflinksSpecificationsSchema = z.object({
+  cufflinksBackingType: z.string().max(100).optional(),
+  cufflinksFaceDiameter: z.string().max(50).optional(),
+  cufflinksFaceDiameterCustom: z.string().max(50).optional(),
+});
+
+/**
+ * Other specifications schema
+ */
+const otherSpecificationsSchema = z.object({
+  otherSpecifications: z.string().max(2000).optional(),
+});
+
+/**
+ * Union schema for all product specifications
+ */
+const productSpecificationsSchema = z
+  .union([
+    ringSpecificationsSchema,
+    necklaceSpecificationsSchema,
+    earringsSpecificationsSchema,
+    banglesSpecificationsSchema,
+    braceletSpecificationsSchema,
+    pendantSpecificationsSchema,
+    chainSpecificationsSchema,
+    ankletSpecificationsSchema,
+    mangalsutraSpecificationsSchema,
+    nosePinSpecificationsSchema,
+    maangTikkaSpecificationsSchema,
+    waistChainSpecificationsSchema,
+    toeRingSpecificationsSchema,
+    broochSpecificationsSchema,
+    cufflinksSpecificationsSchema,
+    otherSpecificationsSchema,
+  ])
+  .optional();
+
+// ============================================
 // ORDER DETAILS SCHEMAS
 // ============================================
 
 /**
- * Order details input validation
+ * Base order details schema without validation refinements
  */
-export const orderDetailsInputSchema = z.object({
+const orderDetailsBaseSchema = z.object({
   goldWeightInitial: z
     .number()
     .positive('Gold weight must be positive')
     .max(10000, 'Gold weight cannot exceed 10kg')
+    .optional(),
+  netWeight: z
+    .number()
+    .positive('Net weight must be positive')
+    .max(10000, 'Net weight cannot exceed 10kg')
     .optional(),
   purity: puritySchema,
   goldColor: z.string().max(50).optional(),
@@ -148,6 +335,7 @@ export const orderDetailsInputSchema = z.object({
   quantity: z.number().int().positive().default(1),
   productType: z.string().max(100).optional(),
   customProductType: z.string().max(200).optional(),
+  productSpecifications: productSpecificationsSchema,
   dueDate: dateStringSchema,
   additionalDescription: z.string().max(2000, 'Description too long').optional(),
   specialInstructions: z.string().max(1000, 'Instructions too long').optional(),
@@ -155,9 +343,25 @@ export const orderDetailsInputSchema = z.object({
 });
 
 /**
+ * Order details input validation with refinements
+ */
+export const orderDetailsInputSchema = orderDetailsBaseSchema.refine(
+  (data) => {
+    // At least one weight field (goldWeightInitial or netWeight) must be provided
+    const hasGrossWeight = data.goldWeightInitial !== undefined && data.goldWeightInitial > 0;
+    const hasNetWeight = data.netWeight !== undefined && data.netWeight > 0;
+    return hasGrossWeight || hasNetWeight;
+  },
+  {
+    message: 'At least one weight field (Gross Weight or Net Weight) is required',
+    path: ['goldWeightInitial'],
+  }
+);
+
+/**
  * Partial order details for updates
  */
-export const orderDetailsUpdateSchema = orderDetailsInputSchema.partial();
+export const orderDetailsUpdateSchema = orderDetailsBaseSchema.partial();
 
 // ============================================
 // CREATE ORDER SCHEMA

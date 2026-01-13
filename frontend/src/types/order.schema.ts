@@ -67,24 +67,22 @@ const metalFinishSchema = z.union([
 
 export const goldDetailsSchema = z
   .object({
-    grossWeight: z.preprocess(
-      (val) =>
-        val === '' || val === undefined || val === null || Number.isNaN(val)
-          ? undefined
-          : Number(val),
-      z
-        .number()
-        .min(0, 'Weight cannot be negative')
-        .max(10000, 'Weight seems too high, please verify')
-        .optional()
-    ),
-    netWeight: z.preprocess(
-      (val) =>
-        val === '' || val === undefined || val === null || Number.isNaN(val)
-          ? undefined
-          : Number(val),
-      z.number().min(0, 'Net weight cannot be negative').optional()
-    ),
+    grossWeight: z.preprocess((val) => {
+      // Convert empty, null, NaN, or 0 to undefined
+      if (val === '' || val === undefined || val === null || Number.isNaN(val)) {
+        return undefined;
+      }
+      const num = Number(val);
+      return num === 0 ? undefined : num;
+    }, z.number().min(0, 'Weight cannot be negative').max(10000, 'Weight seems too high, please verify').optional()),
+    netWeight: z.preprocess((val) => {
+      // Convert empty, null, NaN, or 0 to undefined
+      if (val === '' || val === undefined || val === null || Number.isNaN(val)) {
+        return undefined;
+      }
+      const num = Number(val);
+      return num === 0 ? undefined : num;
+    }, z.number().min(0, 'Net weight cannot be negative').optional()),
     purity: z.nativeEnum(GoldPurity, {
       errorMap: () => ({ message: 'Please select gold purity' }),
     }),
@@ -105,6 +103,7 @@ export const goldDetailsSchema = z
       .int('Quantity must be a whole number')
       .min(1, 'Quantity must be at least 1')
       .max(1000, 'Quantity seems too high, please verify'),
+    productSpecifications: z.any().optional(), // Product-specific details (validated per type)
   })
   .refine(
     (data) => {
@@ -148,7 +147,224 @@ export const goldDetailsSchema = z
       message: 'Please specify the product type',
       path: ['customProductType'],
     }
+  )
+  .refine(
+    (data) => {
+      // At least one weight field (grossWeight or netWeight) must be provided
+      // Check if either field has a meaningful value (greater than 0)
+      const hasGrossWeight =
+        data.grossWeight !== undefined &&
+        data.grossWeight !== null &&
+        !Number.isNaN(data.grossWeight) &&
+        data.grossWeight > 0;
+
+      const hasNetWeight =
+        data.netWeight !== undefined &&
+        data.netWeight !== null &&
+        !Number.isNaN(data.netWeight) &&
+        data.netWeight > 0;
+
+      return hasGrossWeight || hasNetWeight;
+    },
+    {
+      message: 'At least one weight field (Gross Weight or Net Weight) is required',
+      path: ['grossWeight'], // Show error on grossWeight field
+    }
   );
+
+// ============================================
+// PRODUCT-SPECIFIC SPECIFICATIONS SCHEMAS
+// ============================================
+
+export const ringSpecificationsSchema = z
+  .object({
+    size: z.string().optional(),
+    customSize: z.string().max(50).optional(),
+    ringStyle: z.string().optional(),
+    customRingStyle: z.string().max(100).optional(),
+    bandWidth: z.number().positive().max(50).optional(),
+    bandThickness: z.number().positive().max(20).optional(),
+    isResizable: z.boolean().optional(),
+    engraving: z.string().max(200).optional(),
+  })
+  .optional();
+
+export const necklaceSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    claspType: z.string().optional(),
+    customClaspType: z.string().max(100).optional(),
+    chainThickness: z.number().positive().max(20).optional(),
+    layered: z.boolean().optional(),
+    numberOfLayers: z.number().int().positive().max(10).optional(),
+    adjustableLength: z.boolean().optional(),
+  })
+  .optional();
+
+export const earringsSpecificationsSchema = z
+  .object({
+    backType: z.string().optional(),
+    customBackType: z.string().max(100).optional(),
+    earringsStyle: z.string().optional(),
+    customEarringsStyle: z.string().max(100).optional(),
+    dropLength: z.number().positive().max(100).optional(),
+    isPair: z.boolean().optional(),
+    isMatching: z.boolean().optional(),
+  })
+  .optional();
+
+export const banglesSpecificationsSchema = z
+  .object({
+    size: z.string().optional(),
+    customSize: z.string().max(50).optional(),
+    openingType: z.string().optional(),
+    customOpeningType: z.string().max(100).optional(),
+    width: z.number().positive().max(100).optional(),
+    thickness: z.number().positive().max(20).optional(),
+    quantity: z.number().int().positive().max(100).optional(),
+    isSet: z.boolean().optional(),
+  })
+  .optional();
+
+export const braceletSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    claspType: z.string().optional(),
+    customClaspType: z.string().max(100).optional(),
+    width: z.number().positive().max(100).optional(),
+    thickness: z.number().positive().max(20).optional(),
+    isAdjustable: z.boolean().optional(),
+    charmAttachments: z.boolean().optional(),
+  })
+  .optional();
+
+export const pendantSpecificationsSchema = z
+  .object({
+    length: z.number().positive().max(100).optional(),
+    width: z.number().positive().max(100).optional(),
+    thickness: z.number().positive().max(20).optional(),
+    bailType: z.string().optional(),
+    customBailType: z.string().max(100).optional(),
+    includesChain: z.boolean().optional(),
+    chainLength: z.string().optional(),
+    customChainLength: z.string().max(50).optional(),
+  })
+  .optional();
+
+export const chainSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    linkStyle: z.string().optional(),
+    customLinkStyle: z.string().max(100).optional(),
+    thickness: z.number().positive().max(20).optional(),
+    claspType: z.string().optional(),
+    customClaspType: z.string().max(100).optional(),
+    isAdjustable: z.boolean().optional(),
+  })
+  .optional();
+
+export const ankletSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    claspType: z.string().optional(),
+    customClaspType: z.string().max(100).optional(),
+    thickness: z.number().positive().max(20).optional(),
+    charmAttachments: z.boolean().optional(),
+    isAdjustable: z.boolean().optional(),
+  })
+  .optional();
+
+export const mangalsutraSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    style: z.string().optional(),
+    customStyle: z.string().max(100).optional(),
+    numberOfVatis: z.number().int().positive().max(20).optional(),
+    vatiSize: z.number().positive().max(50).optional(),
+    blackBeadsIncluded: z.boolean().optional(),
+    numberOfBlackBeads: z.number().int().positive().max(500).optional(),
+  })
+  .optional();
+
+export const nosePinSpecificationsSchema = z
+  .object({
+    type: z.string().optional(),
+    customType: z.string().max(100).optional(),
+    gaugeSize: z.string().optional(),
+    customGaugeSize: z.string().max(50).optional(),
+    length: z.number().positive().max(20).optional(),
+    stoneSize: z.number().positive().max(10).optional(),
+  })
+  .optional();
+
+export const maangTikkaSpecificationsSchema = z
+  .object({
+    style: z.string().optional(),
+    customStyle: z.string().max(100).optional(),
+    centerPieceLength: z.number().positive().max(100).optional(),
+    centerPieceWidth: z.number().positive().max(100).optional(),
+    chainLength: z.number().positive().max(50).optional(),
+    hasHairHook: z.boolean().optional(),
+  })
+  .optional();
+
+export const waistChainSpecificationsSchema = z
+  .object({
+    length: z.string().optional(),
+    customLength: z.string().max(50).optional(),
+    style: z.string().optional(),
+    customStyle: z.string().max(100).optional(),
+    numberOfStrands: z.number().int().positive().max(10).optional(),
+    claspType: z.string().optional(),
+    customClaspType: z.string().max(100).optional(),
+    isAdjustable: z.boolean().optional(),
+  })
+  .optional();
+
+export const toeRingSpecificationsSchema = z
+  .object({
+    size: z.string().optional(),
+    customSize: z.string().max(50).optional(),
+    isAdjustable: z.boolean().optional(),
+    isPair: z.boolean().optional(),
+    quantity: z.number().int().positive().max(20).optional(),
+  })
+  .optional();
+
+export const broochSpecificationsSchema = z
+  .object({
+    style: z.string().optional(),
+    customStyle: z.string().max(100).optional(),
+    length: z.number().positive().max(100).optional(),
+    width: z.number().positive().max(100).optional(),
+    pinLength: z.number().positive().max(50).optional(),
+    hasSafetyCatch: z.boolean().optional(),
+  })
+  .optional();
+
+export const cufflinksSpecificationsSchema = z
+  .object({
+    style: z.string().optional(),
+    customStyle: z.string().max(100).optional(),
+    faceLength: z.number().positive().max(50).optional(),
+    faceWidth: z.number().positive().max(50).optional(),
+    isPair: z.boolean().optional(),
+    includesBox: z.boolean().optional(),
+  })
+  .optional();
+
+export const otherSpecificationsSchema = z
+  .object({
+    description: z.string().max(500).optional(),
+    dimensions: z.string().max(200).optional(),
+    specialFeatures: z.string().max(500).optional(),
+  })
+  .optional();
 
 // ============================================
 // STEP 3: STONE DETAILS SCHEMA

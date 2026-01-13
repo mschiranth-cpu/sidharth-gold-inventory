@@ -14,7 +14,6 @@ import React, { useRef } from 'react';
 import { UseFormReturn, Controller } from 'react-hook-form';
 import {
   PRIORITY_OPTIONS,
-  MAKING_CHARGE_TYPE_OPTIONS,
   CLASP_TYPE_OPTIONS,
   POLISH_TYPE_OPTIONS,
   CERTIFICATION_OPTIONS,
@@ -22,7 +21,6 @@ import {
   DELIVERY_METHOD_OPTIONS,
   OCCASION_OPTIONS,
   DESIGN_CATEGORY_OPTIONS,
-  WARRANTY_PERIOD_OPTIONS,
   PAYMENT_TERMS_OPTIONS,
 } from '../../../types/order.types';
 import type { AdditionalInfoFormData } from '../../../types/order.types';
@@ -497,48 +495,6 @@ const AdditionalInfoStep: React.FC<AdditionalInfoStepProps> = ({ form }) => {
         </div>
       </div>
 
-      {/* Pricing Details */}
-      <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">Pricing Details</label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Controller
-            name="makingChargeType"
-            control={control}
-            render={({ field }) => (
-              <select {...field} className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
-                <option value="">Making Charge Type</option>
-                {MAKING_CHARGE_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          />
-          <input
-            type="number"
-            step="0.01"
-            {...register('makingChargeValue', { valueAsNumber: true })}
-            placeholder="Value"
-            className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
-          />
-          <input
-            type="number"
-            step="0.1"
-            {...register('wastagePercentage', { valueAsNumber: true })}
-            placeholder="Wastage %"
-            className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
-          />
-        </div>
-        <input
-          type="number"
-          step="0.01"
-          {...register('laborCharges', { valueAsNumber: true })}
-          placeholder="Labor Charges"
-          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
-        />
-      </div>
-
       {/* Manufacturing Instructions */}
       <div className="space-y-3">
         <label className="block text-sm font-medium text-gray-700">Manufacturing Details</label>
@@ -856,22 +812,6 @@ const AdditionalInfoStep: React.FC<AdditionalInfoStepProps> = ({ form }) => {
             </select>
           </div>
 
-          {/* Warranty Period */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Warranty Period</label>
-            <select
-              {...register('warrantyPeriod')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">Select warranty</option>
-              {WARRANTY_PERIOD_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Exchange Policy */}
           <div className="flex items-center pt-2">
             <input
@@ -958,102 +898,6 @@ const AdditionalInfoStep: React.FC<AdditionalInfoStepProps> = ({ form }) => {
               />
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ============================================
-        PRICE ESTIMATION
-      ============================================ */}
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Price Estimation</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Provide cost estimates for this order. These can be manually entered or auto-calculated
-          based on current rates.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Estimated Gold Cost */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Gold Cost (₹)
-            </label>
-            <input
-              type="number"
-              {...register('estimatedGoldCost', {
-                min: 0,
-              })}
-              placeholder="Gold cost"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          {/* Estimated Stone Cost */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Stone Cost (₹)
-            </label>
-            <input
-              type="number"
-              {...register('estimatedStoneCost', {
-                min: 0,
-              })}
-              placeholder="Stone cost"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          {/* Estimated Making Charges */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Making Charges (₹)
-            </label>
-            <input
-              type="number"
-              {...register('estimatedMakingCharges', {
-                min: 0,
-              })}
-              placeholder="Making charges"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          {/* Estimated Other Charges */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Other Charges (₹)
-            </label>
-            <input
-              type="number"
-              {...register('estimatedOtherCharges', {
-                min: 0,
-              })}
-              placeholder="Other charges (certification, etc.)"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          {/* Estimated Total Cost */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Total Cost (₹)
-            </label>
-            <input
-              type="number"
-              {...register('estimatedTotalCost', {
-                min: 0,
-              })}
-              placeholder="Total estimated cost"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-semibold text-lg"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              This can be manually entered or calculated from the above fields
-            </p>
-          </div>
         </div>
       </div>
 

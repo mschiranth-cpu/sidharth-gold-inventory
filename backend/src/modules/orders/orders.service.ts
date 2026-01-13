@@ -306,6 +306,7 @@ function toOrderDetailResponse(order: any, userRole: UserRole): OrderDetailRespo
           quantity: order.orderDetails.quantity,
           productType: order.orderDetails.productType,
           customProductType: order.orderDetails.customProductType,
+          productSpecifications: order.orderDetails.productSpecifications as any,
           dueDate: order.orderDetails.dueDate,
           additionalDescription: order.orderDetails.additionalDescription,
           specialInstructions: order.orderDetails.specialInstructions,
@@ -434,6 +435,9 @@ export async function createOrder(data: CreateOrderRequest, userId: string): Pro
           size: data.orderDetails.size,
           quantity: data.orderDetails.quantity ?? 1,
           productType: data.orderDetails.productType,
+          customProductType: data.orderDetails.customProductType,
+          productSpecifications:
+            (data.orderDetails.productSpecifications as Prisma.InputJsonValue) ?? undefined,
           dueDate: new Date(data.orderDetails.dueDate),
           additionalDescription: data.orderDetails.additionalDescription,
           specialInstructions: data.orderDetails.specialInstructions,
@@ -758,6 +762,16 @@ export async function updateOrder(
     }
     if (data.orderDetails.size !== undefined) {
       detailsUpdate.size = data.orderDetails.size;
+    }
+    if (data.orderDetails.productType !== undefined) {
+      detailsUpdate.productType = data.orderDetails.productType;
+    }
+    if (data.orderDetails.customProductType !== undefined) {
+      detailsUpdate.customProductType = data.orderDetails.customProductType;
+    }
+    if (data.orderDetails.productSpecifications !== undefined) {
+      detailsUpdate.productSpecifications =
+        (data.orderDetails.productSpecifications as Prisma.InputJsonValue) ?? undefined;
     }
     if (data.orderDetails.quantity !== undefined) {
       detailsUpdate.quantity = data.orderDetails.quantity;

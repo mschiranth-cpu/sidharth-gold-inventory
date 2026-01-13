@@ -24,6 +24,7 @@ import {
   ProductType,
 } from '../../../types/order.types';
 import type { GoldDetailsFormData } from '../../../types/order.types';
+import { ProductSpecificationsFields } from './ProductSpecificationsFields';
 
 interface GoldDetailsStepProps {
   form: UseFormReturn<GoldDetailsFormData>;
@@ -390,7 +391,8 @@ const GoldDetailsStep: React.FC<GoldDetailsStepProps> = ({ form }) => {
         {/* Gross Weight */}
         <div>
           <label htmlFor="grossWeight" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Gross Weight (grams)
+            Gross Weight (grams){' '}
+            <span className="text-amber-600 text-xs">(at least one required)</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -427,13 +429,14 @@ const GoldDetailsStep: React.FC<GoldDetailsStepProps> = ({ form }) => {
           {errors.grossWeight && (
             <p className="mt-1.5 text-sm text-red-600">{errors.grossWeight.message}</p>
           )}
-          <p className="mt-1 text-xs text-gray-400">Can be filled later (optional)</p>
+          <p className="mt-1 text-xs text-gray-400">Total weight including stones</p>
         </div>
 
         {/* Net Weight */}
         <div>
           <label htmlFor="netWeight" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Net Weight (grams)
+            Net Weight (grams){' '}
+            <span className="text-amber-600 text-xs">(at least one required)</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -463,7 +466,7 @@ const GoldDetailsStep: React.FC<GoldDetailsStepProps> = ({ form }) => {
               <span className="text-gray-400 text-sm">g</span>
             </div>
           </div>
-          <p className="mt-1 text-xs text-gray-400">Weight excluding stones (optional)</p>
+          <p className="mt-1 text-xs text-gray-400">Weight excluding stones</p>
         </div>
       </div>
 
@@ -585,6 +588,9 @@ const GoldDetailsStep: React.FC<GoldDetailsStepProps> = ({ form }) => {
           </div>
         </div>
       </div>
+
+      {/* Product Specifications - Dynamic based on product type */}
+      <ProductSpecificationsFields form={form} />
     </div>
   );
 };

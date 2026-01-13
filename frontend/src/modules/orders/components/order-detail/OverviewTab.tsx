@@ -14,6 +14,7 @@ import React from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { OrderDetail } from '../../types';
 import { formatMetalFinish } from '../../../../types/order.types';
+import ProductSpecificationsDisplay from './ProductSpecificationsDisplay';
 
 interface OverviewTabProps {
   order: OrderDetail;
@@ -215,6 +216,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             </dl>
           </div>
         </div>
+
+        {/* Product Specifications */}
+        <ProductSpecificationsDisplay order={order} />
 
         {/* Metal & Weight Details */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
