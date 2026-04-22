@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     One-click deploy: builds frontend + backend, restarts NSSM, and ensures
@@ -71,7 +71,17 @@ function Ensure-Service {
 
 function Test-TunnelConnected {
     if (-not (Test-Path $CloudflaredExe)) { return $false }
-    $info = & $CloudflaredExe tunnel info $TunnelName 2>&1 | Out-String
+    # Suppress native-command stderr (e.g. version-upgrade WRN) so it doesn't
+    # become a terminating error under $ErrorActionPreference = 'Stop'.
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $info = (& $CloudflaredExe tunnel info $TunnelName 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    } catch {
+        $info = ''
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
     return ($info -notmatch 'does not have any active connection' -and $info -match 'CONNECTOR ID')
 }
 
@@ -120,8 +130,20 @@ try {
     Write-Step 'Running Prisma migrations (if any)'
     Push-Location "$ProjectRoot\backend"
     try {
-        npx prisma migrate deploy 2>&1 | Write-Host
-        Write-Ok 'Prisma migrate deploy completed'
+        # Don't let prisma errors abort the whole deploy — collect and warn.
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $prismaOutput = & npx prisma migrate deploy 2>&1
+        $prismaExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEAP
+        $prismaOutput | ForEach-Object { Write-Host "    $_" }
+        if ($prismaExit -eq 0) {
+            Write-Ok 'Prisma migrate deploy completed'
+        } else {
+            Write-Warn "Prisma migrate deploy exited with code $prismaExit — continuing deploy."
+            Write-Warn 'If this is the first deploy on an existing DB, baseline with:'
+            Write-Warn '  npx prisma migrate resolve --applied <migration-name>'
+        }
     }
     finally { Pop-Location }
 
