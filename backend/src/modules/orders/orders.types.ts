@@ -463,6 +463,14 @@ export interface OrderListItemResponse {
   customerName?: string; // Hidden for factory users
   customerPhone?: string; // Hidden for factory users
   customerEmail?: string; // Hidden for factory users
+  client?: {
+    id: string;
+    businessName?: string;
+    user?: {
+      name: string;
+      email: string;
+    };
+  };
   productPhotoUrl: string | null;
   status: OrderStatus;
   priority: number;
@@ -480,8 +488,10 @@ export interface OrderListItemResponse {
 /**
  * Full order response (for detail views)
  */
-export interface OrderDetailResponse
-  extends Omit<OrderListItemResponse, 'productType' | 'dueDate' | 'orderDetails'> {
+export interface OrderDetailResponse extends Omit<
+  OrderListItemResponse,
+  'productType' | 'dueDate' | 'orderDetails'
+> {
   orderDetails: OrderDetailsResponse | null;
   stones: StoneResponse[];
   departmentTracking: DepartmentTrackingResponse[];

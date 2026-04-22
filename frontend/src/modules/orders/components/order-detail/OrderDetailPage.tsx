@@ -77,7 +77,7 @@ const OrderDetailPage: React.FC = () => {
     deleteOrder.mutate(id, {
       onSuccess: () => {
         toast.success('Order cancelled');
-        navigate('/orders');
+        navigate('/app/orders');
       },
       onError: (error: any) => {
         toast.error(error?.response?.data?.error?.message || 'Failed to cancel order');
@@ -106,8 +106,8 @@ const OrderDetailPage: React.FC = () => {
       const allImages = referenceImages.length
         ? referenceImages
         : apiOrder.productPhotoUrl
-        ? [apiOrder.productPhotoUrl]
-        : [];
+          ? [apiOrder.productPhotoUrl]
+          : [];
 
       const orderDetail: OrderDetail = {
         id: apiOrder.id,
@@ -122,10 +122,10 @@ const OrderDetailPage: React.FC = () => {
           apiOrder.priority === 3
             ? 'URGENT'
             : apiOrder.priority === 2
-            ? 'HIGH'
-            : apiOrder.priority === 1
-            ? 'NORMAL'
-            : 'LOW',
+              ? 'HIGH'
+              : apiOrder.priority === 1
+                ? 'NORMAL'
+                : 'LOW',
         createdAt: apiOrder.createdAt,
         updatedAt: apiOrder.updatedAt,
         dueDate: apiOrder.orderDetails?.dueDate || new Date().toISOString(),
@@ -178,8 +178,8 @@ const OrderDetailPage: React.FC = () => {
               dt.status === 'COMPLETED'
                 ? 'completed'
                 : dt.status === 'IN_PROGRESS'
-                ? 'current'
-                : 'pending',
+                  ? 'current'
+                  : 'pending',
             assignedWorker: dt.assignedTo
               ? {
                   id: dt.assignedTo.id,
@@ -527,7 +527,7 @@ const OrderDetailPage: React.FC = () => {
     <div className="space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm no-print">
-        <Link to="/orders" className="text-gray-500 hover:text-gray-700">
+        <Link to="/app/orders" className="text-gray-500 hover:text-gray-700">
           Orders
         </Link>
         <svg

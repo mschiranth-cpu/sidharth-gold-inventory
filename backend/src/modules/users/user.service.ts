@@ -291,6 +291,7 @@ class UserService {
       OFFICE_STAFF: 0,
       FACTORY_MANAGER: 0,
       DEPARTMENT_WORKER: 0,
+      CLIENT: 0,
     };
 
     roleStats.forEach((stat) => {

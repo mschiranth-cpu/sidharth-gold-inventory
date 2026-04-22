@@ -61,6 +61,24 @@ export const CurrentAssignmentsCard: React.FC<CurrentAssignmentsCardProps> = ({
   userDepartment,
 }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Start work mutation (declared early so hooks order stays stable across renders)
+  const startWorkMutation = useMutation({
+    mutationFn: async () => {
+      return await workersService.startWork(order.id);
+    },
+    onSuccess: () => {
+      toast.success('Work started successfully!');
+      queryClient.invalidateQueries({ queryKey: ['my-work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orderWork', order.id] });
+      navigate(`/orders/${order.id}/work`);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to start work');
+    },
+  });
 
   // Get department tracking for user's department
   const departmentTracking = order.departmentTracking?.find(
@@ -173,24 +191,6 @@ export const CurrentAssignmentsCard: React.FC<CurrentAssignmentsCardProps> = ({
     return `${days}d ${timeInProgress % 24}h ago`;
   };
 
-  const queryClient = useQueryClient();
-
-  // Start work mutation
-  const startWorkMutation = useMutation({
-    mutationFn: async () => {
-      return await workersService.startWork(order.id);
-    },
-    onSuccess: () => {
-      toast.success('Work started successfully!');
-      queryClient.invalidateQueries({ queryKey: ['my-work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orderWork', order.id] });
-      navigate(`/orders/${order.id}/work`);
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to start work');
-    },
-  });
-
   const handleStartWork = () => {
     // Confirm before starting
     if (
@@ -203,15 +203,12 @@ export const CurrentAssignmentsCard: React.FC<CurrentAssignmentsCardProps> = ({
   };
 
   const handleContinueWork = () => {
-    navigate(`/orders/${order.id}/work`);
+    navigate(`/app/orders/${order.id}/work`);
   };
 
   const handleViewDetails = () => {
-    navigate(`/orders/${order.id}`);
+    navigate(`/app/orders/${order.id}`);
   };
-
-  // State for accordion
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // Progress bar color based on completion
   const getProgressColor = () => {

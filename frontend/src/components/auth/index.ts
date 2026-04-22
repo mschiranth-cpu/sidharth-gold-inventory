@@ -2,11 +2,11 @@
  * ============================================
  * AUTH COMPONENTS INDEX
  * ============================================
- * 
+ *
  * Export all authentication-related components.
  */
 
-export { 
+export {
   default as ProtectedRoute,
   AdminRoute,
   OfficeRoute,
@@ -14,3 +14,4 @@ export {
   WorkerRoute,
   AuthenticatedRoute,
 } from './ProtectedRoute';
+export { ClientRoute } from './ClientRoute';

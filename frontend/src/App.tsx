@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
+import ClientPortalLayout from './components/layout/ClientPortalLayout';
 import { AuthProvider } from './contexts/AuthContext';
 import {
   ProtectedRoute,
@@ -18,6 +19,9 @@ import NotificationPermissionPrompt from './components/NotificationPermissionPro
 // ============================================
 // LAZY LOADED ROUTE COMPONENTS
 // ============================================
+
+// Landing page
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 // Auth pages
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
@@ -88,6 +92,46 @@ const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 const SubmissionsPage = lazy(() => import('./pages/submissions/SubmissionsPage'));
 
+// Client Portal Pages
+const ClientLoginPage = lazy(() => import('./pages/client/ClientLoginPage'));
+const ClientRegisterPage = lazy(() => import('./pages/client/ClientRegisterPage'));
+const ClientDashboardPage = lazy(() => import('./pages/client/ClientDashboardPage'));
+const ClientOrdersPage = lazy(() => import('./pages/client/ClientOrdersPage'));
+const ClientOrderDetailPage = lazy(() => import('./pages/client/OrderDetailPage'));
+const ClientProfilePage = lazy(() => import('./pages/client/ClientProfilePage'));
+const PlaceOrderPage = lazy(() => import('./pages/client/PlaceOrderPage'));
+
+// Admin Pages
+const FeatureTogglePage = lazy(() => import('./pages/admin/FeatureTogglePage'));
+const ClientApprovalPage = lazy(() => import('./pages/admin/ClientApprovalPage'));
+const OrderApprovalPage = lazy(() => import('./pages/admin/OrderApprovalPage'));
+const VendorsPage = lazy(() => import('./pages/vendors/VendorsPage'));
+
+// Inventory Pages (Phase 2)
+const MetalInventoryDashboard = lazy(() => import('./pages/inventory/MetalInventoryDashboard'));
+const MetalStockPage = lazy(() => import('./pages/inventory/MetalStockPage'));
+const ReceiveMetalPage = lazy(() => import('./pages/inventory/ReceiveMetalPage'));
+const IssueMetalPage = lazy(() => import('./pages/inventory/IssueMetalPage'));
+const MetalTransactionsPage = lazy(() => import('./pages/inventory/MetalTransactionsPage'));
+const MeltingBatchPage = lazy(() => import('./pages/inventory/MeltingBatchPage'));
+const RateManagementPage = lazy(() => import('./pages/inventory/RateManagementPage'));
+const PartyListPage = lazy(() => import('./pages/inventory/PartyListPage'));
+const PartyDetailPage = lazy(() => import('./pages/inventory/PartyDetailPage'));
+
+// Phase 3 Inventory Pages
+const DiamondListPage = lazy(() => import('./pages/inventory/DiamondListPage'));
+const RealStoneListPage = lazy(() => import('./pages/inventory/RealStoneListPage'));
+const StonePacketListPage = lazy(() => import('./pages/inventory/StonePacketListPage'));
+
+// Phase 4 Inventory Pages
+const FactoryInventoryPage = lazy(() => import('./pages/inventory/FactoryInventoryPage'));
+
+// Phase 5 Attendance & Payroll Pages
+const CheckInPage = lazy(() => import('./pages/attendance/CheckInPage'));
+const CheckOutPage = lazy(() => import('./pages/attendance/CheckOutPage'));
+const AttendanceDashboard = lazy(() => import('./pages/attendance/AttendanceDashboard'));
+const PayrollDashboard = lazy(() => import('./pages/payroll/PayrollDashboard'));
+
 // ============================================
 // SUSPENSE WRAPPER COMPONENT
 // ============================================
@@ -110,6 +154,14 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route
+          path="/"
+          element={
+            <Suspense fallback={<PageSkeleton />}>
+              <LandingPage />
+            </Suspense>
+          }
+        />
+        <Route
           path="/login"
           element={
             <Suspense fallback={<PageSkeleton />}>
@@ -128,14 +180,14 @@ function App() {
 
         {/* Protected Routes with Main Layout */}
         <Route
-          path="/"
+          path="/app"
           element={
             <AuthenticatedRoute>
               <MainLayout />
             </AuthenticatedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
 
           {/* Dashboard - All authenticated users */}
           <Route
@@ -388,10 +440,323 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Feature Toggle - Admin only */}
+          <Route
+            path="admin/features"
+            element={
+              <AdminRoute>
+                <LazyRoute>
+                  <FeatureTogglePage />
+                </LazyRoute>
+              </AdminRoute>
+            }
+          />
+
+          {/* Client Approval - Admin/Office Staff */}
+          <Route
+            path="admin/clients"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <ClientApprovalPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Vendor Info - Admin/Office Staff */}
+          <Route
+            path="vendors"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <VendorsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Order Approval - Admin/Office Staff */}
+          <Route
+            path="admin/order-approvals"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <OrderApprovalPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Metal Inventory - Admin/Office Staff/Factory Manager */}
+          <Route
+            path="inventory/metal"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <MetalInventoryDashboard />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/stock"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <MetalStockPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/receive"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <ReceiveMetalPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/issue"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <IssueMetalPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/transactions"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <MetalTransactionsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/melting"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.FACTORY_MANAGER]}>
+                <LazyRoute>
+                  <MeltingBatchPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/metal/rates"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <LazyRoute>
+                  <RateManagementPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Party Metal Inventory - Admin/Office Staff/Factory Manager */}
+          <Route
+            path="inventory/parties"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <PartyListPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/parties/:partyId"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <PartyDetailPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Diamond Inventory - Admin/Office Staff/Factory Manager */}
+          <Route
+            path="inventory/diamonds"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondListPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Real Stone Inventory - Admin/Office Staff/Factory Manager */}
+          <Route
+            path="inventory/real-stones"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneListPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Stone Inventory - Admin/Office Staff/Factory Manager */}
+          <Route
+            path="inventory/stone-packets"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StonePacketListPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Factory Inventory - Admin/Factory Manager */}
+          <Route
+            path="inventory/factory"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.FACTORY_MANAGER]}>
+                <LazyRoute>
+                  <FactoryInventoryPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Attendance - All authenticated users */}
+          <Route
+            path="attendance/check-in"
+            element={
+              <AuthenticatedRoute>
+                <LazyRoute>
+                  <CheckInPage />
+                </LazyRoute>
+              </AuthenticatedRoute>
+            }
+          />
+          <Route
+            path="attendance/check-out"
+            element={
+              <AuthenticatedRoute>
+                <LazyRoute>
+                  <CheckOutPage />
+                </LazyRoute>
+              </AuthenticatedRoute>
+            }
+          />
+          <Route
+            path="attendance/dashboard"
+            element={
+              <AuthenticatedRoute>
+                <LazyRoute>
+                  <AttendanceDashboard />
+                </LazyRoute>
+              </AuthenticatedRoute>
+            }
+          />
+
+          {/* Payroll - Admin/Factory Manager */}
+          <Route
+            path="payroll"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.FACTORY_MANAGER]}>
+                <LazyRoute>
+                  <PayrollDashboard />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+
+        {/* Client Portal Routes (Public) */}
+        <Route
+          path="/client/login"
+          element={
+            <Suspense fallback={<PageSkeleton />}>
+              <ClientLoginPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/client/register"
+          element={
+            <Suspense fallback={<PageSkeleton />}>
+              <ClientRegisterPage />
+            </Suspense>
+          }
+        />
+
+        {/* Client Portal Routes (Protected) */}
+        <Route path="/client" element={<ClientPortalLayout />}>
+          <Route index element={<Navigate to="/client/dashboard" replace />} />
+          <Route
+            path="dashboard"
+            element={
+              <LazyRoute>
+                <ClientDashboardPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="orders"
+            element={
+              <LazyRoute>
+                <ClientOrdersPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="orders/new"
+            element={
+              <LazyRoute>
+                <PlaceOrderPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="orders/:orderId"
+            element={
+              <LazyRoute>
+                <ClientOrderDetailPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <LazyRoute>
+                <ClientProfilePage />
+              </LazyRoute>
+            }
+          />
         </Route>
 
         {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
       </Routes>
     </AuthProvider>
   );

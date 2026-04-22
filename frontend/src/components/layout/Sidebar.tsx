@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import {
@@ -19,43 +19,115 @@ import { UserRole } from '../../types/auth.types';
 // Navigation items with role-based visibility
 const getNavigation = (userRole: UserRole) => {
   const allItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, roles: 'all' },
+    { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: 'all' },
     {
       name: 'Orders',
-      href: '/orders',
+      href: '/app/orders',
       icon: ClipboardDocumentListIcon,
       roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.DEPARTMENT_WORKER],
     },
     {
       name: 'Factory Tracking',
-      href: '/factory',
+      href: '/app/factory',
       icon: TruckIcon,
       roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.DEPARTMENT_WORKER],
     },
     {
       name: 'Submissions',
-      href: '/submissions',
+      href: '/app/submissions',
       icon: DocumentCheckIcon,
       roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.DEPARTMENT_WORKER],
     },
     {
       name: 'My Work',
-      href: '/my-work',
+      href: '/app/my-work',
       icon: CubeIcon,
       roles: [UserRole.FACTORY_MANAGER, UserRole.DEPARTMENT_WORKER],
     },
     {
       name: 'Departments',
-      href: '/departments',
+      href: '/app/departments',
       icon: BuildingOfficeIcon,
       roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER],
     },
-    { name: 'Users', href: '/users', icon: UsersIcon, roles: [UserRole.ADMIN] },
+    { name: 'Users', href: '/app/users', icon: UsersIcon, roles: [UserRole.ADMIN] },
     {
       name: 'Reports',
-      href: '/reports',
+      href: '/app/reports',
       icon: ChartBarIcon,
       roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Client Management',
+      href: '/app/admin/clients',
+      icon: UsersIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF],
+    },
+    {
+      name: 'Vendor Info',
+      href: '/app/vendors',
+      icon: BuildingOfficeIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF],
+    },
+    {
+      name: 'Order Approvals',
+      href: '/app/admin/order-approvals',
+      icon: DocumentCheckIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF],
+    },
+    {
+      name: 'Feature Toggle',
+      href: '/app/admin/features',
+      icon: CubeIcon,
+      roles: [UserRole.ADMIN],
+    },
+    {
+      name: 'Metal Inventory',
+      href: '/app/inventory/metal',
+      icon: CubeIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Party Metal',
+      href: '/app/inventory/parties',
+      icon: UsersIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Diamond Inventory',
+      href: '/app/inventory/diamonds',
+      icon: CubeIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Real Stone',
+      href: '/app/inventory/real-stones',
+      icon: CubeIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Stone Inventory',
+      href: '/app/inventory/stone-packets',
+      icon: CubeIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Factory Inventory',
+      href: '/app/inventory/factory',
+      icon: BuildingOfficeIcon,
+      roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER],
+    },
+    {
+      name: 'Attendance',
+      href: '/app/attendance/dashboard',
+      icon: ClipboardDocumentListIcon,
+      roles: 'all',
+    },
+    {
+      name: 'Payroll',
+      href: '/app/payroll',
+      icon: ChartBarIcon,
+      roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER],
     },
   ];
 
@@ -72,8 +144,14 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const navigation = getNavigation(user?.role || UserRole.DEPARTMENT_WORKER);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   // Desktop collapsed sidebar (icons only with hover tooltips)
   const CollapsedSidebar = () => (
@@ -81,7 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       className={cn(
         'flex flex-col h-full bg-white/95 backdrop-blur-xl border-r border-gray-200/50 relative overflow-hidden',
         'transition-[width,padding] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
-        isExpanded ? 'w-64 px-4' : 'w-20 px-3'
+        isExpanded ? 'w-72 px-4' : 'w-20 px-3'
       )}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
@@ -104,13 +182,13 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           <div
             className={cn(
               'rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/30 flex-shrink-0 transition-all duration-500 ease-out',
-              isExpanded ? 'h-11 w-11' : 'h-10 w-10'
+              isExpanded ? 'h-12 w-12' : 'h-11 w-11'
             )}
           >
             <svg
               className={cn(
                 'text-white drop-shadow-sm transition-all duration-500',
-                isExpanded ? 'w-6 h-6' : 'w-5 h-5'
+                isExpanded ? 'w-7 h-7' : 'w-6 h-6'
               )}
               fill="none"
               stroke="currentColor"
@@ -139,10 +217,10 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col mt-4">
-        <ul role="list" className="flex flex-1 flex-col gap-y-2">
+      <nav className="flex flex-1 flex-col mt-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+        <ul role="list" className="flex flex-1 flex-col gap-y-2 pb-4">
           <li>
-            <ul role="list" className="space-y-1">
+            <ul role="list" className="space-y-0.5">
               {navigation.map((item) => (
                 <li key={item.name} className="relative group">
                   <NavLink
@@ -152,7 +230,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                         isActive
                           ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80',
-                        'flex items-center rounded-xl p-2.5 text-sm font-medium',
+                        'flex items-center rounded-xl p-2 text-sm font-medium',
                         'transition-all duration-300 ease-out',
                         'hover:translate-x-1',
                         isExpanded ? 'gap-x-3' : 'justify-center'
@@ -163,7 +241,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                       <>
                         <div
                           className={cn(
-                            'flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0',
+                            'flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0',
                             'transition-all duration-300 ease-out',
                             isActive
                               ? 'bg-white/20 shadow-inner'
@@ -174,8 +252,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                             className={cn(
                               'shrink-0 transition-transform duration-300',
                               isActive
-                                ? 'h-5 w-5'
-                                : 'h-5 w-5 group-hover:scale-110 group-hover:text-indigo-600'
+                                ? 'h-6 w-6'
+                                : 'h-6 w-6 group-hover:scale-110 group-hover:text-indigo-600'
                             )}
                             aria-hidden="true"
                           />
@@ -183,7 +261,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                         <span
                           className={cn(
                             'whitespace-nowrap transition-all duration-500 ease-out overflow-hidden',
-                            isExpanded ? 'opacity-100 max-w-[150px]' : 'opacity-0 max-w-0'
+                            isExpanded ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
                           )}
                         >
                           {item.name}
@@ -257,7 +335,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
               )}
 
               <button
-                onClick={() => logout()}
+                onClick={handleLogout}
                 className={cn(
                   'w-full flex items-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl text-sm font-medium group relative',
                   'transition-all duration-300 ease-out hover:translate-x-1',
@@ -403,7 +481,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                 </div>
               )}
               <button
-                onClick={() => logout()}
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2.5 px-2.5 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium transition-all duration-300 group"
               >
                 <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 group-hover:bg-red-100 transition-all duration-300">

@@ -210,7 +210,7 @@ const Dashboard: React.FC = () => {
                 {isFetching ? 'Syncing...' : 'Refresh'}
               </button>
               <button
-                onClick={() => navigate('/orders/new')}
+                onClick={() => navigate('/app/orders/new')}
                 className="
                   group inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white
                   bg-gradient-to-r from-indigo-500 via-purple-500 to-violet-600 rounded-xl
@@ -351,7 +351,7 @@ const Dashboard: React.FC = () => {
                   return (
                     <div
                       key={order.id}
-                      onClick={() => navigate(`/orders/${order.id}`)}
+                      onClick={() => navigate(`/app/orders/${order.id}`)}
                       className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50 transition-all cursor-pointer group"
                     >
                       <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
@@ -391,8 +391,8 @@ const Dashboard: React.FC = () => {
                             order.status === 'COMPLETED'
                               ? 'bg-green-100 text-green-700'
                               : order.status === 'IN_PROGRESS' || order.status === 'IN_FACTORY'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-yellow-100 text-yellow-700'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-yellow-100 text-yellow-700'
                           }`}
                         >
                           {order.status.replace('_', ' ')}
@@ -539,7 +539,7 @@ const Dashboard: React.FC = () => {
               </h3>
               <div className="space-y-3">
                 <button
-                  onClick={() => navigate('/orders')}
+                  onClick={() => navigate('/app/orders')}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 group shadow-sm hover:shadow-md"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -577,7 +577,7 @@ const Dashboard: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => navigate('/factory-tracking')}
+                  onClick={() => navigate('/app/factory')}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-purple-300 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group shadow-sm hover:shadow-md"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-violet-500 flex items-center justify-center shadow-lg shadow-purple-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -858,7 +858,7 @@ const Dashboard: React.FC = () => {
             <div className="space-y-3">
               {!isWorker && (
                 <button
-                  onClick={() => navigate('/orders/new')}
+                  onClick={() => navigate('/app/orders/new')}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-indigo-300 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-orange-50 transition-all duration-300 group shadow-sm hover:shadow-md"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-orange-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -897,7 +897,7 @@ const Dashboard: React.FC = () => {
               )}
 
               <button
-                onClick={() => navigate('/orders')}
+                onClick={() => navigate('/app/orders')}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 group shadow-sm hover:shadow-md"
               >
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -935,7 +935,7 @@ const Dashboard: React.FC = () => {
               </button>
 
               <button
-                onClick={() => navigate('/factory-tracking')}
+                onClick={() => navigate('/app/factory')}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-purple-300 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group shadow-sm hover:shadow-md"
               >
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-violet-500 flex items-center justify-center shadow-lg shadow-purple-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -974,7 +974,7 @@ const Dashboard: React.FC = () => {
 
               {!isWorker && (
                 <button
-                  onClick={() => navigate('/reports')}
+                  onClick={() => navigate('/app/reports')}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-emerald-300 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-300 group shadow-sm hover:shadow-md"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-110 transition-transform duration-300">

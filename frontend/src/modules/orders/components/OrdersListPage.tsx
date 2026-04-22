@@ -170,7 +170,10 @@ const MobileOrderCard: React.FC<{
           <h3 className="font-semibold text-gray-900 truncate">{order.orderNumber}</h3>
           <StatusBadge status={order.status} />
         </div>
-        <p className="text-sm text-gray-600 mt-0.5">{order.customerName}</p>
+        {order.clientName && (
+          <p className="text-sm text-indigo-600 font-medium mt-0.5">Client: {order.clientName}</p>
+        )}
+        <p className="text-sm text-gray-600 mt-0.5">Customer: {order.customerName}</p>
         <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
           <span>
             {order.grossWeight}g {order.purity}
@@ -371,6 +374,7 @@ const OrdersListPage: React.FC = () => {
         return {
           id: order.id,
           orderNumber: order.orderNumber,
+          clientName: order.client?.user?.name || order.client?.businessName || null,
           customerName: order.customerName || 'N/A',
           customerPhone: order.customerPhone,
           customerEmail: order.customerEmail,
@@ -380,12 +384,12 @@ const OrdersListPage: React.FC = () => {
             order.priority === 0
               ? 'LOW'
               : order.priority === 1
-              ? 'NORMAL'
-              : order.priority === 2
-              ? 'HIGH'
-              : order.priority >= 3
-              ? 'URGENT'
-              : 'NORMAL',
+                ? 'NORMAL'
+                : order.priority === 2
+                  ? 'HIGH'
+                  : order.priority >= 3
+                    ? 'URGENT'
+                    : 'NORMAL',
           dueDate: order.dueDate || order.orderDetails?.dueDate || new Date().toISOString(),
           grossWeight: order.orderDetails?.goldWeightInitial || order.grossWeight || 0,
           metalType: order.orderDetails?.metalType || order.metalType || 'GOLD',
@@ -462,7 +466,12 @@ const OrdersListPage: React.FC = () => {
         cell: (info) => (
           <div>
             <p className="font-medium text-gray-900">{info.getValue()}</p>
-            <p className="text-xs text-gray-500">{info.row.original.customerName}</p>
+            {info.row.original.clientName && (
+              <p className="text-xs text-indigo-600 font-medium">
+                Client: {info.row.original.clientName}
+              </p>
+            )}
+            <p className="text-xs text-gray-500">Customer: {info.row.original.customerName}</p>
           </div>
         ),
       }),
@@ -519,7 +528,7 @@ const OrdersListPage: React.FC = () => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/orders/${row.original.id}`);
+                navigate(`/app/orders/${row.original.id}`);
               }}
               className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
               title="View"
@@ -544,7 +553,7 @@ const OrdersListPage: React.FC = () => {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/orders/${row.original.id}/edit`);
+                  navigate(`/app/orders/${row.original.id}/edit`);
                 }}
                 className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Edit"
@@ -784,7 +793,7 @@ const OrdersListPage: React.FC = () => {
         </div>
         {!isWorker && (
           <button
-            onClick={() => navigate('/orders/new')}
+            onClick={() => navigate('/app/orders/new')}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/25"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -990,7 +999,7 @@ const OrdersListPage: React.FC = () => {
           isWorker ? (
             <div className="p-10 text-center text-gray-500">No orders assigned to you yet.</div>
           ) : (
-            <EmptyState onCreateOrder={() => navigate('/orders/new')} />
+            <EmptyState onCreateOrder={() => navigate('/app/orders/new')} />
           )
         ) : (
           <>
@@ -1079,9 +1088,9 @@ const OrdersListPage: React.FC = () => {
                       [index]: !prev[index],
                     }));
                   }}
-                  onView={() => navigate(`/orders/${order.id}`)}
-                  onEdit={() => navigate(`/orders/${order.id}/edit`)}
-                  onTrack={() => navigate(`/factory?order=${order.orderNumber}`)}
+                  onView={() => navigate(`/app/orders/${order.id}`)}
+                  onEdit={() => navigate(`/app/orders/${order.id}/edit`)}
+                  onTrack={() => navigate(`/app/factory?order=${order.orderNumber}`)}
                   onDelete={() => setDeleteConfirmId(order.id)}
                   isWorker={isWorker}
                 />

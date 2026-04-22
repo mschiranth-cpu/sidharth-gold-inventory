@@ -74,6 +74,7 @@ export interface OrderListParams {
 export interface OrderListItem {
   id: string;
   orderNumber: string;
+  clientName?: string | null;
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;

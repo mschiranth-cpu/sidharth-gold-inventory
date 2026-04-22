@@ -170,6 +170,12 @@ export async function handleCreateOrder(
       return;
     }
 
+    // Log incoming request body for debugging
+    logger.info('Order creation request received', {
+      userId: authReq.user.userId,
+      body: JSON.stringify(req.body, null, 2),
+    });
+
     // Validate request body
     const validatedData = createOrderSchema.parse(req.body) as CreateOrderRequest;
 
@@ -190,6 +196,10 @@ export async function handleCreateOrder(
     );
   } catch (error) {
     if (error instanceof ZodError) {
+      logger.error('Order validation failed', {
+        errors: error.errors,
+        body: req.body,
+      });
       sendError(res, error);
       return;
     }

@@ -52,6 +52,16 @@ router.post('/work/:orderId/save', workersController.saveWorkProgress);
 router.post('/work/:orderId/complete', workersController.completeWork);
 
 /**
+ * POST /api/workers/work/:orderId/reopen
+ * Reopen completed work for editing (Admin/Manager only)
+ */
+router.post(
+  '/work/:orderId/reopen',
+  authorize('ADMIN', 'FACTORY_MANAGER'),
+  workersController.reopenWork
+);
+
+/**
  * POST /api/workers/work/:orderId/upload-file
  * Upload a work file (CAD files, etc.)
  */

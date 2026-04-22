@@ -15,7 +15,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 // ============================================
 // ENUMS
 // ============================================
@@ -25,6 +24,7 @@ enum UserRole {
   OFFICE_STAFF
   FACTORY_MANAGER
   DEPARTMENT_WORKER
+  CLIENT
 }
 
 enum OrderStatus {
@@ -72,28 +72,58 @@ enum StoneType {
 // ============================================
 
 model User {
-  id                    String               @id @default(uuid())
-  name                  String
-  email                 String               @unique
-  password              String               // Hashed password
-  role                  UserRole             @default(DEPARTMENT_WORKER)
-  department            DepartmentName?      // Which department they belong to (for workers)
-  phone                 String?
-  avatar                String?              // Profile photo URL
-  isActive              Boolean              @default(true)
-  lastLoginAt           DateTime?
-  availabilityStatus    String               @default("AVAILABLE") // AVAILABLE, BUSY, ON_LEAVE
-  lastAssignedAt        DateTime?            // When worker was last assigned an order
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  id                 String          @id @default(uuid())
+  name               String
+  email              String          @unique
+  password           String // Hashed password
+  role               UserRole        @default(DEPARTMENT_WORKER)
+  department         DepartmentName? // Which department they belong to (for workers)
+  phone              String?
+  avatar             String? // Profile photo URL
+  isActive           Boolean         @default(true)
+  lastLoginAt        DateTime?
+  availabilityStatus String          @default("AVAILABLE") // AVAILABLE, BUSY, ON_LEAVE
+  lastAssignedAt     DateTime? // When worker was last assigned an order
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   // Relations
-  ordersCreated         Order[]              @relation("OrderCreatedBy")
-  orderDetailsEntered   OrderDetails[]       @relation("OrderDetailsEnteredBy")
-  departmentAssignments DepartmentTracking[] @relation("DepartmentAssignedTo")
-  finalSubmissions      FinalSubmission[]    @relation("FinalSubmittedBy")
-  activities            OrderActivity[]
-  notifications         Notification[]
+  ordersCreated          Order[]                 @relation("OrderCreatedBy")
+  orderDetailsEntered    OrderDetails[]          @relation("OrderDetailsEnteredBy")
+  departmentAssignments  DepartmentTracking[]    @relation("DepartmentAssignedTo")
+  finalSubmissions       FinalSubmission[]       @relation("FinalSubmittedBy")
+  activities             OrderActivity[]
+  notifications          Notification[]
+  specificationTemplates SpecificationTemplate[] @relation("SpecificationTemplates")
+
+  // Phase 1 relations
+  featurePermissions FeaturePermission[] @relation("FeaturePermissions")
+  clientProfile      Client?             @relation("ClientProfile")
+  orderComments      OrderComment[]      @relation("UserComments")
+
+  // Phase 2 relations
+  metalTransactions      MetalTransaction[]      @relation("MetalTransactionsCreated")
+  meltingBatches         MeltingBatch[]          @relation("MeltingBatchesMelted")
+  metalRates             MetalRate[]             @relation("MetalRatesCreated")
+  partyMetalTransactions PartyMetalTransaction[] @relation("PartyMetalTransactionsCreated")
+
+  // Phase 3 relations
+  diamondTransactions     DiamondTransaction[]     @relation("DiamondTransactionsCreated")
+  realStoneTransactions   RealStoneTransaction[]   @relation("RealStoneTransactionsCreated")
+  stonePacketTransactions StonePacketTransaction[] @relation("StonePacketTransactionsCreated")
+
+  // Phase 4 relations
+  factoryItemTransactions FactoryItemTransaction[] @relation("FactoryItemTransactionsCreated")
+  equipmentMaintenance    EquipmentMaintenance[]   @relation("EquipmentMaintenanceCreated")
+
+  // Phase 5 relations
+  employeeShifts    EmployeeShift[]   @relation("EmployeeShifts")
+  attendanceRecords Attendance[]      @relation("AttendanceRecords")
+  leaveApplications Leave[]           @relation("LeaveApplications")
+  salaryStructures  SalaryStructure[] @relation("SalaryStructures")
+  payslips          Payslip[]         @relation("Payslips")
+  employeeAdvances  EmployeeAdvance[] @relation("EmployeeAdvances")
+  employeeLoans     EmployeeLoan[]    @relation("EmployeeLoans")
 
   // Indexes for frequent queries
   @@index([email])
@@ -111,34 +141,54 @@ model User {
 // ============================================
 
 model Order {
-  id              String       @id @default(uuid())
-  orderNumber     String       @unique // Auto-generated unique order number (e.g., ORD-2026-00001)
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique // Auto-generated unique order number (e.g., ORD-2026-00001)
   customerName    String
   customerPhone   String?
   customerEmail   String?
-  productPhotoUrl String?      // Main product reference photo
-  status          OrderStatus  @default(DRAFT)
-  priority        Int          @default(0) // Higher number = higher priority
-  
+  productPhotoUrl String? // Main product reference photo
+  status          OrderStatus @default(DRAFT)
+  priority        Int         @default(0) // Higher number = higher priority
+
   // Current department tracking
-  currentDepartment DepartmentName?  // Current department the order is in
-  
+  currentDepartment DepartmentName? // Current department the order is in
+
   // Creator reference
-  createdById     String
-  createdBy       User         @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  
+  createdById String
+  createdBy   User   @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
   // Timestamps
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  completedAt     DateTime?    // When the order was completed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime? // When the order was completed
+
+  // Client portal fields (Phase 1)
+  clientId        String?
+  client          Client?   @relation("ClientOrders", fields: [clientId], references: [id])
+  orderSource     String    @default("INTERNAL")
+  approvalStatus  String?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
 
   // Relations
-  orderDetails        OrderDetails?
-  stones              Stone[]
-  departmentTracking  DepartmentTracking[]
-  finalSubmission     FinalSubmission?
-  activities          OrderActivity[]
-  notifications       Notification[]
+  orderDetails       OrderDetails?
+  stones             Stone[]
+  departmentTracking DepartmentTracking[]
+  finalSubmission    FinalSubmission?
+  activities         OrderActivity[]
+  notifications      Notification[]
+  comments           OrderComment[]       @relation("OrderComments")
+
+  // Phase 2 relations
+  metalTransactions      MetalTransaction[]      @relation("MetalTransactions")
+  partyMetalTransactions PartyMetalTransaction[] @relation("PartyMetalTransactions")
+
+  // Phase 3 relations
+  diamondIssues           Diamond[]                @relation("DiamondIssues")
+  diamondTransactions     DiamondTransaction[]     @relation("DiamondTransactions")
+  realStoneTransactions   RealStoneTransaction[]   @relation("RealStoneTransactions")
+  stonePacketTransactions StonePacketTransaction[] @relation("StonePacketTransactions")
 
   // Indexes for frequent queries
   @@index([orderNumber])
@@ -161,94 +211,94 @@ model Order {
 // ============================================
 
 model OrderDetails {
-  id                    String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Order reference
-  orderId               String   @unique
-  order                 Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   // Gold specifications
-  goldWeightInitial     Float?   // Initial gold weight in grams (optional - can be filled later)
-  purity                Float    // Purity in karats (e.g., 22, 18, 14)
-  goldColor             String?  // Yellow, White, Rose, etc.
-  metalType             String?  @default("GOLD") // GOLD, SILVER, PLATINUM
-  metalFinish           String?  // GoldFinish, SilverFinish, or PlatinumFinish enum value
-  customFinish          String?  // For "Other" finish option
-  
+  goldWeightInitial Float? // Initial gold weight in grams (optional - can be filled later)
+  purity            Float // Purity in karats (e.g., 22, 18, 14)
+  goldColor         String? // Yellow, White, Rose, etc.
+  metalType         String? @default("GOLD") // GOLD, SILVER, PLATINUM
+  metalFinish       String? // GoldFinish, SilverFinish, or PlatinumFinish enum value
+  customFinish      String? // For "Other" finish option
+
   // Product specifications
-  size                  String?  // Ring size, bangle size, chain length, etc.
-  quantity              Int      @default(1)
-  productType           String?  // Ring, Necklace, Bangle, etc.
-  customProductType     String?  // For "Other" product type option
-  productSpecifications Json?    // Product-specific specifications (Ring size, Earring back type, Chain length, etc.)
-  
+  size                  String? // Ring size, bangle size, chain length, etc.
+  quantity              Int     @default(1)
+  productType           String? // Ring, Necklace, Bangle, etc.
+  customProductType     String? // For "Other" product type option
+  productSpecifications Json? // Product-specific specifications (Ring size, Earring back type, Chain length, etc.)
+
   // CAD/Design files
-  cadFiles              String[] // Array of CAD file URLs (.STL, .3DM, .DWG)
-  
+  cadFiles String[] // Array of CAD file URLs (.STL, .3DM, .DWG)
+
   // Hallmark Details (Legal requirement in India)
-  hallmarkRequired      Boolean  @default(true)
-  huidNumber            String?  // Hallmark Unique ID
-  bisHallmark           String?  // BIS Hallmark number
-  
+  hallmarkRequired Boolean @default(true)
+  huidNumber       String? // Hallmark Unique ID
+  bisHallmark      String? // BIS Hallmark number
+
   // Pricing Details
-  makingChargeType      String?  // PER_GRAM, FLAT_RATE, PERCENTAGE
-  makingChargeValue     Float?   // Value based on type
-  wastagePercentage     Float?   // Estimated gold wastage %
-  laborCharges          Float?   // Additional labor costs
-  
+  makingChargeType  String? // PER_GRAM, FLAT_RATE, PERCENTAGE
+  makingChargeValue Float? // Value based on type
+  wastagePercentage Float? // Estimated gold wastage %
+  laborCharges      Float? // Additional labor costs
+
   // Manufacturing Instructions
-  meltingInstructions   String?  @db.Text // Alloy composition requirements
-  claspType             String?  // SPRING_RING, LOBSTER, TOGGLE, etc.
-  engravingText         String?  // Custom engraving text
-  polishType            String?  // HIGH_POLISH, MATTE, SANDBLAST, MIX
-  rhodiumPlating        Boolean  @default(false) // For white gold items
-  
+  meltingInstructions String? @db.Text // Alloy composition requirements
+  claspType           String? // SPRING_RING, LOBSTER, TOGGLE, etc.
+  engravingText       String? // Custom engraving text
+  polishType          String? // HIGH_POLISH, MATTE, SANDBLAST, MIX
+  rhodiumPlating      Boolean @default(false) // For white gold items
+
   // Certification
-  certificationRequired String?  // NONE, IGI, GIA, INTERNAL
-  
+  certificationRequired String? // NONE, IGI, GIA, INTERNAL
+
   // Customer's Old Gold
-  usingCustomerGold     Boolean  @default(false)
-  customerGoldWeight    Float?   // Weight of customer's gold
-  customerGoldPurity    Float?   // Purity of customer's gold
+  usingCustomerGold  Boolean @default(false)
+  customerGoldWeight Float? // Weight of customer's gold
+  customerGoldPurity Float? // Purity of customer's gold
 
   // Logistics & Classification
-  deliveryMethod        String?  // STORE_PICKUP, COURIER, CUSTOMER_VISIT, HOME_DELIVERY
-  customerAddress       String?  @db.Text // Full delivery address
-  occasion              String?  // WEDDING, ENGAGEMENT, DAILY_WEAR, GIFT, ANNIVERSARY, FESTIVAL, OTHER
-  designCategory        String?  // TRADITIONAL, MODERN, FUSION, ANTIQUE, CONTEMPORARY, OTHER
-  warrantyPeriod        String?  // NONE, SIX_MONTHS, ONE_YEAR, TWO_YEARS, LIFETIME
-  exchangeAllowed       Boolean  @default(false)
-  paymentTerms          String?  // ADVANCE_FULL, ADVANCE_50, ON_DELIVERY, CUSTOM
-  advancePercentage     Float?   // Percentage advance if applicable
-  goldRateLocked        Boolean  @default(false)
-  expectedGoldRate      Float?   // Locked gold rate if applicable
+  deliveryMethod    String? // STORE_PICKUP, COURIER, CUSTOMER_VISIT, HOME_DELIVERY
+  customerAddress   String? @db.Text // Full delivery address
+  occasion          String? // WEDDING, ENGAGEMENT, DAILY_WEAR, GIFT, ANNIVERSARY, FESTIVAL, OTHER
+  designCategory    String? // TRADITIONAL, MODERN, FUSION, ANTIQUE, CONTEMPORARY, OTHER
+  warrantyPeriod    String? // NONE, SIX_MONTHS, ONE_YEAR, TWO_YEARS, LIFETIME
+  exchangeAllowed   Boolean @default(false)
+  paymentTerms      String? // ADVANCE_FULL, ADVANCE_50, ON_DELIVERY, CUSTOM
+  advancePercentage Float? // Percentage advance if applicable
+  goldRateLocked    Boolean @default(false)
+  expectedGoldRate  Float? // Locked gold rate if applicable
 
   // Price Estimation
-  estimatedGoldCost     Float?   // Estimated cost of gold
-  estimatedStoneCost    Float?   // Estimated cost of stones
-  estimatedMakingCharges Float?  // Estimated making charges
-  estimatedOtherCharges Float?   // Other charges (certification, etc.)
-  estimatedTotalCost    Float?   // Total estimated cost
+  estimatedGoldCost      Float? // Estimated cost of gold
+  estimatedStoneCost     Float? // Estimated cost of stones
+  estimatedMakingCharges Float? // Estimated making charges
+  estimatedOtherCharges  Float? // Other charges (certification, etc.)
+  estimatedTotalCost     Float? // Total estimated cost
 
   // Template & Cloning
-  templateName          String?  // If saved as template
-  clonedFromOrderId     String?  // Reference to original order if cloned
-  
+  templateName      String? // If saved as template
+  clonedFromOrderId String? // Reference to original order if cloned
+
   // Timeline
-  dueDate               DateTime
-  
+  dueDate DateTime
+
   // Additional info
   additionalDescription String?  @db.Text
   specialInstructions   String?  @db.Text
   referenceImages       String[] // Array of reference image URLs
-  
+
   // Tracking
-  enteredById           String
-  enteredBy             User     @relation("OrderDetailsEnteredBy", fields: [enteredById], references: [id])
-  
+  enteredById String
+  enteredBy   User   @relation("OrderDetailsEnteredBy", fields: [enteredById], references: [id])
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Indexes for frequent queries
   @@index([orderId])
@@ -264,32 +314,32 @@ model OrderDetails {
 // ============================================
 
 model Stone {
-  id            String    @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Order reference
-  orderId       String
-  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   // Stone details
   stoneType     StoneType
-  stoneName     String?   // Specific name if needed
-  customType    String?   // For "Other" stone type
-  weight        Float     // Weight in carats
+  stoneName     String? // Specific name if needed
+  customType    String? // For "Other" stone type
+  weight        Float // Weight in carats
   quantity      Int       @default(1)
   color         String?
   clarity       String?
   cut           String?
-  shape         String?   // Round, Princess, Oval, etc.
-  customShape   String?   // For "Other" shape
-  setting       String?   // Prong, Bezel, Channel, etc.
-  customSetting String?   // For "Other" setting
-  
+  shape         String? // Round, Princess, Oval, etc.
+  customShape   String? // For "Other" shape
+  setting       String? // Prong, Bezel, Channel, etc.
+  customSetting String? // For "Other" setting
+
   // Notes
-  notes         String?   @db.Text
-  
+  notes String? @db.Text
+
   // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@index([stoneType])
@@ -304,46 +354,46 @@ model Stone {
 // ============================================
 
 model DepartmentTracking {
-  id              String           @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Order reference
-  orderId         String
-  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   // Department info
-  departmentName  DepartmentName
-  sequenceOrder   Int              // Order of processing (1 = first department)
-  status          DepartmentStatus @default(NOT_STARTED)
-  
+  departmentName DepartmentName
+  sequenceOrder  Int // Order of processing (1 = first department)
+  status         DepartmentStatus @default(NOT_STARTED)
+
   // Assignment
-  assignedToId    String?
-  assignedTo      User?            @relation("DepartmentAssignedTo", fields: [assignedToId], references: [id])
-  
+  assignedToId String?
+  assignedTo   User?   @relation("DepartmentAssignedTo", fields: [assignedToId], references: [id])
+
   // Queue management for auto-assignment
-  queuePosition   Int?             // Position in department queue (null = not queued)
-  queuedAt        DateTime?        // When order was added to queue
-  
+  queuePosition Int? // Position in department queue (null = not queued)
+  queuedAt      DateTime? // When order was added to queue
+
   // Gold tracking within department
-  goldWeightIn    Float?           // Gold weight when entering department
-  goldWeightOut   Float?           // Gold weight when leaving department
-  goldLoss        Float?           // Calculated loss (if any)
-  
+  goldWeightIn  Float? // Gold weight when entering department
+  goldWeightOut Float? // Gold weight when leaving department
+  goldLoss      Float? // Calculated loss (if any)
+
   // Timing
-  estimatedHours  Float?           // Estimated time to complete
-  startedAt       DateTime?
-  completedAt     DateTime?
-  
+  estimatedHours Float? // Estimated time to complete
+  startedAt      DateTime?
+  completedAt    DateTime?
+
   // Notes and photos
-  notes           String?          @db.Text
-  photos          String[]         // Array of work-in-progress photo URLs
-  issues          String?          @db.Text // Any issues encountered
-  
+  notes  String?  @db.Text
+  photos String[] // Array of work-in-progress photo URLs
+  issues String?  @db.Text // Any issues encountered
+
   // Relation to work data
-  workData        DepartmentWorkData?
-  
+  workData DepartmentWorkData?
+
   // Timestamps
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([orderId, departmentName]) // Each department can only have one entry per order
   // Indexes for frequent queries
@@ -366,38 +416,38 @@ model DepartmentTracking {
 // ============================================
 
 model DepartmentWorkData {
-  id                    String             @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // References
-  departmentTrackingId  String             @unique // One-to-one with DepartmentTracking
-  departmentTracking    DepartmentTracking @relation(fields: [departmentTrackingId], references: [id], onDelete: Cascade)
-  
+  departmentTrackingId String             @unique // One-to-one with DepartmentTracking
+  departmentTracking   DepartmentTracking @relation(fields: [departmentTrackingId], references: [id], onDelete: Cascade)
+
   // Form data (stored as JSON for flexibility)
-  formData              Json?              // All form field values
-  
+  formData Json? // All form field values
+
   // File uploads
-  uploadedFiles         Json?              // Array of file objects: [{name, url, type, size, uploadedAt}]
-  
+  uploadedFiles Json? // Array of file objects: [{name, url, type, size, uploadedAt}]
+
   // Photo uploads
-  uploadedPhotos        Json?              // Array of photo objects: [{name, url, type, uploadedAt}]
-  
+  uploadedPhotos Json? // Array of photo objects: [{name, url, type, uploadedAt}]
+
   // Work metadata
-  workStartedAt         DateTime?
-  workCompletedAt       DateTime?
-  timeSpent             Float?             // in hours
-  
+  workStartedAt   DateTime?
+  workCompletedAt DateTime?
+  timeSpent       Float? // in hours
+
   // Validation and status
-  isComplete            Boolean            @default(false) // All required fields filled
-  isDraft               Boolean            @default(true)  // Still in draft mode
-  validationErrors      Json?              // Array of validation error messages
-  
+  isComplete       Boolean @default(false) // All required fields filled
+  isDraft          Boolean @default(true) // Still in draft mode
+  validationErrors Json? // Array of validation error messages
+
   // Auto-save
-  lastSavedAt           DateTime?
-  autoSaveData          Json?              // Temporary auto-saved data
-  
+  lastSavedAt  DateTime?
+  autoSaveData Json? // Temporary auto-saved data
+
   // Timestamps
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([departmentTrackingId])
   @@index([isComplete])
@@ -411,42 +461,42 @@ model DepartmentWorkData {
 // ============================================
 
 model FinalSubmission {
-  id                 String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Order reference
-  orderId            String   @unique
-  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   // Final weights
-  finalGoldWeight    Float    // Final gold weight in grams
-  finalStoneWeight   Float    // Total stone weight in carats
-  finalPurity        Float    // Final purity in karats
-  
+  finalGoldWeight  Float // Final gold weight in grams
+  finalStoneWeight Float // Total stone weight in carats
+  finalPurity      Float // Final purity in karats
+
   // Piece info
-  numberOfPieces     Int      @default(1)
-  totalWeight        Float?   // Total weight of finished piece(s)
-  
+  numberOfPieces Int    @default(1)
+  totalWeight    Float? // Total weight of finished piece(s)
+
   // Quality check
-  qualityGrade       String?  // A, B, C or custom grading
-  qualityNotes       String?  @db.Text
-  
+  qualityGrade String? // A, B, C or custom grading
+  qualityNotes String? @db.Text
+
   // Photos
-  completionPhotos   String[] // Array of final product photo URLs
-  certificateUrl     String?  // Quality certificate if any
-  
+  completionPhotos String[] // Array of final product photo URLs
+  certificateUrl   String? // Quality certificate if any
+
   // Submission info
-  submittedById      String
-  submittedBy        User     @relation("FinalSubmittedBy", fields: [submittedById], references: [id])
-  submittedAt        DateTime @default(now())
-  
+  submittedById String
+  submittedBy   User     @relation("FinalSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt   DateTime @default(now())
+
   // Customer approval
-  customerApproved   Boolean  @default(false)
-  approvalDate       DateTime?
-  approvalNotes      String?
-  
+  customerApproved Boolean   @default(false)
+  approvalDate     DateTime?
+  approvalNotes    String?
+
   // Timestamps
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@index([submittedById])
@@ -465,12 +515,12 @@ model OrderActivity {
   id          String   @id @default(uuid())
   orderId     String
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  action      String   // 'STATUS_CHANGE', 'DEPT_MOVE', 'WORKER_ASSIGNED', 'FILE_UPLOADED'
-  title       String   // Human-readable action title
-  description String?  // Detailed description of what happened
-  userId      String?  // Who performed the action
+  action      String // 'STATUS_CHANGE', 'DEPT_MOVE', 'WORKER_ASSIGNED', 'FILE_UPLOADED'
+  title       String // Human-readable action title
+  description String? // Detailed description of what happened
+  userId      String? // Who performed the action
   user        User?    @relation(fields: [userId], references: [id])
-  metadata    Json?    // Additional data (old value, new value, etc.)
+  metadata    Json? // Additional data (old value, new value, etc.)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -487,16 +537,16 @@ model OrderActivity {
 // ============================================
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  entityType  String   // 'Order', 'DepartmentTracking', etc.
-  entityId    String
-  action      String   // 'CREATE', 'UPDATE', 'DELETE'
-  userId      String
-  oldValues   Json?    // Previous values
-  newValues   Json?    // New values
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  entityType String // 'Order', 'DepartmentTracking', etc.
+  entityId   String
+  action     String // 'CREATE', 'UPDATE', 'DELETE'
+  userId     String
+  oldValues  Json? // Previous values
+  newValues  Json? // New values
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([userId])
@@ -519,7 +569,7 @@ enum NotificationType {
   URGENT_ASSIGNMENT
   ORDER_CANCELLED
   COMMENT_ADDED
-  
+
   // Admin notifications
   NEW_ORDER_CREATED
   ORDER_COMPLETED
@@ -530,14 +580,14 @@ enum NotificationType {
   WORKER_IDLE
   PAYMENT_RECEIVED
   DAILY_SUMMARY
-  
+
   // Office Staff
   CUSTOMER_INQUIRY
   ORDER_READY
   DUE_DATE_APPROACHING
   PAYMENT_PENDING
   DELIVERY_SCHEDULED
-  
+
   // Factory Manager
   DEPARTMENT_OVERLOAD
   EQUIPMENT_ISSUE
@@ -553,21 +603,21 @@ enum NotificationPriority {
 
 model Notification {
   id          String               @id @default(uuid())
-  userId      String               // Who should receive the notification
+  userId      String // Who should receive the notification
   user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        NotificationType
   priority    NotificationPriority @default(INFO)
   title       String
   message     String
-  orderId     String?              // Related order ID
+  orderId     String? // Related order ID
   order       Order?               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  actionUrl   String?              // URL to navigate to when clicked
-  actionLabel String?              // "View Order", "Start Work", "Review", etc.
+  actionUrl   String? // URL to navigate to when clicked
+  actionLabel String? // "View Order", "Start Work", "Review", etc.
   isRead      Boolean              @default(false)
   readAt      DateTime?
   createdAt   DateTime             @default(now())
-  expiresAt   DateTime?            // Auto-delete after this date
-  metadata    Json?                // Extra data (departmentId, workerId, etc.)
+  expiresAt   DateTime? // Auto-delete after this date
+  metadata    Json? // Extra data (departmentId, workerId, etc.)
 
   @@index([userId])
   @@index([isRead])
@@ -578,4 +628,975 @@ model Notification {
   @@index([orderId])
   @@index([priority])
   @@map("notifications")
+}
+
+// ============================================
+// SPECIFICATION TEMPLATES
+// ============================================
+
+model SpecificationTemplate {
+  id             String   @id @default(uuid())
+  name           String
+  productType    String
+  specifications Json
+  userId         String
+  isPublic       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation("SpecificationTemplates", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productType])
+  @@index([isPublic])
+  @@map("specification_templates")
+}
+
+// ============================================
+// FEATURE TOGGLE SYSTEM (Phase 1)
+// ============================================
+
+model FeatureModule {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String   @map("display_name")
+  description String?
+  icon        String?
+  isGlobal    Boolean  @default(false) @map("is_global")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  permissions FeaturePermission[]
+
+  @@map("feature_modules")
+}
+
+model FeaturePermission {
+  id        String        @id @default(uuid())
+  featureId String        @map("feature_id")
+  feature   FeatureModule @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  userId       String?   @map("user_id")
+  user         User?     @relation("FeaturePermissions", fields: [userId], references: [id], onDelete: Cascade)
+  role         UserRole?
+  departmentId String?   @map("department_id")
+
+  isEnabled Boolean @default(false) @map("is_enabled")
+  canRead   Boolean @default(true) @map("can_read")
+  canWrite  Boolean @default(false) @map("can_write")
+  canDelete Boolean @default(false) @map("can_delete")
+
+  enabledById String?  @map("enabled_by_id")
+  enabledAt   DateTime @default(now()) @map("enabled_at")
+
+  @@unique([featureId, userId])
+  @@unique([featureId, role])
+  @@index([featureId])
+  @@index([userId])
+  @@index([role])
+  @@map("feature_permissions")
+}
+
+// ============================================
+// CLIENT PORTAL (Phase 1)
+// ============================================
+
+model Client {
+  id     String @id @default(uuid())
+  userId String @unique @map("user_id")
+  user   User   @relation("ClientProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  businessName String? @map("business_name")
+  businessType String? @map("business_type")
+  gstNumber    String? @map("gst_number")
+  panNumber    String? @map("pan_number")
+
+  contactPerson  String? @map("contact_person")
+  phone          String?
+  alternatePhone String? @map("alternate_phone")
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+
+  registrationMethod String    @default("ADMIN_CREATED") @map("registration_method")
+  approvalStatus     String    @default("PENDING") @map("approval_status")
+  approvedById       String?   @map("approved_by_id")
+  approvedAt         DateTime? @map("approved_at")
+  rejectionReason    String?   @map("rejection_reason")
+
+  notifyByEmail    Boolean @default(true) @map("notify_by_email")
+  notifyBySms      Boolean @default(false) @map("notify_by_sms")
+  notifyByWhatsApp Boolean @default(false) @map("notify_by_whatsapp")
+
+  orders Order[] @relation("ClientOrders")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([approvalStatus])
+  @@index([businessName])
+  @@map("clients")
+}
+
+model OrderComment {
+  id      String @id @default(uuid())
+  orderId String @map("order_id")
+  order   Order  @relation("OrderComments", fields: [orderId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+
+  message     String
+  attachments String[]
+
+  isInternal Boolean   @default(false) @map("is_internal")
+  isRead     Boolean   @default(false) @map("is_read")
+  readAt     DateTime? @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId, createdAt])
+  @@index([userId])
+  @@map("order_comments")
+}
+
+model NotificationQueue {
+  id String @id @default(uuid())
+
+  recipientId   String @map("recipient_id")
+  recipientType String @map("recipient_type")
+
+  channel String
+
+  subject      String?
+  message      String
+  templateId   String? @map("template_id")
+  templateData Json?   @map("template_data")
+
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  sentAt        DateTime? @map("sent_at")
+  errorMessage  String?   @map("error_message")
+
+  orderId String? @map("order_id")
+
+  scheduledFor DateTime? @map("scheduled_for")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([status, channel])
+  @@index([recipientId])
+  @@index([scheduledFor])
+  @@map("notification_queue")
+}
+
+// ============================================
+// METAL INVENTORY (Phase 2)
+// ============================================
+
+enum MetalType {
+  GOLD
+  SILVER
+  PLATINUM
+  PALLADIUM
+}
+
+enum MetalForm {
+  BAR
+  WIRE
+  SHEET
+  GRAIN
+  SCRAP
+  FINISHED_PIECE
+  CUSTOMER_METAL
+}
+
+enum MetalTransactionType {
+  PURCHASE
+  SALE
+  ISSUE_TO_DEPARTMENT
+  RETURN_FROM_DEPARTMENT
+  MELTING_IN
+  MELTING_OUT
+  WASTAGE
+  ADJUSTMENT
+  CUSTOMER_METAL_IN
+  CUSTOMER_METAL_OUT
+}
+
+model MetalStock {
+  id          String    @id @default(uuid())
+  metalType   MetalType @map("metal_type")
+  purity      Float
+  form        MetalForm
+  grossWeight Float     @default(0) @map("gross_weight")
+  pureWeight  Float     @default(0) @map("pure_weight")
+  location    String?
+  batchNumber String?   @map("batch_number")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  transactions MetalTransaction[]
+
+  @@index([metalType])
+  @@index([purity])
+  @@index([form])
+  @@index([metalType, purity])
+  @@map("metal_stock")
+}
+
+model MetalTransaction {
+  id              String               @id @default(uuid())
+  transactionType MetalTransactionType @map("transaction_type")
+  metalType       MetalType            @map("metal_type")
+  purity          Float
+  form            MetalForm
+  grossWeight     Float                @map("gross_weight")
+  pureWeight      Float                @map("pure_weight")
+  rate            Float?
+  totalValue      Float?               @map("total_value")
+  stockId         String?              @map("stock_id")
+  stock           MetalStock?          @relation(fields: [stockId], references: [id])
+  orderId         String?              @map("order_id")
+  order           Order?               @relation("MetalTransactions", fields: [orderId], references: [id])
+  departmentId    String?              @map("department_id")
+  workerId        String?              @map("worker_id")
+  supplierId      String?              @map("supplier_id")
+  meltingBatchId  String?              @map("melting_batch_id")
+  meltingBatch    MeltingBatch?        @relation(fields: [meltingBatchId], references: [id])
+  notes           String?
+  referenceNumber String?              @map("reference_number")
+  createdById     String               @map("created_by_id")
+  createdBy       User                 @relation("MetalTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime             @default(now()) @map("created_at")
+
+  @@index([metalType])
+  @@index([transactionType])
+  @@index([createdAt])
+  @@index([metalType, transactionType])
+  @@map("metal_transactions")
+}
+
+model MeltingBatch {
+  id               String    @id @default(uuid())
+  batchNumber      String    @unique @map("batch_number")
+  inputMetals      Json      @map("input_metals")
+  totalInputWeight Float     @map("total_input_weight")
+  outputPurity     Float     @map("output_purity")
+  outputWeight     Float     @map("output_weight")
+  outputForm       MetalForm @map("output_form")
+  wastageWeight    Float     @map("wastage_weight")
+  wastagePercent   Float     @map("wastage_percent")
+  meltedById       String    @map("melted_by_id")
+  meltedBy         User      @relation("MeltingBatchesMelted", fields: [meltedById], references: [id])
+  meltedAt         DateTime  @map("melted_at")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  transactions MetalTransaction[]
+
+  @@index([batchNumber])
+  @@index([meltedAt])
+  @@map("melting_batches")
+}
+
+model MetalRate {
+  id            String    @id @default(uuid())
+  metalType     MetalType @map("metal_type")
+  purity        Float
+  ratePerGram   Float     @map("rate_per_gram")
+  effectiveDate DateTime  @map("effective_date")
+  source        String?
+  createdById   String    @map("created_by_id")
+  createdBy     User      @relation("MetalRatesCreated", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([metalType])
+  @@index([effectiveDate])
+  @@index([metalType, purity, effectiveDate])
+  @@map("metal_rates")
+}
+
+// ============================================
+// PARTY METAL INVENTORY (Phase 2)
+// ============================================
+
+model Party {
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  phone     String?
+  email     String?
+  address   String?
+  gstNumber String?  @map("gst_number")
+  panNumber String?  @map("pan_number")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  metalAccounts PartyMetalAccount[]
+  transactions  PartyMetalTransaction[]
+
+  @@index([name])
+  @@index([type])
+  @@map("parties")
+}
+
+model PartyMetalAccount {
+  id           String    @id @default(uuid())
+  partyId      String    @map("party_id")
+  party        Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  metalType    MetalType @map("metal_type")
+  purity       Float
+  grossBalance Float     @default(0) @map("gross_balance")
+  pureBalance  Float     @default(0) @map("pure_balance")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([partyId, metalType, purity])
+  @@index([partyId])
+  @@map("party_metal_accounts")
+}
+
+model PartyMetalTransaction {
+  id              String    @id @default(uuid())
+  partyId         String    @map("party_id")
+  party           Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  transactionType String    @map("transaction_type")
+  metalType       MetalType @map("metal_type")
+  grossWeight     Float     @map("gross_weight")
+  testedPurity    Float?    @map("tested_purity")
+  declaredPurity  Float     @map("declared_purity")
+  pureWeight      Float     @map("pure_weight")
+  orderId         String?   @map("order_id")
+  order           Order?    @relation("PartyMetalTransactions", fields: [orderId], references: [id])
+  voucherNumber   String    @map("voucher_number")
+  notes           String?
+  createdById     String    @map("created_by_id")
+  createdBy       User      @relation("PartyMetalTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([partyId])
+  @@index([createdAt])
+  @@index([partyId, createdAt])
+  @@map("party_metal_transactions")
+}
+
+// ============================================
+// VENDORS
+// ============================================
+
+model Vendor {
+  id          String   @id @default(uuid())
+  name        String
+  uniqueCode  String   @unique @map("unique_code")
+  phone       String?
+  gstNumber   String?  @map("gst_number")
+  gstDetails  Json?    @map("gst_details")
+  address     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@index([gstNumber])
+  @@map("vendors")
+}
+
+// ============================================
+// DIAMOND INVENTORY (Phase 3)
+// ============================================
+
+enum DiamondShape {
+  ROUND
+  PRINCESS
+  OVAL
+  MARQUISE
+  PEAR
+  CUSHION
+  EMERALD
+  ASSCHER
+  RADIANT
+  HEART
+  OTHER
+}
+
+enum DiamondClarity {
+  FL
+  IF
+  VVS1
+  VVS2
+  VS1
+  VS2
+  SI1
+  SI2
+  I1
+  I2
+  I3
+}
+
+enum DiamondColor {
+  D
+  E
+  F
+  G
+  H
+  I
+  J
+  K
+  L
+  M
+  N_Z
+  FANCY
+}
+
+enum DiamondCut {
+  EXCELLENT
+  VERY_GOOD
+  GOOD
+  FAIR
+  POOR
+}
+
+model DiamondLot {
+  id               String    @id @default(uuid())
+  lotNumber        String    @unique @map("lot_number")
+  description      String?
+  totalPieces      Int       @map("total_pieces")
+  totalCarats      Float     @map("total_carats")
+  avgPricePerCarat Float?    @map("avg_price_per_carat")
+  supplierId       String?   @map("supplier_id")
+  purchaseDate     DateTime? @map("purchase_date")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  diamonds Diamond[]
+
+  @@index([lotNumber])
+  @@map("diamond_lots")
+}
+
+model Diamond {
+  id               String         @id @default(uuid())
+  stockNumber      String         @unique @map("stock_number")
+  caratWeight      Float          @map("carat_weight")
+  color            DiamondColor
+  clarity          DiamondClarity
+  cut              DiamondCut?
+  shape            DiamondShape
+  measurements     String?
+  depthPercent     Float?         @map("depth_percent")
+  tablePercent     Float?         @map("table_percent")
+  polish           String?
+  symmetry         String?
+  fluorescence     String?
+  certificationLab String?        @map("certification_lab")
+  certNumber       String?        @map("cert_number")
+  certDate         DateTime?      @map("cert_date")
+  certUrl          String?        @map("cert_url")
+  pricePerCarat    Float?         @map("price_per_carat")
+  totalPrice       Float?         @map("total_price")
+  lotId            String?        @map("lot_id")
+  lot              DiamondLot?    @relation(fields: [lotId], references: [id])
+  status           String         @default("IN_STOCK")
+  currentLocation  String?        @map("current_location")
+  issuedToOrderId  String?        @map("issued_to_order_id")
+  issuedToOrder    Order?         @relation("DiamondIssues", fields: [issuedToOrderId], references: [id])
+  issuedAt         DateTime?      @map("issued_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  transactions DiamondTransaction[]
+
+  @@index([status])
+  @@index([shape, color, clarity])
+  @@index([stockNumber])
+  @@map("diamonds")
+}
+
+model DiamondTransaction {
+  id              String   @id @default(uuid())
+  diamondId       String   @map("diamond_id")
+  diamond         Diamond  @relation(fields: [diamondId], references: [id], onDelete: Cascade)
+  transactionType String   @map("transaction_type")
+  fromLocation    String?  @map("from_location")
+  toLocation      String?  @map("to_location")
+  orderId         String?  @map("order_id")
+  order           Order?   @relation("DiamondTransactions", fields: [orderId], references: [id])
+  workerId        String?  @map("worker_id")
+  notes           String?
+  createdById     String   @map("created_by_id")
+  createdBy       User     @relation("DiamondTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([diamondId])
+  @@index([createdAt])
+  @@map("diamond_transactions")
+}
+
+// ============================================
+// REAL STONE INVENTORY (Phase 3)
+// ============================================
+
+enum RealStoneType {
+  RUBY
+  EMERALD
+  BLUE_SAPPHIRE
+  YELLOW_SAPPHIRE
+  PINK_SAPPHIRE
+  ALEXANDRITE
+  TANZANITE
+  TOURMALINE
+  SPINEL
+  GARNET
+  AQUAMARINE
+  TOPAZ
+  OPAL
+  PEARL
+  CORAL
+  OTHER
+}
+
+model RealStone {
+  id             String        @id @default(uuid())
+  stockNumber    String        @unique @map("stock_number")
+  stoneType      RealStoneType @map("stone_type")
+  caratWeight    Float         @map("carat_weight")
+  shape          String
+  color          String
+  clarity        String?
+  cut            String?
+  origin         String?
+  treatment      String?
+  treatmentNotes String?       @map("treatment_notes")
+  certLab        String?       @map("cert_lab")
+  certNumber     String?       @map("cert_number")
+  certDate       DateTime?     @map("cert_date")
+  pricePerCarat  Float?        @map("price_per_carat")
+  totalPrice     Float?        @map("total_price")
+  status         String        @default("IN_STOCK")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  transactions RealStoneTransaction[]
+
+  @@index([status])
+  @@index([stoneType])
+  @@index([stockNumber])
+  @@map("real_stones")
+}
+
+model RealStoneTransaction {
+  id              String    @id @default(uuid())
+  stoneId         String    @map("stone_id")
+  stone           RealStone @relation(fields: [stoneId], references: [id], onDelete: Cascade)
+  transactionType String    @map("transaction_type")
+  orderId         String?   @map("order_id")
+  order           Order?    @relation("RealStoneTransactions", fields: [orderId], references: [id])
+  notes           String?
+  createdById     String    @map("created_by_id")
+  createdBy       User      @relation("RealStoneTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([stoneId])
+  @@map("real_stone_transactions")
+}
+
+// ============================================
+// STONE INVENTORY (Phase 3)
+// ============================================
+
+enum SyntheticStoneType {
+  CZ
+  AMERICAN_DIAMOND
+  KUNDAN
+  POLKI
+  MOISSANITE
+  GLASS
+  SYNTHETIC_RUBY
+  SYNTHETIC_EMERALD
+  SYNTHETIC_SAPPHIRE
+  MARCASITE
+  OTHER
+}
+
+model StonePacket {
+  id            String             @id @default(uuid())
+  packetNumber  String             @unique @map("packet_number")
+  stoneType     SyntheticStoneType @map("stone_type")
+  shape         String
+  size          String
+  color         String
+  quality       String?
+  totalPieces   Int?               @map("total_pieces")
+  totalWeight   Float              @map("total_weight")
+  unit          String             @default("CARAT")
+  currentPieces Int?               @map("current_pieces")
+  currentWeight Float              @map("current_weight")
+  pricePerUnit  Float?             @map("price_per_unit")
+  reorderLevel  Float?             @map("reorder_level")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  transactions StonePacketTransaction[]
+
+  @@index([stoneType, size, color])
+  @@index([packetNumber])
+  @@map("stone_packets")
+}
+
+model StonePacketTransaction {
+  id              String      @id @default(uuid())
+  packetId        String      @map("packet_id")
+  packet          StonePacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  transactionType String      @map("transaction_type")
+  quantity        Float
+  unit            String
+  orderId         String?     @map("order_id")
+  order           Order?      @relation("StonePacketTransactions", fields: [orderId], references: [id])
+  workerId        String?     @map("worker_id")
+  notes           String?
+  createdById     String      @map("created_by_id")
+  createdBy       User        @relation("StonePacketTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([packetId])
+  @@map("stone_packet_transactions")
+}
+
+// ============================================
+// FACTORY INVENTORY (Phase 4)
+// ============================================
+
+model FactoryItemCategory {
+  id          String                @id @default(uuid())
+  name        String                @unique
+  description String?
+  parentId    String?               @map("parent_id")
+  parent      FactoryItemCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    FactoryItemCategory[] @relation("CategoryHierarchy")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  items FactoryItem[]
+
+  @@index([parentId])
+  @@index([name])
+  @@map("factory_item_categories")
+}
+
+model FactoryItem {
+  id                String              @id @default(uuid())
+  itemCode          String              @unique @map("item_code")
+  name              String
+  description       String?
+  categoryId        String              @map("category_id")
+  category          FactoryItemCategory @relation(fields: [categoryId], references: [id])
+  unit              String
+  currentStock      Float               @default(0) @map("current_stock")
+  minStock          Float?              @map("min_stock")
+  maxStock          Float?              @map("max_stock")
+  reorderQty        Float?              @map("reorder_qty")
+  lastPurchasePrice Float?              @map("last_purchase_price")
+  avgPrice          Float?              @map("avg_price")
+  location          String?
+  isEquipment       Boolean             @default(false) @map("is_equipment")
+  serialNumber      String?             @map("serial_number")
+  purchaseDate      DateTime?           @map("purchase_date")
+  warrantyEnd       DateTime?           @map("warranty_end")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  transactions    FactoryItemTransaction[]
+  maintenanceLogs EquipmentMaintenance[]
+
+  @@index([itemCode])
+  @@index([categoryId])
+  @@index([isEquipment])
+  @@map("factory_items")
+}
+
+model FactoryItemTransaction {
+  id              String      @id @default(uuid())
+  itemId          String      @map("item_id")
+  item            FactoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  transactionType String      @map("transaction_type")
+  quantity        Float
+  rate            Float?
+  totalValue      Float?      @map("total_value")
+  departmentId    String?     @map("department_id")
+  workerId        String?     @map("worker_id")
+  vendorId        String?     @map("vendor_id")
+  referenceNumber String?     @map("reference_number")
+  notes           String?
+  createdById     String      @map("created_by_id")
+  createdBy       User        @relation("FactoryItemTransactionsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([itemId])
+  @@index([createdAt])
+  @@map("factory_item_transactions")
+}
+
+model EquipmentMaintenance {
+  id              String      @id @default(uuid())
+  equipmentId     String      @map("equipment_id")
+  equipment       FactoryItem @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  maintenanceType String      @map("maintenance_type")
+  description     String
+  cost            Float?
+  performedBy     String?     @map("performed_by")
+  performedAt     DateTime    @map("performed_at")
+  nextDueDate     DateTime?   @map("next_due_date")
+  createdById     String      @map("created_by_id")
+  createdBy       User        @relation("EquipmentMaintenanceCreated", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([equipmentId])
+  @@index([performedAt])
+  @@map("equipment_maintenance")
+}
+
+// ============================================
+// ATTENDANCE SYSTEM (Phase 5)
+// ============================================
+
+model Shift {
+  id           String   @id @default(uuid())
+  name         String
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  breakMinutes Int      @default(60) @map("break_minutes")
+  graceMinutes Int      @default(15) @map("grace_minutes")
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  employees EmployeeShift[]
+
+  @@index([isDefault])
+  @@map("shifts")
+}
+
+model EmployeeShift {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  user          User      @relation("EmployeeShifts", fields: [userId], references: [id], onDelete: Cascade)
+  shiftId       String    @map("shift_id")
+  shift         Shift     @relation(fields: [shiftId], references: [id])
+  effectiveFrom DateTime  @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  @@index([userId])
+  @@index([effectiveFrom])
+  @@map("employee_shifts")
+}
+
+model Attendance {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  user           User      @relation("AttendanceRecords", fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime  @db.Date
+  checkInTime    DateTime? @map("check_in_time")
+  checkInPhoto   String?   @map("check_in_photo")
+  checkInLat     Float?    @map("check_in_lat")
+  checkInLng     Float?    @map("check_in_lng")
+  checkInDevice  String?   @map("check_in_device")
+  checkOutTime   DateTime? @map("check_out_time")
+  checkOutPhoto  String?   @map("check_out_photo")
+  checkOutLat    Float?    @map("check_out_lat")
+  checkOutLng    Float?    @map("check_out_lng")
+  checkOutDevice String?   @map("check_out_device")
+  totalHours     Float?    @map("total_hours")
+  overtimeHours  Float?    @map("overtime_hours")
+  status         String    @default("ABSENT")
+  isLate         Boolean   @default(false) @map("is_late")
+  lateMinutes    Int?      @map("late_minutes")
+  isEarlyOut     Boolean   @default(false) @map("is_early_out")
+  earlyMinutes   Int?      @map("early_minutes")
+  approvedById   String?   @map("approved_by_id")
+  approvedAt     DateTime? @map("approved_at")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId, date])
+  @@index([status])
+  @@map("attendance")
+}
+
+model Leave {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  user            User      @relation("LeaveApplications", fields: [userId], references: [id], onDelete: Cascade)
+  leaveType       String    @map("leave_type")
+  startDate       DateTime  @map("start_date") @db.Date
+  endDate         DateTime  @map("end_date") @db.Date
+  totalDays       Float     @map("total_days")
+  reason          String?
+  status          String    @default("PENDING")
+  approvedById    String?   @map("approved_by_id")
+  approvedAt      DateTime? @map("approved_at")
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+  @@map("leaves")
+}
+
+model Holiday {
+  id         String   @id @default(uuid())
+  name       String
+  date       DateTime @db.Date
+  isOptional Boolean  @default(false) @map("is_optional")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+  @@map("holidays")
+}
+
+// ============================================
+// PAYROLL SYSTEM (Phase 5)
+// ============================================
+
+model SalaryStructure {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  user          User      @relation("SalaryStructures", fields: [userId], references: [id], onDelete: Cascade)
+  basicSalary   Float     @map("basic_salary")
+  hra           Float?
+  da            Float?
+  conveyance    Float?
+  medicalAllow  Float?    @map("medical_allow")
+  specialAllow  Float?    @map("special_allow")
+  otherAllow    Float?    @map("other_allow")
+  perDayRate    Float?    @map("per_day_rate")
+  perHourRate   Float?    @map("per_hour_rate")
+  overtimeRate  Float?    @map("overtime_rate")
+  bankName      String?   @map("bank_name")
+  accountNumber String?   @map("account_number")
+  ifscCode      String?   @map("ifsc_code")
+  effectiveFrom DateTime  @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([effectiveFrom])
+  @@map("salary_structures")
+}
+
+model PayrollPeriod {
+  id            String    @id @default(uuid())
+  month         Int
+  year          Int
+  startDate     DateTime  @map("start_date") @db.Date
+  endDate       DateTime  @map("end_date") @db.Date
+  workingDays   Int       @map("working_days")
+  status        String    @default("DRAFT")
+  processedById String?   @map("processed_by_id")
+  processedAt   DateTime? @map("processed_at")
+  finalizedById String?   @map("finalized_by_id")
+  finalizedAt   DateTime? @map("finalized_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  payslips Payslip[]
+
+  @@unique([month, year])
+  @@index([month, year])
+  @@index([status])
+  @@map("payroll_periods")
+}
+
+model Payslip {
+  id               String        @id @default(uuid())
+  periodId         String        @map("period_id")
+  period           PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  userId           String        @map("user_id")
+  user             User          @relation("Payslips", fields: [userId], references: [id], onDelete: Cascade)
+  totalDays        Int           @map("total_days")
+  presentDays      Float         @map("present_days")
+  absentDays       Float         @map("absent_days")
+  leaveDays        Float         @map("leave_days")
+  holidays         Int
+  overtimeHours    Float         @map("overtime_hours")
+  lateDeductions   Float?        @map("late_deductions")
+  basicEarned      Float         @map("basic_earned")
+  hraEarned        Float?        @map("hra_earned")
+  daEarned         Float?        @map("da_earned")
+  conveyanceEarned Float?        @map("conveyance_earned")
+  medicalEarned    Float?        @map("medical_earned")
+  specialEarned    Float?        @map("special_earned")
+  otherEarned      Float?        @map("other_earned")
+  overtimePay      Float?        @map("overtime_pay")
+  bonus            Float?
+  incentive        Float?
+  grossEarnings    Float         @map("gross_earnings")
+  advanceDeduction Float?        @map("advance_deduction")
+  loanDeduction    Float?        @map("loan_deduction")
+  otherDeduction   Float?        @map("other_deduction")
+  totalDeductions  Float         @map("total_deductions")
+  netSalary        Float         @map("net_salary")
+  paymentStatus    String        @default("PENDING") @map("payment_status")
+  paymentDate      DateTime?     @map("payment_date")
+  paymentMode      String?       @map("payment_mode")
+  transactionRef   String?       @map("transaction_ref")
+  payslipUrl       String?       @map("payslip_url")
+  emailedAt        DateTime?     @map("emailed_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@unique([periodId, userId])
+  @@index([userId])
+  @@index([periodId])
+  @@index([paymentStatus])
+  @@map("payslips")
+}
+
+model EmployeeAdvance {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  user              User     @relation("EmployeeAdvances", fields: [userId], references: [id], onDelete: Cascade)
+  amount            Float
+  reason            String?
+  givenDate         DateTime @map("given_date")
+  deductionPerMonth Float    @map("deduction_per_month")
+  totalDeducted     Float    @default(0) @map("total_deducted")
+  remainingAmount   Float    @map("remaining_amount")
+  status            String   @default("ACTIVE")
+  approvedById      String?  @map("approved_by_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@map("employee_advances")
+}
+
+model EmployeeLoan {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  user            User     @relation("EmployeeLoans", fields: [userId], references: [id], onDelete: Cascade)
+  loanAmount      Float    @map("loan_amount")
+  interestRate    Float?   @map("interest_rate")
+  tenure          Int
+  emiAmount       Float    @map("emi_amount")
+  disbursedDate   DateTime @map("disbursed_date")
+  startMonth      DateTime @map("start_month")
+  totalPaid       Float    @default(0) @map("total_paid")
+  remainingAmount Float    @map("remaining_amount")
+  status          String   @default("ACTIVE")
+  approvedById    String?  @map("approved_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@map("employee_loans")
 }

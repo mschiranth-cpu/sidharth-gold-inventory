@@ -372,85 +372,200 @@ export const completeWork = async (orderId: string, userId: string, data: WorkPr
     });
   }
 
-  // Auto-cascade to next department
-  // First, check if next department tracking exists
-  let nextDepartment = tracking.order.departmentTracking.find(
-    (dt: any) => dt.sequenceOrder === tracking.sequenceOrder + 1
-  );
+  // Smart routing logic for reopened orders:
+  // Check if this is a reopened order by looking at subsequent departments
+  const currentDeptIndex = DEPARTMENT_ORDER.indexOf(tracking.departmentName as DepartmentName);
 
-  // If next department tracking doesn't exist, create it
-  if (!nextDepartment) {
-    // Get the current department's index in the order
-    const currentDeptIndex = DEPARTMENT_ORDER.indexOf(tracking.departmentName as DepartmentName);
+  // Get all department tracking records for this order
+  const allDepartmentTracking = tracking.order.departmentTracking;
 
-    if (currentDeptIndex !== -1 && currentDeptIndex < DEPARTMENT_ORDER.length - 1) {
-      const nextDeptName = DEPARTMENT_ORDER[currentDeptIndex + 1];
+  // Check if any subsequent departments exist and are already completed
+  let hasSubsequentCompletedDepts = false;
+  let nextIncompleteDept: DepartmentName | null = null;
 
-      if (nextDeptName) {
-        // Create the next department tracking
-        nextDepartment = await prisma.departmentTracking.create({
-          data: {
-            orderId: tracking.orderId,
-            departmentName: nextDeptName,
-            sequenceOrder: tracking.sequenceOrder + 1,
-            status: DepartmentStatus.PENDING_ASSIGNMENT,
-          },
-        });
+  if (currentDeptIndex !== -1 && currentDeptIndex < DEPARTMENT_ORDER.length - 1) {
+    // Check all departments after the current one
+    for (let i = currentDeptIndex + 1; i < DEPARTMENT_ORDER.length; i++) {
+      const deptName = DEPARTMENT_ORDER[i];
+      const deptTracking = allDepartmentTracking.find((dt: any) => dt.departmentName === deptName);
+
+      if (deptTracking) {
+        if (deptTracking.status === DepartmentStatus.COMPLETED) {
+          hasSubsequentCompletedDepts = true;
+        } else if (!nextIncompleteDept) {
+          // Found the first incomplete department
+          nextIncompleteDept = deptName;
+          break;
+        }
+      } else {
+        // Department tracking doesn't exist, so it's not complete
+        nextIncompleteDept = deptName;
+        break;
       }
-    } else if (currentDeptIndex === DEPARTMENT_ORDER.length - 1) {
-      // This is the LAST department (ADDITIONAL/Finishing Touch)
-      // Mark the order as COMPLETED and create FinalSubmission
-      console.log('✅ All departments completed! Marking order as COMPLETED');
+    }
+  }
 
-      // Get order details for final submission
-      const orderDetails = tracking.order.orderDetails;
-      const initialGoldWeight = orderDetails?.goldWeightInitial || 0;
+  // Determine routing based on reopened order logic
+  let nextDepartment;
 
+  if (hasSubsequentCompletedDepts && nextIncompleteDept) {
+    // This is a reopened order with some completed subsequent departments
+    // Route to the next incomplete department
+    console.log(`🔄 Reopened order: routing to next incomplete department: ${nextIncompleteDept}`);
+
+    nextDepartment = allDepartmentTracking.find(
+      (dt: any) => dt.departmentName === nextIncompleteDept
+    );
+
+    if (!nextDepartment) {
+      // Create tracking for the next incomplete department
+      const nextSeqOrder = DEPARTMENT_ORDER.indexOf(nextIncompleteDept) + 1;
+      nextDepartment = await prisma.departmentTracking.create({
+        data: {
+          orderId: tracking.orderId,
+          departmentName: nextIncompleteDept,
+          sequenceOrder: nextSeqOrder,
+          status: DepartmentStatus.PENDING_ASSIGNMENT,
+        },
+      });
+    }
+  } else if (hasSubsequentCompletedDepts && !nextIncompleteDept) {
+    // All subsequent departments are complete - move to submission
+    console.log('✅ Reopened order: all subsequent departments complete! Moving to submission');
+
+    // Get order details for final submission
+    const orderDetails = tracking.order.orderDetails;
+    const initialGoldWeight = orderDetails?.goldWeightInitial || 0;
+
+    // Check if FinalSubmission already exists
+    const existingSubmission = await prisma.finalSubmission.findUnique({
+      where: { orderId: tracking.orderId },
+    });
+
+    if (!existingSubmission) {
       // Create FinalSubmission record
       await prisma.finalSubmission.create({
         data: {
           orderId: tracking.orderId,
-          finalGoldWeight: initialGoldWeight, // Can be updated later with actual final weight
-          finalStoneWeight: 0, // No stone weight field in OrderDetails, default to 0
+          finalGoldWeight: initialGoldWeight,
+          finalStoneWeight: 0,
           finalPurity: orderDetails?.purity || 22,
           numberOfPieces: orderDetails?.quantity || 1,
           totalWeight: initialGoldWeight,
           submittedById: userId,
           submittedAt: now,
           completionPhotos: (data.uploadedPhotos || []) as string[],
-          qualityNotes: 'Auto-submitted upon completion of all departments',
+          qualityNotes: 'Resubmitted after corrections - all departments complete',
         },
       });
-      console.log('📦 FinalSubmission record created');
+      console.log('📦 FinalSubmission record created for reopened order');
+    }
 
-      // Log order completion activity
-      await activityService.logActivity({
-        orderId: tracking.orderId,
-        action: ActivityAction.ORDER_SUBMITTED,
-        title: 'Order completed - Ready for final submission',
-        description: `All 9 departments have completed their work. Order is ready for factory-to-office handoff.`,
-        userId: userId,
-        metadata: {
-          completedDepartments: DEPARTMENT_ORDER,
-          finalGoldWeight: initialGoldWeight,
-          finalPurity: orderDetails?.purity || 22,
-          numberOfPieces: orderDetails?.quantity || 1,
-        },
-      });
+    // Log order completion activity
+    await activityService.logActivity({
+      orderId: tracking.orderId,
+      action: ActivityAction.ORDER_SUBMITTED,
+      title: 'Order resubmitted - Ready for final submission',
+      description: `All departments completed. Order corrections verified and ready for submission.`,
+      userId: userId,
+      metadata: {
+        reopenedOrder: true,
+        completedDepartments: DEPARTMENT_ORDER,
+      },
+    });
 
-      // Update order status
-      await prisma.order.update({
-        where: {
-          id: tracking.orderId,
-        },
-        data: {
-          status: 'COMPLETED',
-          completedAt: now,
-        },
-      });
+    // Update order status and clear currentDepartment
+    await prisma.order.update({
+      where: {
+        id: tracking.orderId,
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: now,
+        currentDepartment: null,
+      },
+    });
 
-      // Return early since there's no next department
-      return workData;
+    return workData;
+  } else {
+    // Normal flow: no subsequent completed departments (not a reopened order)
+    // First, check if next department tracking exists
+    nextDepartment = tracking.order.departmentTracking.find(
+      (dt: any) => dt.sequenceOrder === tracking.sequenceOrder + 1
+    );
+
+    // If next department tracking doesn't exist, create it
+    if (!nextDepartment) {
+      if (currentDeptIndex !== -1 && currentDeptIndex < DEPARTMENT_ORDER.length - 1) {
+        const nextDeptName = DEPARTMENT_ORDER[currentDeptIndex + 1];
+
+        if (nextDeptName) {
+          // Create the next department tracking
+          nextDepartment = await prisma.departmentTracking.create({
+            data: {
+              orderId: tracking.orderId,
+              departmentName: nextDeptName,
+              sequenceOrder: tracking.sequenceOrder + 1,
+              status: DepartmentStatus.PENDING_ASSIGNMENT,
+            },
+          });
+        }
+      } else if (currentDeptIndex === DEPARTMENT_ORDER.length - 1) {
+        // This is the LAST department (ADDITIONAL/Finishing Touch)
+        // Mark the order as COMPLETED and create FinalSubmission
+        console.log('✅ All departments completed! Marking order as COMPLETED');
+
+        // Get order details for final submission
+        const orderDetails = tracking.order.orderDetails;
+        const initialGoldWeight = orderDetails?.goldWeightInitial || 0;
+
+        // Create FinalSubmission record
+        await prisma.finalSubmission.create({
+          data: {
+            orderId: tracking.orderId,
+            finalGoldWeight: initialGoldWeight, // Can be updated later with actual final weight
+            finalStoneWeight: 0, // No stone weight field in OrderDetails, default to 0
+            finalPurity: orderDetails?.purity || 22,
+            numberOfPieces: orderDetails?.quantity || 1,
+            totalWeight: initialGoldWeight,
+            submittedById: userId,
+            submittedAt: now,
+            completionPhotos: (data.uploadedPhotos || []) as string[],
+            qualityNotes: 'Auto-submitted upon completion of all departments',
+          },
+        });
+        console.log('📦 FinalSubmission record created');
+
+        // Log order completion activity
+        await activityService.logActivity({
+          orderId: tracking.orderId,
+          action: ActivityAction.ORDER_SUBMITTED,
+          title: 'Order completed - Ready for final submission',
+          description: `All 9 departments have completed their work. Order is ready for factory-to-office handoff.`,
+          userId: userId,
+          metadata: {
+            completedDepartments: DEPARTMENT_ORDER,
+            finalGoldWeight: initialGoldWeight,
+            finalPurity: orderDetails?.purity || 22,
+            numberOfPieces: orderDetails?.quantity || 1,
+          },
+        });
+
+        // Update order status and clear currentDepartment
+        await prisma.order.update({
+          where: {
+            id: tracking.orderId,
+          },
+          data: {
+            status: 'COMPLETED',
+            completedAt: now,
+            currentDepartment: null, // Clear department so it doesn't show in Factory Tracking
+          },
+        });
+
+        // Return early since there's no next department
+        return workData;
+      }
     }
   }
 
@@ -565,4 +680,101 @@ export const completeWork = async (orderId: string, userId: string, data: WorkPr
   }
 
   return workData;
+};
+
+/**
+ * Reopen completed work for editing
+ * Allows admins to reset work completion status so workers can make corrections
+ *
+ * @param orderId - Order ID
+ * @param departmentName - Department name to reopen
+ * @returns Updated work data
+ */
+export const reopenWork = async (orderId: string, departmentName: string) => {
+  // Get department tracking
+  const tracking = await prisma.departmentTracking.findFirst({
+    where: {
+      orderId,
+      departmentName: departmentName as DepartmentName,
+    },
+    include: {
+      order: {
+        include: {
+          orderDetails: true,
+        },
+      },
+    },
+  });
+
+  if (!tracking) {
+    throw new Error('Department tracking not found');
+  }
+
+  if (tracking.status !== DepartmentStatus.COMPLETED) {
+    throw new Error('This department work is not completed yet');
+  }
+
+  // Reset department tracking status to IN_PROGRESS
+  await prisma.departmentTracking.update({
+    where: {
+      id: tracking.id,
+    },
+    data: {
+      status: DepartmentStatus.IN_PROGRESS,
+      completedAt: null,
+    },
+  });
+
+  // Reset work data completion status
+  const workData = await prisma.departmentWorkData.findUnique({
+    where: {
+      departmentTrackingId: tracking.id,
+    },
+  });
+
+  if (workData) {
+    await prisma.departmentWorkData.update({
+      where: {
+        id: workData.id,
+      },
+      data: {
+        isComplete: false,
+        workCompletedAt: null,
+      },
+    });
+  }
+
+  // Update order status back to IN_FACTORY if it was COMPLETED
+  if (tracking.order.status === 'COMPLETED') {
+    await prisma.order.update({
+      where: {
+        id: orderId,
+      },
+      data: {
+        status: 'IN_FACTORY',
+        currentDepartment: departmentName as DepartmentName,
+        completedAt: null,
+      },
+    });
+  }
+
+  // Log activity
+  const deptLabel = DEPARTMENT_LABELS[departmentName as DepartmentName] || departmentName;
+  await activityService.logActivity({
+    orderId: tracking.orderId,
+    action: ActivityAction.STATUS_CHANGE,
+    title: `${deptLabel} work reopened for editing`,
+    description: `Admin reopened completed work in ${deptLabel} department for corrections`,
+    metadata: {
+      departmentName,
+      departmentLabel: deptLabel,
+      previousStatus: 'COMPLETED',
+      newStatus: 'IN_PROGRESS',
+    },
+  });
+
+  return {
+    success: true,
+    message: 'Work reopened for editing',
+  };
 };

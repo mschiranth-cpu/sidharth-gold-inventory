@@ -113,4 +113,18 @@ export const workersService = {
     );
     return response.data;
   },
+
+  /**
+   * Reopen completed work for editing (Admin/Manager only)
+   */
+  reopenWork: async (
+    orderId: string,
+    departmentName: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post<{ success: boolean; message: string }>(
+      `/workers/work/${orderId}/reopen`,
+      { departmentName }
+    );
+    return response.data;
+  },
 };

@@ -27,6 +27,9 @@ export default defineConfig(({ mode }) => {
 
       // PWA Configuration
       VitePWA({
+        // Service worker caching can cause "stuck loading" when hosting behind tunnels/proxies.
+        // Disable in production hosting for reliability.
+        disable: true,
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
@@ -245,14 +248,10 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       cssMinify: isProduction,
 
-      // Aggressive minification settings
       esbuild: isProduction
         ? {
-            drop: ['console', 'debugger'],
+            drop: ['debugger'],
             legalComments: 'none',
-            minifyIdentifiers: true,
-            minifySyntax: true,
-            minifyWhitespace: true,
           }
         : undefined,
 
@@ -324,9 +323,22 @@ export default defineConfig(({ mode }) => {
               return 'date-utils';
             }
 
-            // State management
-            if (id.includes('node_modules/zustand')) {
+            // State management (zustand + its peer dependency)
+            if (
+              id.includes('node_modules/zustand') ||
+              id.includes('node_modules/use-sync-external-store')
+            ) {
               return 'state';
+            }
+
+            // Three.js ecosystem — keep out of vendor so it only loads
+            // when the lazy CADFilePreview component is requested
+            if (
+              id.includes('node_modules/three/') ||
+              id.includes('node_modules/@react-three/') ||
+              id.includes('node_modules/react-reconciler/')
+            ) {
+              return undefined; // let Rollup decide (stays with its lazy consumer)
             }
 
             // Other vendor modules
@@ -359,12 +371,7 @@ export default defineConfig(({ mode }) => {
             return 'assets/[name]-[hash][extname]';
           },
         },
-        // Tree-shaking optimizations
-        treeshake: {
-          moduleSideEffects: 'no-external',
-          propertyReadSideEffects: false,
-          tryCatchDeoptimization: false,
-        },
+        treeshake: true,
       },
 
       // Chunk size warning limit

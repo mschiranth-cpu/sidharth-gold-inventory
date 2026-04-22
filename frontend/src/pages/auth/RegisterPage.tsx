@@ -508,7 +508,7 @@ export default function RegisterPage() {
         {/* Footer */}
         <div className="flex items-center justify-center gap-4 mt-6">
           <Link 
-            to="/dashboard" 
+            to="/app/dashboard" 
             className="text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,7 +518,7 @@ export default function RegisterPage() {
           </Link>
           <span className="text-gray-300">|</span>
           <Link 
-            to="/users" 
+            to="/app/users" 
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
           >
             View All Users

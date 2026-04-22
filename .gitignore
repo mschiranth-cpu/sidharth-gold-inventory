@@ -62,3 +62,15 @@ load-test-results.json
 
 # Build outputs
 prisma/migrations/
+.nexusgraphai
+
+# Playwright browser cache
+**/test-results/
+**/playwright-report/
+
+# NSSM service logs
+backend/logs/
+
+# Cursor AI artifacts
+.cursor/
+assets/

@@ -11,17 +11,10 @@ import './index.css';
 // Get optimized query client instance
 const queryClient = getQueryClient();
 
-// Register service worker for PWA (production only)
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (registration) => {
-        console.log('SW registered:', registration.scope);
-      },
-      (error) => {
-        console.log('SW registration failed:', error);
-      }
-    );
+// Unregister any stale service workers from previous builds
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((r) => r.unregister());
   });
 }
 

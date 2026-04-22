@@ -98,9 +98,9 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
       ordersInProgress: stats.byStatus?.IN_FACTORY || 0,
       completedToday: stats.byStatus?.COMPLETED || 0,
       overdueOrders: stats.overdueCount || 0,
-      totalGoldInProcess: 0, // Not available without factory module
-      totalSilverInProcess: 0,
-      totalPlatinumInProcess: 0,
+      totalGoldInProcess: stats.totalGoldInProcess || 0,
+      totalSilverInProcess: stats.totalSilverInProcess || 0,
+      totalPlatinumInProcess: stats.totalPlatinumInProcess || 0,
       pendingSubmissions: (submissionsRes as any)?.data?.stats?.pendingApprovals || 0,
     };
 

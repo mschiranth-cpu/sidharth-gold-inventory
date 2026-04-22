@@ -159,6 +159,20 @@ function toOrderListItem(order: any, userRole: UserRole): OrderListItemResponse 
     response.customerEmail = order.customerEmail ?? undefined;
   }
 
+  // Always include client info if available (for order tracking)
+  if (order.client) {
+    response.client = {
+      id: order.client.id,
+      businessName: order.client.businessName,
+      user: order.client.user
+        ? {
+            name: order.client.user.name,
+            email: order.client.user.email,
+          }
+        : undefined,
+    };
+  }
+
   return response;
 }
 
@@ -621,6 +635,18 @@ export async function getOrders(
       include: {
         createdBy: true,
         orderDetails: true,
+        client: {
+          select: {
+            id: true,
+            businessName: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
         departmentTracking: {
           select: {
             departmentName: true,
@@ -915,8 +941,11 @@ export async function getOrderStats(): Promise<{
   byStatus: Record<string, number>;
   overdueCount: number;
   dueTodayCount: number;
+  totalGoldInProcess: number;
+  totalSilverInProcess: number;
+  totalPlatinumInProcess: number;
 }> {
-  const [total, byStatusArray, overdueCount, dueTodayCount] = await Promise.all([
+  const [total, byStatusArray, overdueCount, dueTodayCount, ordersInProcess] = await Promise.all([
     prisma.order.count(),
     prisma.order.groupBy({
       by: ['status'],
@@ -941,14 +970,48 @@ export async function getOrderStats(): Promise<{
         },
       },
     }),
+    prisma.order.findMany({
+      where: { status: 'IN_FACTORY' },
+      include: { orderDetails: true },
+    }),
   ]);
 
-  const byStatus = byStatusArray.reduce((acc, item) => {
-    acc[item.status] = item._count.status;
-    return acc;
-  }, {} as Record<string, number>);
+  const byStatus = byStatusArray.reduce(
+    (acc, item) => {
+      acc[item.status] = item._count.status;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
-  return { total, byStatus, overdueCount, dueTodayCount };
+  let totalGoldInProcess = 0;
+  let totalSilverInProcess = 0;
+  let totalPlatinumInProcess = 0;
+
+  ordersInProcess.forEach((order) => {
+    if (order.orderDetails) {
+      const metalType = order.orderDetails.metalType?.toUpperCase() || 'GOLD';
+      const weight = order.orderDetails.goldWeightInitial || 0;
+
+      if (metalType === 'GOLD') {
+        totalGoldInProcess += weight;
+      } else if (metalType === 'SILVER') {
+        totalSilverInProcess += weight;
+      } else if (metalType === 'PLATINUM') {
+        totalPlatinumInProcess += weight;
+      }
+    }
+  });
+
+  return {
+    total,
+    byStatus,
+    overdueCount,
+    dueTodayCount,
+    totalGoldInProcess,
+    totalSilverInProcess,
+    totalPlatinumInProcess,
+  };
 }
 
 // ============================================

@@ -472,7 +472,7 @@ async function main() {
         customerName: randomElement(customerNames),
         customerPhone: generatePhone(),
         customerEmail: `customer${i}@example.com`,
-        productPhotoUrl: `https://images.unsplash.com/photo-${1600000000000 + i}?w=400`,
+        productPhotoUrl: `https://picsum.photos/seed/gold-order-${i}/400/400`,
         status,
         priority: randomInt(0, 5),
         createdById: creator.id,
@@ -510,12 +510,8 @@ async function main() {
             ? 'Handle with extra care. Customer is VIP. Priority processing required.'
             : null,
         referenceImages: [
-          `https://images.unsplash.com/photo-${
-            1600000000000 + Math.floor(Math.random() * 1000)
-          }?w=400`,
-          `https://images.unsplash.com/photo-${
-            1600000001000 + Math.floor(Math.random() * 1000)
-          }?w=400`,
+          `https://picsum.photos/seed/gold-ref-${order.orderNumber}-1/400/400`,
+          `https://picsum.photos/seed/gold-ref-${order.orderNumber}-2/400/400`,
         ],
         enteredById: enteredBy.id,
         createdAt: order.createdAt,
@@ -600,7 +596,8 @@ async function main() {
 
       // Simulate gold weight changes
       const goldLoss = randomFloat(0, 0.5);
-      const goldWeightOut = deptStatus === 'COMPLETED' ? currentGoldWeight - goldLoss : null;
+      const goldWeightOut =
+        deptStatus === 'COMPLETED' && currentGoldWeight ? currentGoldWeight - goldLoss : null;
 
       await prisma.departmentTracking.create({
         data: {
@@ -626,9 +623,7 @@ async function main() {
           photos:
             deptStatus !== 'NOT_STARTED'
               ? [
-                  `https://images.unsplash.com/photo-${
-                    1600000000000 + Math.floor(Math.random() * 1000)
-                  }?w=400`,
+                  `https://picsum.photos/seed/gold-dept-${order.orderNumber}-${dept}/400/400`,
                 ]
               : [],
           issues: Math.random() > 0.9 ? 'Minor adjustment required. Resolved.' : null,
@@ -660,7 +655,7 @@ async function main() {
     if (!orderDetails) continue;
 
     const submitter = randomElement([...managers, ...admins]);
-    const finalGoldWeight = orderDetails.goldWeightInitial - randomFloat(0.5, 3);
+    const finalGoldWeight = (orderDetails.goldWeightInitial || 0) - randomFloat(0.5, 3);
 
     // Get total stone weight
     const stones = await prisma.stone.findMany({
@@ -682,15 +677,9 @@ async function main() {
         qualityGrade: randomElement(['A+', 'A', 'A', 'A', 'B+', 'B']),
         qualityNotes: 'Quality inspection passed. All specifications met. Ready for delivery.',
         completionPhotos: [
-          `https://images.unsplash.com/photo-${
-            1600000000000 + Math.floor(Math.random() * 1000)
-          }?w=800`,
-          `https://images.unsplash.com/photo-${
-            1600000001000 + Math.floor(Math.random() * 1000)
-          }?w=800`,
-          `https://images.unsplash.com/photo-${
-            1600000002000 + Math.floor(Math.random() * 1000)
-          }?w=800`,
+          `https://picsum.photos/seed/gold-final-${order.orderNumber}-1/800/800`,
+          `https://picsum.photos/seed/gold-final-${order.orderNumber}-2/800/800`,
+          `https://picsum.photos/seed/gold-final-${order.orderNumber}-3/800/800`,
         ],
         certificateUrl:
           Math.random() > 0.5
@@ -733,7 +722,7 @@ async function main() {
       userId: staff.id,
       title: 'Order Due Soon',
       message: 'Order deadline is approaching. Please follow up with the factory.',
-      type: 'DUE_DATE_REMINDER',
+      type: 'ORDER_UPDATE' as any,
       relatedId: randomElement(orders).id,
       isRead: false,
     });

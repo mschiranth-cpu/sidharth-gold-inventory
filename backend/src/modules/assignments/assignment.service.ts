@@ -409,7 +409,10 @@ export async function completeDepartmentAndCascade(
     // Last department - mark order as completed
     await prisma.order.update({
       where: { id: orderId },
-      data: { status: 'COMPLETED' },
+      data: {
+        status: 'COMPLETED',
+        currentDepartment: null, // Clear department so it doesn't show in Factory Tracking
+      },
     });
 
     // Log order completion
@@ -627,6 +630,14 @@ export async function moveToDepartment(
   if (fromDepartment) {
     await activityService.logDepartmentMove(orderId, fromDepartment, targetDepartment);
   }
+
+  // Update order's current department
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      currentDepartment: targetDepartment,
+    },
+  });
 
   // Auto-assign the target department
   const assignment = await autoAssignDepartment(orderId, targetDepartment);

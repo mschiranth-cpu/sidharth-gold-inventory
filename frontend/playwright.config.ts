@@ -69,11 +69,11 @@ export default defineConfig({
 
   // Configure projects for major browsers
   projects: [
-    // Setup project for authentication
-    {
-      name: 'setup',
-      testMatch: /.*\.setup\.ts/,
-    },
+    // Setup project for authentication (DISABLED - using direct login in tests)
+    // {
+    //   name: 'setup',
+    //   testMatch: /.*\.setup\.ts/,
+    // },
 
     // Desktop browsers
     {
@@ -81,21 +81,21 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // Disabled - using direct login
     },
     {
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // Disabled
     },
     {
       name: 'webkit',
       use: {
         ...devices['Desktop Safari'],
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // Disabled
     },
 
     // Mobile viewports
@@ -104,14 +104,14 @@ export default defineConfig({
       use: {
         ...devices['Pixel 5'],
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // Disabled
     },
     {
       name: 'mobile-safari',
       use: {
         ...devices['iPhone 12'],
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // Disabled
     },
 
     // Branded browsers (optional)

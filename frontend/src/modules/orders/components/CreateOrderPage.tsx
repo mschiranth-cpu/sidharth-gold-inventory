@@ -255,10 +255,10 @@ const CreateOrderPage: React.FC = () => {
         currentStep === 1
           ? basicInfoForm
           : currentStep === 2
-          ? goldDetailsForm
-          : currentStep === 3
-          ? stoneDetailsForm
-          : additionalInfoForm;
+            ? goldDetailsForm
+            : currentStep === 3
+              ? stoneDetailsForm
+              : additionalInfoForm;
       const errors = currentForm.formState.errors;
       const errorFields = Object.keys(errors);
       if (errorFields.length > 0) {
@@ -307,7 +307,25 @@ const CreateOrderPage: React.FC = () => {
     ]);
 
     if (!validations.every(Boolean)) {
-      toast.error('Please complete all required fields');
+      // Find which step has errors
+      const stepNames = ['Basic Info', 'Gold Details', 'Stone Details', 'Additional Info'];
+      const failedSteps = validations
+        .map((isValid, index) => (!isValid ? stepNames[index] : null))
+        .filter(Boolean);
+
+      toast.error(
+        <div>
+          <p className="font-semibold">Please complete all required fields</p>
+          <p className="text-sm mt-1">Check: {failedSteps.join(', ')}</p>
+        </div>,
+        { duration: 5000 }
+      );
+
+      // Navigate to first failed step
+      const firstFailedStep = validations.findIndex((v) => !v);
+      if (firstFailedStep !== -1) {
+        setCurrentStep(firstFailedStep);
+      }
       return;
     }
 
@@ -343,26 +361,46 @@ const CreateOrderPage: React.FC = () => {
 
       const orderPayload = {
         customerName: basicInfo.customerName,
-        customerPhone: basicInfo.customerPhone || undefined,
-        customerEmail: basicInfo.customerEmail || undefined,
-        productPhotoUrl: primaryImageUrl,
+        customerPhone: basicInfo.customerPhone ? basicInfo.customerPhone.trim() : '',
+        customerEmail: basicInfo.customerEmail ? basicInfo.customerEmail.trim() : '',
+        productPhotoUrl: primaryImageUrl || '',
         priority: priorityMap[additionalInfo.priority] || 0,
         orderDetails: {
-          goldWeightInitial: goldDetails.grossWeight || undefined,
+          goldWeightInitial:
+            goldDetails.grossWeight && goldDetails.grossWeight > 0
+              ? goldDetails.grossWeight
+              : undefined,
+          netWeight:
+            goldDetails.netWeight && goldDetails.netWeight > 0 ? goldDetails.netWeight : undefined,
           purity: purityMap[goldDetails.purity] || 22,
           goldColor: goldDetails.metalFinish || undefined,
           metalType: goldDetails.metalType || 'GOLD',
           metalFinish: goldDetails.metalFinish || undefined,
-          customFinish: goldDetails.customFinish || undefined,
-          size: additionalInfo.size || undefined,
+          customFinish:
+            goldDetails.customFinish && goldDetails.customFinish.trim()
+              ? goldDetails.customFinish.trim()
+              : undefined,
+          size:
+            additionalInfo.size && additionalInfo.size.trim()
+              ? additionalInfo.size.trim()
+              : undefined,
           quantity: goldDetails.quantity || 1,
           productType: goldDetails.productType || undefined,
-          customProductType: goldDetails.customProductType || undefined,
+          customProductType:
+            goldDetails.customProductType && goldDetails.customProductType.trim()
+              ? goldDetails.customProductType.trim()
+              : undefined,
           productSpecifications: goldDetails.productSpecifications || undefined,
           dueDate: additionalInfo.dueDate?.toISOString() || new Date().toISOString(),
-          additionalDescription: additionalInfo.description || undefined,
-          specialInstructions: additionalInfo.specialInstructions || undefined,
-          referenceImages: imagePreviews,
+          additionalDescription:
+            additionalInfo.description && additionalInfo.description.trim()
+              ? additionalInfo.description.trim()
+              : undefined,
+          specialInstructions:
+            additionalInfo.specialInstructions && additionalInfo.specialInstructions.trim()
+              ? additionalInfo.specialInstructions.trim()
+              : undefined,
+          referenceImages: imagePreviews.length > 0 ? imagePreviews : undefined,
         },
         stones: stoneDetails.hasStones
           ? stoneDetails.stones.map((stone) => ({
@@ -402,13 +440,34 @@ const CreateOrderPage: React.FC = () => {
         );
 
         // Navigate to orders list
-        navigate('/orders');
+        navigate('/app/orders');
       } else {
         throw new Error(response.message || 'Failed to create order');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating order:', error);
-      toast.error('Failed to create order. Please try again.');
+
+      // Check if it's a validation error from backend
+      if (error?.response?.data?.error?.details) {
+        const details = error.response.data.error.details;
+        toast.error(
+          <div>
+            <p className="font-semibold">Validation Error</p>
+            <ul className="text-sm mt-1 space-y-1">
+              {details.map((detail: any, index: number) => (
+                <li key={index}>
+                  • {detail.field}: {detail.message}
+                </li>
+              ))}
+            </ul>
+          </div>,
+          { duration: 7000 }
+        );
+      } else if (error?.response?.data?.error?.message) {
+        toast.error(error.response.data.error.message);
+      } else {
+        toast.error('Failed to create order. Please check all required fields and try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }

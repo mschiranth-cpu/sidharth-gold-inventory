@@ -2,10 +2,10 @@
  * ============================================
  * AUTH TYPES & INTERFACES
  * ============================================
- * 
+ *
  * TypeScript interfaces for authentication system.
  * Defines request/response shapes, JWT payloads, and role types.
- * 
+ *
  * @author Gold Factory Dev Team
  * @version 1.0.0
  */
@@ -32,8 +32,8 @@ export interface AccessTokenPayload {
   email: string;
   role: UserRole;
   type: 'access';
-  iat?: number;  // Issued at (added by JWT)
-  exp?: number;  // Expiration (added by JWT)
+  iat?: number; // Issued at (added by JWT)
+  exp?: number; // Expiration (added by JWT)
 }
 
 /**
@@ -42,7 +42,7 @@ export interface AccessTokenPayload {
  */
 export interface RefreshTokenPayload {
   userId: string;
-  tokenId: string;  // Unique ID for token invalidation
+  tokenId: string; // Unique ID for token invalidation
   type: 'refresh';
   iat?: number;
   exp?: number;
@@ -58,7 +58,7 @@ export interface RefreshTokenPayload {
 export interface LoginRequest {
   email: string;
   password: string;
-  rememberMe?: boolean;  // Extended token validity
+  rememberMe?: boolean; // Extended token validity
 }
 
 /**
@@ -70,8 +70,8 @@ export interface RegisterRequest {
   password: string;
   confirmPassword: string;
   phone?: string;
-  role?: UserRole;  // Only admins can set this
-  department?: string;  // Required for DEPARTMENT_WORKER
+  role?: UserRole; // Only admins can set this
+  department?: string; // Required for DEPARTMENT_WORKER
 }
 
 /**
@@ -85,8 +85,8 @@ export interface RefreshTokenRequest {
  * Logout request body
  */
 export interface LogoutRequest {
-  refreshToken?: string;  // Optional: invalidate specific token
-  allDevices?: boolean;   // Logout from all devices
+  refreshToken?: string; // Optional: invalidate specific token
+  allDevices?: boolean; // Logout from all devices
 }
 
 /**
@@ -181,7 +181,7 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     role: UserRole;
   };
-  tokenId?: string;  // For refresh token operations
+  tokenId?: string; // For refresh token operations
 }
 
 /**
@@ -240,8 +240,8 @@ export interface RateLimitInfo {
  */
 export interface RateLimitConfig {
   maxAttempts: number;
-  windowMs: number;      // Time window in milliseconds
-  blockDurationMs: number;  // Block duration after max attempts
+  windowMs: number; // Time window in milliseconds
+  blockDurationMs: number; // Block duration after max attempts
 }
 
 // ============================================
@@ -333,29 +333,44 @@ export type Permission =
  */
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ADMIN: [
-    'users:read', 'users:write', 'users:delete',
-    'orders:read', 'orders:write', 'orders:delete', 'orders:assign',
-    'factory:read', 'factory:write',
-    'departments:read', 'departments:write', 'departments:update-status',
-    'reports:read', 'reports:generate',
-    'settings:read', 'settings:write',
+    'users:read',
+    'users:write',
+    'users:delete',
+    'orders:read',
+    'orders:write',
+    'orders:delete',
+    'orders:assign',
+    'factory:read',
+    'factory:write',
+    'departments:read',
+    'departments:write',
+    'departments:update-status',
+    'reports:read',
+    'reports:generate',
+    'settings:read',
+    'settings:write',
   ],
   OFFICE_STAFF: [
-    'orders:read', 'orders:write', 'orders:assign',
+    'orders:read',
+    'orders:write',
+    'orders:assign',
     'factory:read',
     'departments:read',
     'reports:read',
   ],
   FACTORY_MANAGER: [
-    'orders:read', 'orders:assign',
-    'factory:read', 'factory:write',
-    'departments:read', 'departments:write', 'departments:update-status',
-    'reports:read', 'reports:generate',
-  ],
-  DEPARTMENT_WORKER: [
     'orders:read',
-    'departments:read', 'departments:update-status',
+    'orders:assign',
+    'factory:read',
+    'factory:write',
+    'departments:read',
+    'departments:write',
+    'departments:update-status',
+    'reports:read',
+    'reports:generate',
   ],
+  DEPARTMENT_WORKER: ['orders:read', 'departments:read', 'departments:update-status'],
+  CLIENT: ['orders:read', 'orders:write'],
 };
 
 // ============================================

@@ -18,8 +18,8 @@ import type { Notification as NotificationModel } from '../services/notification
 import type { NotificationType, NotificationFilters } from '../types/notification.types';
 import { SOCKET_EVENTS, NOTIFICATION_CONFIG } from '../types/notification.types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
 interface UseNotificationsReturn {
   notifications: NotificationModel[];

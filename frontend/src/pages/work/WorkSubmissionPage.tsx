@@ -39,6 +39,7 @@ import {
   createSaveShortcut,
   createSubmitShortcut,
 } from '../../hooks/useKeyboardShortcuts';
+import { workersService } from '../../services/workers.service';
 
 // Mapping from backend DepartmentName enum to frontend config IDs
 const departmentNameToConfigId: Record<string, string> = {
@@ -161,8 +162,9 @@ interface UploadedPhoto {
 function WorkSubmissionPage() {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  useAuth(); // Ensures user is authenticated
+  const { user } = useAuth(); // Get user for role checking
   const queryClient = useQueryClient();
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'FACTORY_MANAGER';
 
   // Form state
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -377,13 +379,34 @@ function WorkSubmissionPage() {
       queryClient.invalidateQueries({ queryKey: ['orderWork', orderId] });
       queryClient.invalidateQueries({ queryKey: ['workerAssignments'] });
       queryClient.invalidateQueries({ queryKey: ['my-work-orders'] });
-      navigate('/my-work');
+      navigate('/app/my-work');
     },
     onError: (err: unknown) => {
       const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
       const errorMsg =
         axiosError?.response?.data?.message || axiosError?.message || 'Unknown error';
       toast.error(`Failed to submit work: ${errorMsg}`);
+    },
+  });
+
+  // Reopen work mutation (Admin only)
+  const reopenWorkMutation = useMutation({
+    mutationFn: async () => {
+      if (!orderId || !workDetails?.departmentName) {
+        throw new Error('Order ID or department name not found');
+      }
+      return await workersService.reopenWork(orderId, workDetails.departmentName);
+    },
+    onSuccess: () => {
+      toast.success('Work reopened for editing');
+      queryClient.invalidateQueries({ queryKey: ['orderWork', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-orders'] });
+    },
+    onError: (err: unknown) => {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMsg =
+        axiosError?.response?.data?.message || axiosError?.message || 'Failed to reopen work';
+      toast.error(errorMsg);
     },
   });
 
@@ -440,9 +463,8 @@ function WorkSubmissionPage() {
           const categoryPhotos = uploadedPhotos.filter((p) => p && p.category === photoReq.name);
           const minCount = photoReq.minCount || 1;
           if (categoryPhotos.length < minCount) {
-            errors[
-              `photo_${photoReq.name}`
-            ] = `${photoReq.label} requires at least ${minCount} photo(s)`;
+            errors[`photo_${photoReq.name}`] =
+              `${photoReq.label} requires at least ${minCount} photo(s)`;
           }
         }
       });
@@ -758,8 +780,8 @@ function WorkSubmissionPage() {
       error instanceof Error
         ? error.message
         : error && typeof error === 'object' && 'message' in error
-        ? String((error as { message: string }).message)
-        : 'An error occurred';
+          ? String((error as { message: string }).message)
+          : 'An error occurred';
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mb-4" />
@@ -805,426 +827,512 @@ function WorkSubmissionPage() {
   const isWorkComplete = workDetails.workData?.isComplete || false;
   const orderDetails = workDetails.order.orderDetails;
 
+  // State for collapsible sections
+  const [showTips, setShowTips] = useState(true);
+  const [showMistakes, setShowMistakes] = useState(true);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - Mobile responsive */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+      {/* Header - Compact */}
+      <header className="bg-white shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate(-1)}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg flex-shrink-0"
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">
                   {requirements.departmentName}
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-500 truncate">
-                  Order: {workDetails.order.orderNumber}
-                </p>
+                <p className="text-xs text-gray-500">Order: {workDetails.order.orderNumber}</p>
               </div>
             </div>
 
-            {/* Status Badge - Mobile responsive */}
-            <div className="flex items-center gap-2">
-              {isWorkComplete ? (
-                <span className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">
-                  <CheckCircleSolidIcon className="w-4 h-4" />
-                  <span className="hidden sm:inline">Completed</span>
-                  <span className="sm:hidden">Done</span>
-                </span>
-              ) : workDetails.workData?.isDraft ? (
-                <span className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">
-                  <ClockIcon className="w-4 h-4" />
-                  <span className="hidden sm:inline">Draft</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">
-                  <ArrowPathIcon className="w-4 h-4" />
-                  <span className="hidden sm:inline">In Progress</span>
-                  <span className="sm:hidden">Active</span>
-                </span>
-              )}
-            </div>
+            {/* Status Badge */}
+            {isWorkComplete ? (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                <CheckCircleSolidIcon className="w-4 h-4" />
+                Completed
+              </span>
+            ) : workDetails.workData?.isDraft ? (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                <ClockIcon className="w-4 h-4" />
+                Draft
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                <ArrowPathIcon className="w-4 h-4" />
+                In Progress
+              </span>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Order Summary Card */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Details</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-gray-500">Product Type</p>
-              <p className="font-medium text-gray-900">{orderDetails?.productType || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Metal Type</p>
-              <p className="font-medium text-gray-900">{orderDetails?.metalType || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Gold Weight</p>
-              <p className="font-medium text-gray-900">
-                {orderDetails?.goldWeightInitial ? `${orderDetails.goldWeightInitial}g` : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Purity</p>
-              <p className="font-medium text-gray-900">{orderDetails?.purity || 'N/A'}</p>
-            </div>
-          </div>
-
-          {orderDetails?.specialInstructions && (
-            <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <p className="text-sm font-medium text-yellow-800">Special Instructions:</p>
-              <p className="text-sm text-yellow-700">{orderDetails.specialInstructions}</p>
-            </div>
-          )}
-
-          {orderDetails?.productSpecifications &&
-            Object.keys(orderDetails.productSpecifications).length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-800 mb-3">Product Specifications:</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {Object.entries(orderDetails.productSpecifications)
-                    .filter(([_, value]) => value !== null && value !== undefined && value !== '')
-                    .map(([key, value]) => (
-                      <div key={key} className="text-sm">
-                        <p className="text-blue-600 font-medium">{formatSpecLabel(key)}</p>
-                        <p className="text-blue-900">{formatSpecValue(value)}</p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-        </div>
-
-        {/* Tips Section */}
-        {requirements.tips && requirements.tips.length > 0 && (
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <h3 className="text-sm font-medium text-blue-800 mb-2 flex items-center gap-2">
-              <InformationCircleIcon className="w-5 h-5" />
-              Tips for {requirements.departmentName}
-            </h3>
-            <ul className="list-disc list-inside space-y-1">
-              {requirements.tips.map((tip, index) => (
-                <li key={index} className="text-sm text-blue-700">
-                  {tip}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Department Context Note */}
-        <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
-          <div className="flex items-start gap-2">
-            <InformationCircleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-amber-800">Department Worker View</p>
-              <p className="text-sm text-amber-700 mt-1">
-                You are filling out this form as a {requirements.departmentName} department worker.
-                All fields and uploads are specific to your department's work requirements.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Common Mistakes Warning */}
-        {requirements.commonMistakes && requirements.commonMistakes.length > 0 && (
-          <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-            <h3 className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
-              <ExclamationTriangleIcon className="w-5 h-5" />
-              Common Mistakes to Avoid
-            </h3>
-            <ul className="list-disc list-inside space-y-1">
-              {requirements.commonMistakes.map((mistake, index) => (
-                <li key={index} className="text-sm text-orange-700">
-                  {mistake}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Form Fields Section */}
-        {requirements.formFields && requirements.formFields.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Work Details</h2>
-            <div className="space-y-4">
-              {requirements.formFields.map((field: FormField) => (
-                <div key={field.name}>
-                  {field.type !== 'checkbox' && (
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {field.label}
-                      {field.required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                  )}
-                  {renderFormField(field)}
-                  {field.helpText && <p className="mt-1 text-xs text-gray-500">{field.helpText}</p>}
-                  {validationErrors[field.name] && (
-                    <p className="mt-1 text-xs text-red-500">{validationErrors[field.name]}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Photo Upload Section */}
-        {requirements.photoRequirements && requirements.photoRequirements.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <PhotoIcon className="w-5 h-5" />
-              Photo Documentation
-            </h2>
-            <div className="space-y-6">
-              {requirements.photoRequirements.map((photoReq: PhotoRequirement) => {
-                const categoryPhotos = uploadedPhotos.filter(
-                  (p) => p && p.category === photoReq.name
-                );
-                const error = validationErrors[`photo_${photoReq.name}`];
-
-                return (
-                  <div key={photoReq.name} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {photoReq.label}
-                          {photoReq.required && <span className="text-red-500 ml-1">*</span>}
-                        </h3>
-                        <p className="text-sm text-gray-500">{photoReq.description}</p>
-                        <p className="text-xs text-gray-600 font-medium mt-1">
-                          {categoryPhotos.length} uploaded
-                        </p>
-                        {(photoReq.minCount ?? 0) > 0 && (
-                          <p className="text-xs text-gray-400">
-                            Minimum: {photoReq.minCount} photo(s)
-                          </p>
-                        )}
-                      </div>
-                      <label className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700">
-                        <PhotoIcon className="w-4 h-4" />
-                        <span className="text-sm">Upload</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => handlePhotoUpload(e, photoReq.name)}
-                          disabled={isWorkComplete}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Photo Grid */}
-                    {categoryPhotos.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {categoryPhotos.map((photo) => (
-                          <div key={photo.id} className="relative group">
-                            <img
-                              src={photo.thumbnailUrl || photo.url}
-                              alt={photo.originalName}
-                              className="w-full h-24 object-cover rounded-lg"
-                            />
-                            {!isWorkComplete && (
-                              <button
-                                onClick={() => handleDeletePhoto(photo.id)}
-                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <XMarkIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+      {/* Two-Column Layout */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Left Sidebar - Sticky */}
+          <aside className="hidden lg:block w-80 flex-shrink-0">
+            <div className="sticky top-20 space-y-4">
+              {/* Order Summary Card - Sidebar */}
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Details</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Product Type</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {orderDetails?.productType || 'N/A'}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  <div>
+                    <p className="text-xs text-gray-500">Metal Type</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {orderDetails?.metalType || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Gold Weight</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {orderDetails?.goldWeightInitial
+                        ? `${orderDetails.goldWeightInitial}g`
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Purity</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {orderDetails?.purity || 'N/A'}
+                    </p>
+                  </div>
+                </div>
 
-        {/* File Upload Section */}
-        {requirements.fileRequirements && requirements.fileRequirements.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DocumentArrowUpIcon className="w-5 h-5" />
-              File Uploads
-            </h2>
-            <div className="space-y-4">
-              {requirements.fileRequirements.map((fileReq: FileRequirement) => {
-                const categoryFiles = uploadedFiles.filter((f) => f && f.category === fileReq.name);
-                const error = validationErrors[`file_${fileReq.name}`];
-                const acceptedFormats = fileReq.acceptedFormats || [];
+                {orderDetails?.specialInstructions && (
+                  <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+                    <p className="text-xs font-medium text-yellow-800">Special Instructions:</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      {orderDetails.specialInstructions}
+                    </p>
+                  </div>
+                )}
 
-                return (
-                  <div key={fileReq.name} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {fileReq.label}
-                          {fileReq.required && <span className="text-red-500 ml-1">*</span>}
-                        </h3>
-                        <p className="text-sm text-gray-500">{fileReq.description}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Accepted formats: {acceptedFormats.join(', ') || 'Any'}
-                          {fileReq.maxSize && ` | Max size: ${fileReq.maxSize}MB`}
-                        </p>
-                      </div>
-                      <label className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg cursor-pointer hover:bg-gray-700">
-                        <DocumentArrowUpIcon className="w-4 h-4" />
-                        <span className="text-sm">Upload</span>
-                        <input
-                          type="file"
-                          accept={
-                            acceptedFormats.length > 0 ? acceptedFormats.join(',') : undefined
-                          }
-                          className="hidden"
-                          onChange={(e) => handleFileUpload(e, fileReq.name)}
-                          disabled={isWorkComplete}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Uploaded Files List */}
-                    {categoryFiles.length > 0 && (
-                      <div className="space-y-2">
-                        {categoryFiles.map((file) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-2">
-                              <DocumentArrowUpIcon className="w-5 h-5 text-gray-400" />
-                              <span className="text-sm text-gray-700">{file.originalName}</span>
-                              <span className="text-xs text-gray-400">
-                                ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                {orderDetails?.productSpecifications &&
+                  Object.keys(orderDetails.productSpecifications).length > 0 && (
+                    <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                      <p className="text-xs font-medium text-blue-800 mb-2">Specifications:</p>
+                      <div className="space-y-1">
+                        {Object.entries(orderDetails.productSpecifications)
+                          .filter(
+                            ([_, value]) => value !== null && value !== undefined && value !== ''
+                          )
+                          .slice(0, 5)
+                          .map(([key, value]) => (
+                            <div key={key} className="text-xs">
+                              <span className="text-blue-600 font-medium">
+                                {formatSpecLabel(key)}:
                               </span>
+                              <span className="text-blue-900 ml-1">{formatSpecValue(value)}</span>
                             </div>
-                            {!isWorkComplete && (
-                              <button
-                                onClick={() => handleDeleteFile(file.id)}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                          ))}
                       </div>
-                    )}
+                    </div>
+                  )}
+              </div>
 
-                    {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+              {/* Tips Section - Collapsible */}
+              {requirements.tips && requirements.tips.length > 0 && (
+                <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden">
+                  <button
+                    onClick={() => setShowTips(!showTips)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-blue-100 transition-colors"
+                  >
+                    <h3 className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                      <InformationCircleIcon className="w-4 h-4" />
+                      Tips
+                    </h3>
+                    <svg
+                      className={`w-4 h-4 text-blue-600 transition-transform ${showTips ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                  {showTips && (
+                    <ul className="px-4 pb-3 space-y-1">
+                      {requirements.tips.map((tip, index) => (
+                        <li key={index} className="text-xs text-blue-700 flex items-start gap-2">
+                          <span className="text-blue-400 mt-0.5">•</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
-        {/* Auto-save Status */}
-        <div className="text-center py-2">
-          {autoSaveMutation.isPending && (
-            <div className="inline-flex items-center gap-2 text-sm text-blue-600">
-              <ArrowPathIcon className="w-4 h-4 animate-spin" />
-              <span>Auto-saving...</span>
-            </div>
-          )}
-          {!autoSaveMutation.isPending && lastSavedRef.current && (
-            <div className="text-sm text-gray-500">
-              {isDirty ? (
-                <span className="text-amber-600">● Unsaved changes</span>
-              ) : (
-                <span>✓ Last saved: {new Date(lastSavedRef.current).toLocaleString()}</span>
+              {/* Common Mistakes - Collapsible */}
+              {requirements.commonMistakes && requirements.commonMistakes.length > 0 && (
+                <div className="bg-orange-50 rounded-lg border border-orange-200 overflow-hidden">
+                  <button
+                    onClick={() => setShowMistakes(!showMistakes)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-orange-100 transition-colors"
+                  >
+                    <h3 className="text-sm font-medium text-orange-800 flex items-center gap-2">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      Common Mistakes
+                    </h3>
+                    <svg
+                      className={`w-4 h-4 text-orange-600 transition-transform ${showMistakes ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                  {showMistakes && (
+                    <ul className="px-4 pb-3 space-y-1">
+                      {requirements.commonMistakes.map((mistake, index) => (
+                        <li key={index} className="text-xs text-orange-700 flex items-start gap-2">
+                          <span className="text-orange-400 mt-0.5">•</span>
+                          <span>{mistake}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
-          )}
-          {!autoSaveMutation.isPending && !lastSavedRef.current && isDirty && (
-            <div className="text-sm text-amber-600">● Unsaved changes</div>
-          )}
-        </div>
+          </aside>
 
-        {/* Action Buttons */}
-        {!isWorkComplete && (
-          <div className="sticky bottom-0 bg-white border-t p-4 -mx-4">
-            {/* Keyboard Shortcuts Hint */}
-            <div className="mb-3 hidden sm:flex items-center justify-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1.5">
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 font-mono">
-                  Ctrl
-                </kbd>
-                <span>+</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 font-mono">
-                  S
-                </kbd>
-                <span className="ml-1">Save Draft</span>
+          {/* Main Content Area */}
+          <main className="flex-1 min-w-0 space-y-6">
+            {/* Form Fields Section - Two Column Grid */}
+            {requirements.formFields && requirements.formFields.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Work Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {requirements.formFields.map((field: FormField) => (
+                    <div
+                      key={field.name}
+                      className={field.type === 'textarea' ? 'md:col-span-2' : ''}
+                    >
+                      {field.type !== 'checkbox' && (
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                      )}
+                      {renderFormField(field)}
+                      {field.helpText && (
+                        <p className="mt-1 text-xs text-gray-500">{field.helpText}</p>
+                      )}
+                      {validationErrors[field.name] && (
+                        <p className="mt-1 text-xs text-red-500">{validationErrors[field.name]}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 font-mono">
-                  Ctrl
-                </kbd>
-                <span>+</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 font-mono">
-                  Enter
-                </kbd>
-                <span className="ml-1">Submit Work</span>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-4 justify-end">
-              <button
-                onClick={handleSaveDraft}
-                disabled={saveDraftMutation.isPending}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || submitWorkMutation.isPending}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircleIcon className="w-4 h-4" />
-                    Submit Work
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Completed Notice */}
-        {isWorkComplete && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <CheckCircleSolidIcon className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <h3 className="text-lg font-medium text-green-800">Work Completed</h3>
-            <p className="text-sm text-green-600">
-              This work has been submitted and marked as complete.
-            </p>
-            {workDetails.workData?.workCompletedAt && (
-              <p className="text-xs text-green-500 mt-1">
-                Completed at: {new Date(workDetails.workData.workCompletedAt).toLocaleString()}
-              </p>
             )}
+
+            {/* Photo Upload Section - Optimized */}
+            {requirements.photoRequirements && requirements.photoRequirements.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <PhotoIcon className="w-5 h-5" />
+                  Photo Documentation
+                </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {requirements.photoRequirements.map((photoReq: PhotoRequirement) => {
+                    const categoryPhotos = uploadedPhotos.filter(
+                      (p) => p && p.category === photoReq.name
+                    );
+                    const error = validationErrors[`photo_${photoReq.name}`];
+
+                    return (
+                      <div key={photoReq.name} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="font-medium text-gray-900">
+                              {photoReq.label}
+                              {photoReq.required && <span className="text-red-500 ml-1">*</span>}
+                            </h3>
+                            <p className="text-sm text-gray-500">{photoReq.description}</p>
+                            <p className="text-xs text-gray-600 font-medium mt-1">
+                              {categoryPhotos.length} uploaded
+                            </p>
+                            {(photoReq.minCount ?? 0) > 0 && (
+                              <p className="text-xs text-gray-400">
+                                Minimum: {photoReq.minCount} photo(s)
+                              </p>
+                            )}
+                          </div>
+                          <label className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700">
+                            <PhotoIcon className="w-4 h-4" />
+                            <span className="text-sm">Upload</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => handlePhotoUpload(e, photoReq.name)}
+                              disabled={isWorkComplete}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Photo Grid */}
+                        {categoryPhotos.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {categoryPhotos.map((photo) => (
+                              <div key={photo.id} className="relative group">
+                                <img
+                                  src={photo.thumbnailUrl || photo.url}
+                                  alt={photo.originalName}
+                                  className="w-full h-20 object-cover rounded-lg"
+                                />
+                                {!isWorkComplete && (
+                                  <button
+                                    onClick={() => handleDeletePhoto(photo.id)}
+                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <XMarkIcon className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Section */}
+            {requirements.fileRequirements && requirements.fileRequirements.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <DocumentArrowUpIcon className="w-5 h-5" />
+                  File Uploads
+                </h2>
+                <div className="space-y-4">
+                  {requirements.fileRequirements.map((fileReq: FileRequirement) => {
+                    const categoryFiles = uploadedFiles.filter(
+                      (f) => f && f.category === fileReq.name
+                    );
+                    const error = validationErrors[`file_${fileReq.name}`];
+                    const acceptedFormats = fileReq.acceptedFormats || [];
+
+                    return (
+                      <div key={fileReq.name} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="font-medium text-gray-900">
+                              {fileReq.label}
+                              {fileReq.required && <span className="text-red-500 ml-1">*</span>}
+                            </h3>
+                            <p className="text-sm text-gray-500">{fileReq.description}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Accepted formats: {acceptedFormats.join(', ') || 'Any'}
+                              {fileReq.maxSize && ` | Max size: ${fileReq.maxSize}MB`}
+                            </p>
+                          </div>
+                          <label className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg cursor-pointer hover:bg-gray-700">
+                            <DocumentArrowUpIcon className="w-4 h-4" />
+                            <span className="text-sm">Upload</span>
+                            <input
+                              type="file"
+                              accept={
+                                acceptedFormats.length > 0 ? acceptedFormats.join(',') : undefined
+                              }
+                              className="hidden"
+                              onChange={(e) => handleFileUpload(e, fileReq.name)}
+                              disabled={isWorkComplete}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Uploaded Files List */}
+                        {categoryFiles.length > 0 && (
+                          <div className="space-y-2">
+                            {categoryFiles.map((file) => (
+                              <div
+                                key={file.id}
+                                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <DocumentArrowUpIcon className="w-5 h-5 text-gray-400" />
+                                  <span className="text-sm text-gray-700">{file.originalName}</span>
+                                  <span className="text-xs text-gray-400">
+                                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                  </span>
+                                </div>
+                                {!isWorkComplete && (
+                                  <button
+                                    onClick={() => handleDeleteFile(file.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Completed Notice */}
+            {isWorkComplete && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-center">
+                  <CheckCircleSolidIcon className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <h3 className="text-lg font-medium text-green-800">Work Completed</h3>
+                  <p className="text-sm text-green-600">
+                    This work has been submitted and marked as complete.
+                  </p>
+                  {workDetails.workData?.workCompletedAt && (
+                    <p className="text-xs text-green-500 mt-1">
+                      Completed at:{' '}
+                      {new Date(workDetails.workData.workCompletedAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Admin-only: Reopen for Editing button */}
+                {isAdmin && (
+                  <div className="mt-4 pt-4 border-t border-green-200">
+                    <button
+                      onClick={() => reopenWorkMutation.mutate()}
+                      disabled={reopenWorkMutation.isPending}
+                      className="w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {reopenWorkMutation.isPending ? (
+                        <>
+                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          Reopening...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowPathIcon className="w-4 h-4" />
+                          Reopen for Editing
+                        </>
+                      )}
+                    </button>
+                    <p className="text-xs text-amber-700 mt-2 text-center">
+                      Admin: Reopen this work to allow the worker to make corrections
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+
+      {/* Floating Action Bar */}
+      {!isWorkComplete && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-10">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Auto-save Status */}
+              <div className="flex items-center gap-3">
+                {autoSaveMutation.isPending && (
+                  <div className="inline-flex items-center gap-2 text-sm text-blue-600">
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    <span>Auto-saving...</span>
+                  </div>
+                )}
+                {!autoSaveMutation.isPending && lastSavedRef.current && (
+                  <div className="text-sm text-gray-500">
+                    {isDirty ? (
+                      <span className="text-amber-600">● Unsaved changes</span>
+                    ) : (
+                      <span>
+                        ✓ Last saved: {new Date(lastSavedRef.current).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!autoSaveMutation.isPending && !lastSavedRef.current && isDirty && (
+                  <div className="text-sm text-amber-600">● Unsaved changes</div>
+                )}
+
+                {/* Keyboard Shortcuts Hint */}
+                <div className="hidden lg:flex items-center gap-3 text-xs text-gray-400 ml-4">
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-gray-600 font-mono text-xs">
+                      Ctrl+S
+                    </kbd>
+                    <span>Save</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-gray-600 font-mono text-xs">
+                      Ctrl+Enter
+                    </kbd>
+                    <span>Submit</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={saveDraftMutation.isPending}
+                  className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 font-medium"
+                >
+                  {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || submitWorkMutation.isPending}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 font-medium shadow-sm"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="w-5 h-5" />
+                      Submit Work
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }

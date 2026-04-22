@@ -20,6 +20,7 @@ export const UserRole = {
   OFFICE_STAFF: 'OFFICE_STAFF',
   FACTORY_MANAGER: 'FACTORY_MANAGER',
   DEPARTMENT_WORKER: 'DEPARTMENT_WORKER',
+  CLIENT: 'CLIENT',
 } as const;
 
 // Type alias derived from the const object
@@ -30,6 +31,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   OFFICE_STAFF: 'Office Staff',
   FACTORY_MANAGER: 'Factory Manager',
   DEPARTMENT_WORKER: 'Department Worker',
+  CLIENT: 'Client',
 };
 
 export const USER_ROLE_COLORS: Record<UserRole, string> = {
@@ -37,6 +39,7 @@ export const USER_ROLE_COLORS: Record<UserRole, string> = {
   OFFICE_STAFF: 'bg-blue-100 text-blue-800',
   FACTORY_MANAGER: 'bg-amber-100 text-amber-800',
   DEPARTMENT_WORKER: 'bg-green-100 text-green-800',
+  CLIENT: 'bg-indigo-100 text-indigo-800',
 };
 
 // ============================================
@@ -175,15 +178,17 @@ export function hasRole(userRole: UserRole | undefined, allowedRoles: UserRole[]
 export function getDefaultRedirectPath(role: UserRole): string {
   switch (role) {
     case 'ADMIN':
-      return '/dashboard';
+      return '/app/dashboard';
     case 'OFFICE_STAFF':
-      return '/orders';
+      return '/app/orders';
     case 'FACTORY_MANAGER':
-      return '/factory';
+      return '/app/factory';
     case 'DEPARTMENT_WORKER':
-      return '/my-work';
+      return '/app/my-work';
+    case 'CLIENT':
+      return '/client/dashboard';
     default:
-      return '/dashboard';
+      return '/app/dashboard';
   }
 }
 

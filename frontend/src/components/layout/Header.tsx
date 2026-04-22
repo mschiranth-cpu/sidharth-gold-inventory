@@ -23,6 +23,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     }
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/50 bg-white/70 backdrop-blur-md px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       <button type="button" className="-m-2.5 p-2.5 text-gray-700 lg:hidden" onClick={onMenuClick}>
@@ -137,7 +143,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   <Menu.Item>
                     {({ active }) => (
                       <button
-                        onClick={() => logout()}
+                        onClick={handleLogout}
                         className={`${
                           active ? 'bg-gray-50' : ''
                         } block w-full text-left px-4 py-2 text-sm text-red-600`}

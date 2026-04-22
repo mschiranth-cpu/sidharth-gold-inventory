@@ -270,6 +270,42 @@ export const uploadFile = async (req: AuthRequest, res: Response): Promise<void>
 };
 
 /**
+ * Reopen completed work for editing
+ *
+ * @route POST /api/workers/work/:orderId/reopen
+ * @access Private - ADMIN, FACTORY_MANAGER only
+ */
+export const reopenWork = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    const { departmentName } = req.body;
+
+    if (!departmentName) {
+      res.status(400).json({
+        success: false,
+        message: 'Department name is required',
+      });
+      return;
+    }
+
+    const result = await workersService.reopenWork(orderId, departmentName);
+
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    logger.error('Error reopening work:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reopen work',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
  * Upload photos for work
  *
  * @route POST /api/workers/work/:orderId/upload-photos

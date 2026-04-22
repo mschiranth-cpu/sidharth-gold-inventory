@@ -17,20 +17,17 @@
     "docker:ps": "docker-compose ps",
     "docker:restart": "docker-compose restart",
     "docker:stop": "docker-compose stop",
-    
     "------- DOCKER DEV COMMANDS -------": "",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up",
     "docker:dev:build": "docker-compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "docker:dev:tools": "docker-compose -f docker-compose.dev.yml --profile tools up",
-    
     "------- DATABASE COMMANDS -------": "",
     "docker:db:migrate": "docker-compose exec backend npx prisma migrate deploy",
     "docker:db:studio": "docker-compose exec backend npx prisma studio",
     "docker:db:seed": "docker-compose exec backend npx prisma db seed",
     "docker:db:reset": "docker-compose exec backend npx prisma migrate reset --force",
-    
     "------- MAINTENANCE COMMANDS -------": "",
     "docker:clean": "docker system prune -f",
     "docker:clean:all": "docker system prune -a -f --volumes",
@@ -49,5 +46,8 @@
     "tracking"
   ],
   "author": "Gold Factory Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
+  }
 }
