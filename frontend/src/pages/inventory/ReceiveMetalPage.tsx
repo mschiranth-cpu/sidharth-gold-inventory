@@ -14,7 +14,7 @@ import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 import VendorFormModal from '../../components/VendorFormModal';
 
 // Red asterisk for required-field labels
-const Req = () => <span className="text-red-500 ml-0.5">*</span>;
+const Req = () => <span className="text-accent-ruby ml-0.5">*</span>;
 
 interface FieldErrors {
   vendor?: string;
@@ -188,15 +188,15 @@ export default function ReceiveMetalPage() {
 
   const inputClass = (hasError?: string) =>
     `w-full px-4 py-3 rounded-xl border ${
-      hasError ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+      hasError ? 'border-accent-ruby/50 focus:ring-accent-ruby' : 'border-champagne-300 focus:ring-champagne-500'
     } focus:ring-2 focus:border-transparent`;
 
   return (
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Receive Metal</h1>
-          <p className="text-gray-600">Record metal received from supplier</p>
+          <h1 className="text-3xl font-bold text-onyx-900 mb-2">Receive Metal</h1>
+          <p className="text-onyx-500">Record metal received from supplier</p>
         </div>
 
         {/* Vendor selector — must be picked before the rest of the form unlocks */}
@@ -210,8 +210,8 @@ export default function ReceiveMetalPage() {
         />
 
         {!selectedVendor && (
-          <div className="mt-6 bg-white rounded-2xl shadow-lg p-10 border-2 border-dashed border-gray-200 text-center">
-            <p className="text-gray-500">
+          <div className="mt-6 bg-white rounded-2xl shadow-lg p-10 border-2 border-dashed border-champagne-200 text-center">
+            <p className="text-onyx-400">
               Select a vendor above to continue recording the receipt.
             </p>
           </div>
@@ -226,9 +226,9 @@ export default function ReceiveMetalPage() {
               onUseRate={(rate) => setFormData((prev) => ({ ...prev, rate }))}
             />
 
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <div className="bg-white rounded-2xl shadow-lg p-8 border border-champagne-100">
           {createMutation.isError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <div className="mb-6 p-4 bg-red-50 border border-accent-ruby/30 rounded-xl text-accent-ruby text-sm">
               Failed to record transaction
             </div>
           )}
@@ -236,7 +236,7 @@ export default function ReceiveMetalPage() {
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Metal Type<Req />
                 </label>
                 <select
@@ -250,12 +250,12 @@ export default function ReceiveMetalPage() {
                   <option value="PALLADIUM">Palladium</option>
                 </select>
                 {errors.metalType && (
-                  <p className="mt-1 text-xs text-red-600">{errors.metalType}</p>
+                  <p className="mt-1 text-xs text-accent-ruby">{errors.metalType}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Purity (Karat)<Req />
                 </label>
                 <select
@@ -268,11 +268,11 @@ export default function ReceiveMetalPage() {
                   <option value="18">18K</option>
                   <option value="14">14K</option>
                 </select>
-                {errors.purity && <p className="mt-1 text-xs text-red-600">{errors.purity}</p>}
+                {errors.purity && <p className="mt-1 text-xs text-accent-ruby">{errors.purity}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Form<Req />
                 </label>
                 <select
@@ -286,11 +286,11 @@ export default function ReceiveMetalPage() {
                   <option value="GRAIN">Grain</option>
                   <option value="SCRAP">Scrap</option>
                 </select>
-                {errors.form && <p className="mt-1 text-xs text-red-600">{errors.form}</p>}
+                {errors.form && <p className="mt-1 text-xs text-accent-ruby">{errors.form}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Gross Weight (grams)<Req />
                 </label>
                 <input
@@ -303,12 +303,12 @@ export default function ReceiveMetalPage() {
                   className={inputClass(errors.grossWeight)}
                 />
                 {errors.grossWeight && (
-                  <p className="mt-1 text-xs text-red-600">{errors.grossWeight}</p>
+                  <p className="mt-1 text-xs text-accent-ruby">{errors.grossWeight}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Rate per Gram (₹)<Req />
                 </label>
                 <input
@@ -318,11 +318,11 @@ export default function ReceiveMetalPage() {
                   onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) })}
                   className={inputClass(errors.rate)}
                 />
-                {errors.rate && <p className="mt-1 text-xs text-red-600">{errors.rate}</p>}
+                {errors.rate && <p className="mt-1 text-xs text-accent-ruby">{errors.rate}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Reference Number
                 </label>
                 <input
@@ -335,7 +335,7 @@ export default function ReceiveMetalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Transaction Date<Req />
                 </label>
                 <div className="relative">
@@ -349,7 +349,7 @@ export default function ReceiveMetalPage() {
                     className={`${inputClass()} pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
                   />
                   <svg
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-600"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-champagne-700"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -362,14 +362,14 @@ export default function ReceiveMetalPage() {
                     />
                   </svg>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-onyx-400">
                   Defaults to today. Pick a past date to back-date the entry.
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+              <label className="block text-sm font-semibold text-onyx-700 mb-2">Notes</label>
               <textarea
                 rows={3}
                 value={formData.notes}
@@ -381,22 +381,22 @@ export default function ReceiveMetalPage() {
 
             {/* Calculated Pure Weight & Total Price */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                <p className="text-sm text-gray-700 mb-1">Calculated Pure Weight:</p>
-                <p className="text-2xl font-bold text-indigo-900">
+              <div className="p-4 bg-champagne-50 rounded-xl border border-champagne-200">
+                <p className="text-sm text-onyx-700 mb-1">Calculated Pure Weight:</p>
+                <p className="text-2xl font-bold text-onyx-900">
                   {((formData.grossWeight * formData.purity) / 24).toFixed(3)} grams
                 </p>
               </div>
               <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <p className="text-sm text-gray-700 mb-1">Total Price:</p>
-                <p className="text-2xl font-bold text-emerald-900">
+                <p className="text-sm text-onyx-700 mb-1">Total Price:</p>
+                <p className="text-2xl font-bold text-accent-emerald">
                   ₹
                   {totalPrice.toLocaleString('en-IN', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-onyx-500 mt-1">
                   {((formData.grossWeight * formData.purity) / 24).toFixed(3)} g × ₹
                   {formData.rate.toLocaleString('en-IN')}/g
                 </p>
@@ -453,7 +453,7 @@ export default function ReceiveMetalPage() {
             <div className="flex items-start gap-4 mb-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-red-600"
+                  className="w-6 h-6 text-accent-ruby"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -467,8 +467,8 @@ export default function ReceiveMetalPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-900">Please fix these errors</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="text-lg font-bold text-onyx-900">Please fix these errors</h3>
+                <p className="text-sm text-onyx-500 mt-1">
                   The form has {Object.keys(errors).length} validation issue
                   {Object.keys(errors).length === 1 ? '' : 's'}.
                 </p>
@@ -476,7 +476,7 @@ export default function ReceiveMetalPage() {
             </div>
             <ul className="space-y-2 mb-6 pl-4">
               {Object.entries(errors).map(([field, msg]) => (
-                <li key={field} className="text-sm text-red-700 list-disc">
+                <li key={field} className="text-sm text-accent-ruby list-disc">
                   {msg}
                 </li>
               ))}
@@ -614,12 +614,12 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
   };
 
   const triggerBorder = error
-    ? 'border-red-400 focus:ring-red-500'
-    : 'border-gray-300 focus:ring-indigo-500';
+    ? 'border-accent-ruby/50 focus:ring-accent-ruby'
+    : 'border-champagne-300 focus:ring-champagne-500';
 
   return (
     <div ref={containerRef} className="relative mb-6">
-      <label className="block text-sm font-semibold text-gray-700 mb-2">
+      <label className="block text-sm font-semibold text-onyx-700 mb-2">
         Vendor<Req />
       </label>
 
@@ -629,11 +629,11 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
         onKeyDown={onTriggerKeyDown}
         className={`w-full px-4 py-3 rounded-xl border ${triggerBorder} bg-white text-left flex items-center justify-between focus:ring-2 focus:border-transparent`}
       >
-        <span className={selected ? 'text-gray-900' : 'text-gray-400'}>
+        <span className={selected ? 'text-onyx-900' : 'text-onyx-300'}>
           {selected ? `${selected.name} (${selected.uniqueCode})` : 'Select a vendor…'}
         </span>
         <svg
-          className={`w-5 h-5 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-onyx-400 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -641,11 +641,11 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-accent-ruby">{error}</p>}
 
       {open && (
-        <div className="absolute z-40 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-          <div className="p-3 border-b border-gray-100">
+        <div className="absolute z-40 mt-2 w-full bg-white rounded-xl shadow-2xl border border-champagne-200 overflow-hidden">
+          <div className="p-3 border-b border-champagne-100">
             <input
               ref={searchInputRef}
               type="text"
@@ -653,20 +653,20 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={onSearchKeyDown}
               placeholder="Search by name, code, phone, GSTIN, address…"
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-champagne-200 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent text-sm"
             />
           </div>
 
           {isLoading ? (
-            <div className="p-6 text-center text-sm text-gray-500">Loading vendors…</div>
+            <div className="p-6 text-center text-sm text-onyx-400">Loading vendors…</div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-500">
+            <div className="p-6 text-center text-sm text-onyx-400">
               {vendors.length === 0 ? (
                 <>
                   No vendors yet —{' '}
                   <button
                     type="button"
-                    className="text-indigo-600 hover:underline font-medium"
+                    className="text-champagne-700 hover:underline font-medium"
                     onClick={() => setShowAddModal(true)}
                   >
                     Add New Vendor
@@ -677,7 +677,7 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
                   No matches —{' '}
                   <button
                     type="button"
-                    className="text-indigo-600 hover:underline font-medium"
+                    className="text-champagne-700 hover:underline font-medium"
                     onClick={() => setShowAddModal(true)}
                   >
                     Add New Vendor
@@ -694,15 +694,15 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
                     key={v.id}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     onClick={() => choose(v)}
-                    className={`px-4 py-3 cursor-pointer border-b border-gray-50 last:border-b-0 ${
-                      active ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                    className={`px-4 py-3 cursor-pointer border-b border-champagne-100 last:border-b-0 ${
+                      active ? 'bg-champagne-50' : 'hover:bg-pearl'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900">{v.name}</span>
-                      <span className="text-xs text-gray-500">{v.uniqueCode}</span>
+                      <span className="font-medium text-onyx-900">{v.name}</span>
+                      <span className="text-xs text-onyx-400">{v.uniqueCode}</span>
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-x-3">
+                    <div className="text-xs text-onyx-400 mt-0.5 flex flex-wrap gap-x-3">
                       {v.phone && <span>📞 {v.phone}</span>}
                       {v.gstNumber && <span>GSTIN: {v.gstNumber}</span>}
                       {v.gstDetails?.state && <span>{v.gstDetails.state}</span>}
@@ -713,11 +713,11 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
             </ul>
           )}
 
-          <div className="border-t border-gray-100 p-2">
+          <div className="border-t border-champagne-100 p-2">
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="w-full px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center justify-center gap-1"
+              className="w-full px-3 py-2 text-sm font-medium text-champagne-700 hover:bg-champagne-50 rounded-lg flex items-center justify-center gap-1"
             >
               <span className="text-lg leading-none">+</span> Add New Vendor
             </button>
@@ -726,12 +726,12 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
       )}
 
       {selected && (
-        <div className="mt-4 p-5 bg-indigo-50 rounded-xl border border-indigo-200">
+        <div className="mt-4 p-5 bg-champagne-50 rounded-xl border border-champagne-200">
           <div className="flex items-start justify-between mb-3">
-            <h3 className="font-semibold text-indigo-900">Selected vendor</h3>
+            <h3 className="font-semibold text-onyx-900">Selected vendor</h3>
             <button
               type="button"
-              className="text-xs text-indigo-700 hover:underline font-medium"
+              className="text-xs text-champagne-800 hover:underline font-medium"
               onClick={() => onSelect(null)}
             >
               Change vendor
@@ -784,8 +784,8 @@ function InfoRow({
 }) {
   return (
     <div className={full ? 'md:col-span-2' : ''}>
-      <span className="text-gray-500">{label}: </span>
-      <span className="text-gray-900">{value || '—'}</span>
+      <span className="text-onyx-400">{label}: </span>
+      <span className="text-onyx-900">{value || '—'}</span>
     </div>
   );
 }
@@ -851,17 +851,17 @@ export function BillingPaymentCard({
   const segBtn = (active: boolean) =>
     `flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition border ${
       active
-        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+        ? 'bg-champagne-700 text-white border-champagne-700 shadow-sm'
+        : 'bg-white text-onyx-700 border-champagne-300 hover:bg-pearl'
     }`;
 
   const inputCls =
-    'w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
+    'w-full px-4 py-2.5 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent';
 
   return (
-    <div className="p-5 bg-white rounded-xl border border-gray-200 space-y-4">
+    <div className="p-5 bg-white rounded-xl border border-champagne-200 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">Billing &amp; Payment</h3>
+        <h3 className="font-semibold text-onyx-900">Billing &amp; Payment</h3>
       </div>
 
       {/* Billable toggle */}
@@ -875,7 +875,7 @@ export function BillingPaymentCard({
       </div>
 
       {!formData.isBillable && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-onyx-400">
           Non-Billable: this transaction won&apos;t affect vendor outstanding balance.
         </p>
       )}
@@ -892,9 +892,9 @@ export function BillingPaymentCard({
           {vendorCredit > 0.01 && (
             <div className="px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm text-emerald-900">
+                <div className="text-sm text-accent-emerald">
                   <span className="font-semibold">{vendorName ?? 'Vendor'} has ₹{fmt(vendorCredit)} in credit.</span>
-                  <span className="text-emerald-800 ml-1">Apply some toward this purchase?</span>
+                  <span className="text-accent-emerald ml-1">Apply some toward this purchase?</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -909,12 +909,12 @@ export function BillingPaymentCard({
                       })
                     }
                     placeholder="0"
-                    className="w-32 px-3 py-1.5 rounded-lg border border-emerald-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                    className="w-32 px-3 py-1.5 rounded-lg border border-emerald-300 text-sm focus:ring-2 focus:ring-accent-emerald"
                   />
                   <button
                     type="button"
                     onClick={() => set({ creditApplied: maxApplicableCredit })}
-                    className="text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
+                    className="text-xs font-medium text-accent-emerald hover:text-accent-emerald underline"
                   >
                     Apply max
                   </button>
@@ -925,7 +925,7 @@ export function BillingPaymentCard({
 
           {/* Payment Mode */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Mode</label>
+            <label className="block text-sm font-semibold text-onyx-700 mb-2">Payment Mode</label>
             <div className="flex gap-2">
               {(['CASH', 'NEFT', 'BOTH'] as const).map((m) => (
                 <button
@@ -938,14 +938,14 @@ export function BillingPaymentCard({
                 </button>
               ))}
             </div>
-            {errors.paymentMode && <p className="text-xs text-red-600 mt-1">{errors.paymentMode}</p>}
+            {errors.paymentMode && <p className="text-xs text-accent-ruby mt-1">{errors.paymentMode}</p>}
           </div>
 
           {formData.paymentMode === 'BOTH' && (
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Cash Amount (₹)</label>
+                  <label className="block text-xs font-medium text-onyx-500 mb-1">Cash Amount (₹)</label>
                   <input
                     type="number"
                     min={0}
@@ -956,7 +956,7 @@ export function BillingPaymentCard({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">NEFT Amount (₹)</label>
+                  <label className="block text-xs font-medium text-onyx-500 mb-1">NEFT Amount (₹)</label>
                   <input
                     type="number"
                     min={0}
@@ -967,22 +967,22 @@ export function BillingPaymentCard({
                   />
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-onyx-400 mt-1">
                 Total: ₹{fmt((formData.cashAmount || 0) + (formData.neftAmount || 0))} of ₹{fmt(totalPrice)}
                 {overPaid > 0.01 && (
-                  <span className="text-emerald-700 font-medium">
+                  <span className="text-accent-emerald font-medium">
                     {' '}— ₹{fmt(overPaid)} will be added to vendor credit
                   </span>
                 )}
               </p>
-              {errors.paymentSplit && <p className="text-xs text-red-600 mt-1">{errors.paymentSplit}</p>}
+              {errors.paymentSplit && <p className="text-xs text-accent-ruby mt-1">{errors.paymentSplit}</p>}
             </div>
           )}
 
           {isNeft && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">NEFT UTR</label>
+                <label className="block text-xs font-medium text-onyx-500 mb-1">NEFT UTR</label>
                 <input
                   type="text"
                   value={formData.neftUtr}
@@ -992,7 +992,7 @@ export function BillingPaymentCard({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Bank</label>
+                <label className="block text-xs font-medium text-onyx-500 mb-1">Bank</label>
                 <input
                   type="text"
                   value={formData.neftBank}
@@ -1002,7 +1002,7 @@ export function BillingPaymentCard({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">NEFT Date</label>
+                <label className="block text-xs font-medium text-onyx-500 mb-1">NEFT Date</label>
                 <input
                   type="date"
                   value={formData.neftDate}
@@ -1015,7 +1015,7 @@ export function BillingPaymentCard({
 
           {/* Payment Status */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Status</label>
+            <label className="block text-sm font-semibold text-onyx-700 mb-2">Payment Status</label>
             <div className="flex gap-2">
               {(['COMPLETE', 'HALF', 'PENDING'] as const).map((s) => (
                 <button
@@ -1029,31 +1029,31 @@ export function BillingPaymentCard({
               ))}
             </div>
             {errors.paymentStatus && (
-              <p className="text-xs text-red-600 mt-1">{errors.paymentStatus}</p>
+              <p className="text-xs text-accent-ruby mt-1">{errors.paymentStatus}</p>
             )}
           </div>
 
           {formData.paymentStatus === 'COMPLETE' && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-onyx-400">
               Full payment of ₹{fmt(totalPrice)} recorded.
               {creditApplied > 0 && (
-                <span className="text-emerald-700"> (incl. ₹{fmt(creditApplied)} from vendor credit)</span>
+                <span className="text-accent-emerald"> (incl. ₹{fmt(creditApplied)} from vendor credit)</span>
               )}
             </p>
           )}
           {formData.paymentStatus === 'PENDING' && (
-            <p className="text-sm text-gray-500">Full balance ₹{fmt(totalPrice)} pending.</p>
+            <p className="text-sm text-onyx-400">Full balance ₹{fmt(totalPrice)} pending.</p>
           )}
           {formData.paymentStatus === 'HALF' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {formData.paymentMode === 'BOTH' ? (
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs text-gray-700 mb-1">Amount Paid (Cash + NEFT):</p>
-                  <p className="text-lg font-bold text-gray-900">₹{fmt(formData.amountPaid || 0)}</p>
+                <div className="p-3 bg-pearl rounded-xl border border-champagne-200">
+                  <p className="text-xs text-onyx-700 mb-1">Amount Paid (Cash + NEFT):</p>
+                  <p className="text-lg font-bold text-onyx-900">₹{fmt(formData.amountPaid || 0)}</p>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount Paid (₹)</label>
+                  <label className="block text-xs font-medium text-onyx-500 mb-1">Amount Paid (₹)</label>
                   <input
                     type="number"
                     min={0}
@@ -1062,19 +1062,19 @@ export function BillingPaymentCard({
                     onChange={(e) => set({ amountPaid: num(e.target.value) })}
                     className={inputCls}
                   />
-                  {errors.amountPaid && <p className="text-xs text-red-600 mt-1">{errors.amountPaid}</p>}
+                  {errors.amountPaid && <p className="text-xs text-accent-ruby mt-1">{errors.amountPaid}</p>}
                 </div>
               )}
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
-                <p className="text-xs text-gray-700 mb-1">Balance Due:</p>
+                <p className="text-xs text-onyx-700 mb-1">Balance Due:</p>
                 <p className="text-lg font-bold text-amber-900">₹{fmt(balanceDue)}</p>
                 {creditApplied > 0 && (
-                  <p className="text-xs text-emerald-700 mt-1">
+                  <p className="text-xs text-accent-emerald mt-1">
                     + ₹{fmt(creditApplied)} from vendor credit
                   </p>
                 )}
                 {overPaid > 0.01 && (
-                  <p className="text-xs text-emerald-700 mt-1 font-medium">
+                  <p className="text-xs text-accent-emerald mt-1 font-medium">
                     + ₹{fmt(overPaid)} will be added to vendor credit
                   </p>
                 )}

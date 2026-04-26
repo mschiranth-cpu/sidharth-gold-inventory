@@ -41,6 +41,16 @@ export const updateUserSchema = z.object({
   role: z.nativeEnum(UserRole).optional(),
   department: z.nativeEnum(DepartmentName).optional().nullable(),
   phone: z.string().optional().nullable(),
+  avatar: z.string().max(900_000, 'Avatar image too large — please use a smaller picture').optional().nullable(),
+});
+
+/**
+ * Self-update schema (any authenticated user can update these fields on their own profile)
+ */
+export const updateSelfSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
+  phone: z.string().optional().nullable(),
+  avatar: z.string().max(900_000, 'Avatar image too large — please use a smaller picture').optional().nullable(),
 });
 
 /**

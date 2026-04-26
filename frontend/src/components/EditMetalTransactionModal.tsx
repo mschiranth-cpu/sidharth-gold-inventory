@@ -220,25 +220,25 @@ export default function EditMetalTransactionModal({
 
   const inputClass = (hasError?: string) =>
     `w-full px-4 py-3 rounded-xl border ${
-      hasError ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+      hasError ? 'border-accent-ruby/50 focus:ring-accent-ruby' : 'border-champagne-300 focus:ring-champagne-500'
     } focus:ring-2 focus:border-transparent`;
 
-  const Req = () => <span className="text-red-500 ml-0.5">*</span>;
+  const Req = () => <span className="text-accent-ruby ml-0.5">*</span>;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-champagne-200 sticky top-0 bg-white rounded-t-2xl z-10">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Edit Transaction</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h2 className="text-xl font-bold text-onyx-900">Edit Transaction</h2>
+            <p className="text-xs text-onyx-400 mt-0.5">
               Stock and vendor credit will be re-balanced automatically.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            className="text-onyx-300 hover:text-onyx-500 text-2xl leading-none"
             aria-label="Close"
           >
             ×
@@ -272,7 +272,7 @@ export default function EditMetalTransactionModal({
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Metal Type<Req />
                 </label>
                 <select
@@ -290,7 +290,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Purity (Karat)<Req />
                 </label>
                 <select
@@ -308,7 +308,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Form<Req />
                 </label>
                 <select
@@ -327,7 +327,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Gross Weight (grams)<Req />
                 </label>
                 <input
@@ -345,7 +345,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Rate per Gram (₹){isPurchase && <Req />}
                 </label>
                 <input
@@ -360,7 +360,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Reference Number
                 </label>
                 <input
@@ -375,7 +375,7 @@ export default function EditMetalTransactionModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Transaction Date
                 </label>
                 <div className="relative">
@@ -389,7 +389,7 @@ export default function EditMetalTransactionModal({
                     className={`${inputClass()} pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
                   />
                   <svg
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-600"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-champagne-700"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -406,7 +406,7 @@ export default function EditMetalTransactionModal({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+              <label className="block text-sm font-semibold text-onyx-700 mb-2">Notes</label>
               <textarea
                 rows={3}
                 value={formData.notes}
@@ -418,22 +418,22 @@ export default function EditMetalTransactionModal({
 
             {/* Calculated Pure Weight & Total Price */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                <p className="text-sm text-gray-700 mb-1">Calculated Pure Weight:</p>
-                <p className="text-2xl font-bold text-indigo-900">
+              <div className="p-4 bg-champagne-50 rounded-xl border border-champagne-200">
+                <p className="text-sm text-onyx-700 mb-1">Calculated Pure Weight:</p>
+                <p className="text-2xl font-bold text-onyx-900">
                   {((formData.grossWeight * formData.purity) / 24).toFixed(3)} grams
                 </p>
               </div>
               <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <p className="text-sm text-gray-700 mb-1">Total Price:</p>
-                <p className="text-2xl font-bold text-emerald-900">
+                <p className="text-sm text-onyx-700 mb-1">Total Price:</p>
+                <p className="text-2xl font-bold text-accent-emerald">
                   ₹
                   {totalPrice.toLocaleString('en-IN', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-onyx-500 mt-1">
                   {((formData.grossWeight * formData.purity) / 24).toFixed(3)} g × ₹
                   {formData.rate.toLocaleString('en-IN')}/g
                 </p>
@@ -487,10 +487,10 @@ export default function EditMetalTransactionModal({
             className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Please fix these errors</h3>
+            <h3 className="text-lg font-bold text-onyx-900 mb-2">Please fix these errors</h3>
             <ul className="space-y-2 mb-6 pl-4">
               {Object.entries(errors).map(([field, msg]) => (
-                <li key={field} className="text-sm text-red-700 list-disc">
+                <li key={field} className="text-sm text-accent-ruby list-disc">
                   {msg}
                 </li>
               ))}

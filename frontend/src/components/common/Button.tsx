@@ -38,53 +38,53 @@ const Button: React.FC<ButtonProps> = ({
   const variants = {
     primary: cn(
       'text-white rounded-xl',
-      'bg-gradient-to-r from-indigo-500 via-purple-600 to-violet-600',
+      'bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800',
       'bg-[length:200%_200%] bg-[position:0%_0%]',
       'hover:bg-[position:100%_100%]',
-      'shadow-[0_4px_15px_rgba(99,102,241,0.4)]',
-      'hover:shadow-[0_8px_25px_rgba(99,102,241,0.5),0_0_20px_rgba(99,102,241,0.3)]',
-      'focus:ring-indigo-500'
+      'shadow-[0_4px_15px_rgba(58,44,22,0.35)]',
+      'hover:shadow-[0_8px_25px_rgba(58,44,22,0.5),0_0_20px_rgba(201,165,92,0.25)]',
+      'focus:ring-champagne-500'
     ),
     secondary: cn(
-      'text-gray-700 rounded-xl',
+      'text-onyx-700 rounded-xl',
       'bg-white/90 backdrop-blur-sm',
-      'border border-gray-200/50',
-      'shadow-[0_2px_10px_rgba(0,0,0,0.05)]',
-      'hover:bg-white hover:border-indigo-300/50',
-      'hover:shadow-[0_8px_25px_rgba(0,0,0,0.1)]',
-      'focus:ring-gray-400'
+      'border border-champagne-200/70',
+      'shadow-[0_2px_10px_rgba(58,44,22,0.06)]',
+      'hover:bg-white hover:border-champagne-400/70',
+      'hover:shadow-[0_8px_25px_rgba(58,44,22,0.1)]',
+      'focus:ring-champagne-400'
     ),
     danger: cn(
       'text-white rounded-xl',
-      'bg-gradient-to-r from-red-500 via-red-600 to-red-700',
+      'bg-gradient-to-r from-accent-ruby via-accent-ruby to-accent-ruby/85',
       'bg-[length:200%_200%] bg-[position:0%_0%]',
       'hover:bg-[position:100%_100%]',
-      'shadow-[0_4px_15px_rgba(239,68,68,0.4)]',
-      'hover:shadow-[0_8px_25px_rgba(239,68,68,0.5),0_0_20px_rgba(239,68,68,0.3)]',
-      'focus:ring-red-500'
+      'shadow-[0_4px_15px_rgba(180,58,74,0.4)]',
+      'hover:shadow-[0_8px_25px_rgba(180,58,74,0.5)]',
+      'focus:ring-accent-ruby'
     ),
     success: cn(
       'text-white rounded-xl',
-      'bg-gradient-to-r from-green-500 via-green-600 to-emerald-600',
+      'bg-gradient-to-r from-accent-emerald via-accent-emerald to-accent-emerald/85',
       'bg-[length:200%_200%] bg-[position:0%_0%]',
       'hover:bg-[position:100%_100%]',
-      'shadow-[0_4px_15px_rgba(34,197,94,0.4)]',
-      'hover:shadow-[0_8px_25px_rgba(34,197,94,0.5),0_0_20px_rgba(34,197,94,0.3)]',
-      'focus:ring-green-500'
+      'shadow-[0_4px_15px_rgba(31,138,111,0.4)]',
+      'hover:shadow-[0_8px_25px_rgba(31,138,111,0.5)]',
+      'focus:ring-accent-emerald'
     ),
     ghost: cn(
-      'text-gray-600 bg-transparent rounded-xl',
-      'hover:text-gray-900 hover:bg-gray-100/80',
-      'hover:shadow-[0_4px_15px_rgba(0,0,0,0.05)]',
-      'focus:ring-gray-400'
+      'text-onyx-500 bg-transparent rounded-xl',
+      'hover:text-onyx-900 hover:bg-champagne-100/60',
+      'hover:shadow-[0_4px_15px_rgba(58,44,22,0.05)]',
+      'focus:ring-champagne-300'
     ),
     outline: cn(
-      'text-indigo-600 bg-transparent rounded-xl',
-      'border-2 border-indigo-500',
+      'text-champagne-800 bg-transparent rounded-xl',
+      'border-2 border-champagne-500',
       'hover:text-white hover:border-transparent',
-      'hover:bg-gradient-to-r hover:from-indigo-500 hover:to-purple-600',
-      'hover:shadow-[0_8px_25px_rgba(99,102,241,0.4)]',
-      'focus:ring-indigo-500'
+      'hover:bg-gradient-to-r hover:from-champagne-700 hover:to-onyx-800',
+      'hover:shadow-[0_8px_25px_rgba(58,44,22,0.3)]',
+      'focus:ring-champagne-500'
     ),
   };
 

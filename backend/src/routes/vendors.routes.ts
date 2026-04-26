@@ -102,16 +102,80 @@ async function lookupGstin(gstin: string) {
     cancelledDate: null as string | null,
     centerJurisdiction: null as string | null,
     stateJurisdiction: null as string | null,
-    source: 'parsed' as 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'manual',
+    source: 'parsed' as 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'rapidapi-tool' | 'manual',
     notice: undefined as string | undefined,
   };
 
   // External provider — only if API key configured.
-  // Supported: gstincheck (default), mastergst, rapidapi (GST Insights API)
+  // Supported: gstincheck (default), mastergst, rapidapi (GST Insights API),
+  //            rapidapi-tool (Powerful GSTIN Tool API)
   const apiKey = process.env.GST_API_KEY;
   if (apiKey) {
     try {
-      if (provider === 'rapidapi') {
+      if (provider === 'rapidapi-tool') {
+        const rapidHost = 'powerful-gstin-tool.p.rapidapi.com';
+        const url = `https://${rapidHost}/v1/gstin/${clean}/details`;
+        const r = await fetch(url, {
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': rapidHost,
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (r.status === 401 || r.status === 403) {
+          console.warn('[GST] rapidapi-tool auth failed', r.status);
+          parsed.notice = 'GST API authentication failed — showing structural data';
+        } else if (r.status === 429) {
+          console.warn('[GST] rapidapi-tool rate-limited');
+          parsed.notice = 'GST API quota exhausted — showing structural data';
+        } else if (r.ok) {
+          const j: any = await r.json();
+          const d = j?.data;
+          if (d && typeof d === 'object') {
+            parsed.legalName = d.legal_name || null;
+            parsed.tradeName = d.trade_name || d.legal_name || null;
+            parsed.status = d.status || null;
+            parsed.registrationDate = d.registration_date || null;
+            parsed.businessType = d.business_constitution || null;
+            parsed.taxType = d.type || null;
+            parsed.natureOfBusinessActivity = Array.isArray(d.business_activity_nature)
+              ? d.business_activity_nature.filter(Boolean)
+              : null;
+            parsed.cancelledDate = d.cancellation_date || null;
+            parsed.centerJurisdiction = d.centre_jurisdiction || d.centre_jurisdiction_code || null;
+            parsed.stateJurisdiction = d.state_jurisdiction || d.state_jurisdiction_code || null;
+            const addr = (d?.place_of_business_principal?.address || {}) as Record<string, string>;
+            const ap: typeof parsed.addressParts = {
+              buildingNumber: addr.door_num || undefined,
+              buildingName: addr.building_name || undefined,
+              floorNumber: addr.floor_num || undefined,
+              street: addr.street || undefined,
+              locality: addr.location || undefined,
+              location: addr.location || undefined,
+              district: addr.district || undefined,
+              stateCode: addr.state || undefined,
+              pincode: addr.pin_code || undefined,
+            };
+            parsed.addressParts = ap;
+            const flat = [
+              addr.door_num,
+              addr.building_name,
+              addr.floor_num,
+              addr.street,
+              addr.location,
+              addr.district,
+              addr.state,
+              addr.pin_code,
+            ]
+              .filter(Boolean)
+              .join(', ');
+            parsed.address = flat || null;
+            parsed.city = addr.district || addr.location || null;
+            parsed.pincode = addr.pin_code || null;
+            parsed.source = 'rapidapi-tool';
+          }
+        }
+      } else if (provider === 'rapidapi') {
         const rapidHost = 'gst-insights-api.p.rapidapi.com';
         const url = `https://${rapidHost}/getGSTDetailsUsingGST/${clean}`;
         const r = await fetch(url, {

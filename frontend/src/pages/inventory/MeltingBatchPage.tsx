@@ -18,7 +18,7 @@ export default function MeltingBatchPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-champagne-700"></div>
       </div>
     );
   }
@@ -28,8 +28,8 @@ export default function MeltingBatchPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Melting Batches</h1>
-            <p className="text-gray-600">Track melting records and wastage</p>
+            <h1 className="text-3xl font-bold text-onyx-900 mb-2">Melting Batches</h1>
+            <p className="text-onyx-500">Track melting records and wastage</p>
           </div>
           <div className="flex gap-3">
             <Button variant="primary">Create Batch</Button>
@@ -44,12 +44,12 @@ export default function MeltingBatchPage() {
           {batches.map((batch: any) => (
             <div
               key={batch.id}
-              className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
+              className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{batch.batchNumber}</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="text-xl font-bold text-onyx-900">{batch.batchNumber}</h3>
+                  <p className="text-sm text-onyx-500">
                     Melted by: {batch.meltedBy?.name} on{' '}
                     {new Date(batch.meltedAt).toLocaleDateString('en-IN')}
                   </p>
@@ -57,44 +57,44 @@ export default function MeltingBatchPage() {
                 <span
                   className={`px-4 py-2 rounded-xl text-sm font-semibold ${
                     batch.wastagePercent > 2
-                      ? 'bg-red-100 text-red-800'
+                      ? 'bg-red-100 text-accent-ruby'
                       : batch.wastagePercent > 1
                       ? 'bg-amber-100 text-amber-800'
-                      : 'bg-green-100 text-green-800'
+                      : 'bg-green-100 text-accent-emerald'
                   }`}
                 >
                   Wastage: {batch.wastagePercent.toFixed(2)}%
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-xl">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-pearl rounded-xl">
                 <div>
-                  <p className="text-sm text-gray-600">Input Weight</p>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-sm text-onyx-500">Input Weight</p>
+                  <p className="text-lg font-bold text-onyx-900">
                     {batch.totalInputWeight.toFixed(2)}g
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Output Weight</p>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-sm text-onyx-500">Output Weight</p>
+                  <p className="text-lg font-bold text-onyx-900">
                     {batch.outputWeight.toFixed(2)}g
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Output Purity</p>
-                  <p className="text-lg font-bold text-gray-900">{batch.outputPurity}K</p>
+                  <p className="text-sm text-onyx-500">Output Purity</p>
+                  <p className="text-lg font-bold text-onyx-900">{batch.outputPurity}K</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Wastage</p>
-                  <p className="text-lg font-bold text-red-600">
+                  <p className="text-sm text-onyx-500">Wastage</p>
+                  <p className="text-lg font-bold text-accent-ruby">
                     {batch.wastageWeight.toFixed(2)}g
                   </p>
                 </div>
               </div>
 
               {batch.notes && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-xl">
-                  <p className="text-sm text-gray-700">{batch.notes}</p>
+                <div className="mt-4 p-3 bg-champagne-50 rounded-xl">
+                  <p className="text-sm text-onyx-700">{batch.notes}</p>
                 </div>
               )}
             </div>

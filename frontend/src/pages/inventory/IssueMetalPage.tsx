@@ -50,22 +50,22 @@ export default function IssueMetalPage() {
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Issue Metal</h1>
-          <p className="text-gray-600">Issue metal to department or worker</p>
+          <h1 className="text-3xl font-bold text-onyx-900 mb-2">Issue Metal</h1>
+          <p className="text-onyx-500">Issue metal to department or worker</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-champagne-100">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Metal Type *
                 </label>
                 <select
                   required
                   value={formData.metalType}
                   onChange={(e) => setFormData({ ...formData, metalType: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent"
                 >
                   <option value="GOLD">Gold</option>
                   <option value="SILVER">Silver</option>
@@ -74,12 +74,12 @@ export default function IssueMetalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Purity *</label>
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">Purity *</label>
                 <select
                   required
                   value={formData.purity}
                   onChange={(e) => setFormData({ ...formData, purity: parseFloat(e.target.value) })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent"
                 >
                   <option value="24">24K</option>
                   <option value="22">22K</option>
@@ -89,12 +89,12 @@ export default function IssueMetalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Form *</label>
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">Form *</label>
                 <select
                   required
                   value={formData.form}
                   onChange={(e) => setFormData({ ...formData, form: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent"
                 >
                   <option value="BAR">Bar</option>
                   <option value="WIRE">Wire</option>
@@ -104,7 +104,7 @@ export default function IssueMetalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
                   Gross Weight (grams) *
                 </label>
                 <input
@@ -115,24 +115,24 @@ export default function IssueMetalPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, grossWeight: parseFloat(e.target.value) })
                   }
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+              <label className="block text-sm font-semibold text-onyx-700 mb-2">Notes</label>
               <textarea
                 rows={3}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500 focus:border-transparent"
               />
             </div>
 
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-              <p className="text-sm text-gray-700 mb-1">Pure Weight:</p>
-              <p className="text-2xl font-bold text-indigo-900">
+            <div className="p-4 bg-champagne-50 rounded-xl border border-champagne-200">
+              <p className="text-sm text-onyx-700 mb-1">Pure Weight:</p>
+              <p className="text-2xl font-bold text-onyx-900">
                 {((formData.grossWeight * formData.purity) / 24).toFixed(3)} grams
               </p>
             </div>

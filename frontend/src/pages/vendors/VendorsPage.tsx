@@ -38,12 +38,12 @@ type SortKey = 'name' | 'outstanding' | 'paid' | 'credit';
 type SortDir = 'asc' | 'desc';
 
 const AVATAR_PALETTE = [
-  'bg-indigo-100 text-indigo-700',
+  'bg-champagne-100 text-champagne-800',
   'bg-emerald-100 text-emerald-700',
   'bg-amber-100 text-amber-700',
   'bg-rose-100 text-rose-700',
   'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
+  'bg-onyx-100 text-onyx-700',
   'bg-teal-100 text-teal-700',
   'bg-fuchsia-100 text-fuchsia-700',
 ];
@@ -63,7 +63,7 @@ function getAvatar(name: string) {
 
 function isVerified(v: Vendor) {
   const s = v.gstDetails?.source;
-  return s === 'rapidapi' || s === 'gstincheck' || s === 'mastergst';
+  return s === 'rapidapi' || s === 'rapidapi-tool' || s === 'gstincheck' || s === 'mastergst';
 }
 
 function downloadCsv(rows: any[][], filename: string) {
@@ -288,13 +288,13 @@ export default function VendorsPage() {
   ];
 
   return (
-    <div className="p-6 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 min-h-screen">
+    <div className="p-6 bg-gradient-to-br from-champagne-50/40 via-white to-pearl min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1 flex items-center gap-2">
-              <BuildingOffice2Icon className="w-8 h-8 text-indigo-600" />
+              <BuildingOffice2Icon className="w-8 h-8 text-champagne-700" />
               Vendor Info
             </h1>
             <p className="text-gray-600 text-sm">
@@ -319,7 +319,7 @@ export default function VendorsPage() {
             </button>
             <button
               onClick={handleAdd}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-indigo-500/20"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-onyx-700/20"
             >
               <PlusIcon className="w-4 h-4" /> Add Vendor
             </button>
@@ -371,7 +371,7 @@ export default function VendorsPage() {
               placeholder="Search by name, code, GSTIN or phone…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 focus:bg-white transition"
+              className="w-full pl-11 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-champagne-600 focus:border-transparent bg-gray-50 focus:bg-white transition"
             />
             {search && (
               <button
@@ -391,7 +391,7 @@ export default function VendorsPage() {
                   onClick={() => setFilter(c.key)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
                     active
-                      ? 'border-indigo-500 bg-indigo-600 text-white shadow-sm'
+                      ? 'border-champagne-700 bg-champagne-800 text-white shadow-sm'
                       : `border-transparent ${c.cls} hover:brightness-95`
                   }`}
                 >
@@ -468,7 +468,7 @@ export default function VendorsPage() {
                     return (
                       <tr
                         key={v.id}
-                        className="hover:bg-indigo-50/40 cursor-pointer transition"
+                        className="hover:bg-champagne-50/40 cursor-pointer transition"
                         onClick={() => navigate(`/app/vendors/${v.id}`)}
                       >
                         <td className="px-4 py-3">
@@ -525,7 +525,7 @@ export default function VendorsPage() {
                                 )}
                                 {(v.gstDetails?.eInvoiceStatus || '').toLowerCase() === 'yes' && (
                                   <span
-                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold"
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-champagne-50 text-champagne-800 border border-champagne-200 text-[10px] font-semibold"
                                     title="e-Invoice eligible"
                                   >
                                     ⚡ e-Inv
@@ -601,7 +601,7 @@ export default function VendorsPage() {
                                 handleEdit(v);
                               }}
                               title="Edit vendor"
-                              className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50"
+                              className="p-2 rounded-lg text-champagne-700 hover:bg-champagne-50"
                             >
                               <PencilSquareIcon className="w-4 h-4" />
                             </button>
@@ -661,10 +661,10 @@ export default function VendorsPage() {
 
 const TINTS: Record<string, { ring: string; bg: string; text: string; iconBg: string }> = {
   indigo: {
-    ring: 'ring-indigo-100',
+    ring: 'ring-champagne-200',
     bg: 'bg-white',
-    text: 'text-indigo-700',
-    iconBg: 'bg-indigo-50 text-indigo-600',
+    text: 'text-champagne-800',
+    iconBg: 'bg-champagne-50 text-champagne-700',
   },
   emerald: {
     ring: 'ring-emerald-100',
@@ -685,10 +685,10 @@ const TINTS: Record<string, { ring: string; bg: string; text: string; iconBg: st
     iconBg: 'bg-sky-50 text-sky-600',
   },
   violet: {
-    ring: 'ring-violet-100',
+    ring: 'ring-onyx-200',
     bg: 'bg-white',
-    text: 'text-violet-700',
-    iconBg: 'bg-violet-50 text-violet-600',
+    text: 'text-onyx-700',
+    iconBg: 'bg-onyx-100 text-onyx-700',
   },
 };
 
@@ -734,7 +734,7 @@ function Th({
   return (
     <th
       onClick={onClick}
-      className={`px-4 py-3 ${cls} ${onClick ? 'cursor-pointer select-none hover:text-indigo-600' : ''}`}
+      className={`px-4 py-3 ${cls} ${onClick ? 'cursor-pointer select-none hover:text-champagne-700' : ''}`}
     >
       {children}
     </th>
@@ -830,7 +830,7 @@ function ConfirmDeleteModal({
 function EmptyState({ onAdd, hasSearch }: { onAdd: () => void; hasSearch: boolean }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto mb-4 flex items-center justify-center">
+      <div className="w-16 h-16 rounded-2xl bg-champagne-50 text-champagne-700 mx-auto mb-4 flex items-center justify-center">
         <BuildingOffice2Icon className="w-8 h-8" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -844,7 +844,7 @@ function EmptyState({ onAdd, hasSearch }: { onAdd: () => void; hasSearch: boolea
       {!hasSearch && (
         <button
           onClick={onAdd}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-md shadow-indigo-500/20"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-md shadow-onyx-700/20"
         >
           <PlusIcon className="w-4 h-4" /> Add Vendor
         </button>

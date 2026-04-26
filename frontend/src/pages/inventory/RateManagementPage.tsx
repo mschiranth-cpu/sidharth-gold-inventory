@@ -51,7 +51,7 @@ export default function RateManagementPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-champagne-700"></div>
       </div>
     );
   }
@@ -61,8 +61,8 @@ export default function RateManagementPage() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Rate Management</h1>
-            <p className="text-gray-600">Manage metal rates</p>
+            <h1 className="text-3xl font-bold text-onyx-900 mb-2">Rate Management</h1>
+            <p className="text-onyx-500">Manage metal rates</p>
           </div>
           <Button variant="primary" onClick={() => setShowForm(!showForm)}>
             {showForm ? 'Cancel' : 'Add Rate'}
@@ -71,19 +71,19 @@ export default function RateManagementPage() {
 
         {/* Add Rate Form */}
         {showForm && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Rate</h2>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100 mb-6">
+            <h2 className="text-xl font-bold text-onyx-900 mb-4">Add New Rate</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Metal Type *
                   </label>
                   <select
                     required
                     value={formData.metalType}
                     onChange={(e) => setFormData({ ...formData, metalType: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   >
                     <option value="GOLD">Gold</option>
                     <option value="SILVER">Silver</option>
@@ -91,14 +91,14 @@ export default function RateManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Purity *</label>
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">Purity *</label>
                   <select
                     required
                     value={formData.purity}
                     onChange={(e) =>
                       setFormData({ ...formData, purity: parseFloat(e.target.value) })
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   >
                     <option value="24">24K</option>
                     <option value="22">22K</option>
@@ -107,7 +107,7 @@ export default function RateManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Rate/Gram (₹) *
                   </label>
                   <input
@@ -118,11 +118,11 @@ export default function RateManagementPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, ratePerGram: parseFloat(e.target.value) })
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Effective Date *
                   </label>
                   <input
@@ -130,7 +130,7 @@ export default function RateManagementPage() {
                     required
                     value={formData.effectiveDate}
                     onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   />
                 </div>
               </div>
@@ -142,28 +142,28 @@ export default function RateManagementPage() {
         )}
 
         {/* Current Rates */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Current Rates</h2>
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100">
+          <h2 className="text-xl font-bold text-onyx-900 mb-6">Current Rates</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {rates.map((rate: any) => (
               <div
                 key={rate.id}
-                className="p-6 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-200"
+                className="p-6 bg-gradient-to-br from-amber-50 to-amber-50 rounded-xl border border-amber-200"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold text-gray-700">{rate.metalType}</p>
+                  <p className="text-sm font-semibold text-onyx-700">{rate.metalType}</p>
                   <span className="px-2 py-1 bg-amber-200 text-amber-800 rounded-lg text-xs font-semibold">
                     {rate.purity}K
                   </span>
                 </div>
-                <p className="text-3xl font-bold text-gray-900 mb-1">
+                <p className="text-3xl font-bold text-onyx-900 mb-1">
                   ₹{rate.ratePerGram.toLocaleString('en-IN')}
                 </p>
-                <p className="text-xs text-gray-600">per gram</p>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-onyx-500">per gram</p>
+                <p className="text-xs text-onyx-400 mt-2">
                   {new Date(rate.effectiveDate).toLocaleDateString('en-IN')}
                 </p>
-                {rate.source && <p className="text-xs text-gray-500 mt-1">Source: {rate.source}</p>}
+                {rate.source && <p className="text-xs text-onyx-400 mt-1">Source: {rate.source}</p>}
               </div>
             ))}
           </div>

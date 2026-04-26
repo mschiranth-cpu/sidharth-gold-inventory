@@ -24,19 +24,19 @@ const DELETE_ROLES = new Set(['ADMIN']);
 // Per-metal stat card config — one entry per metal supported in ReceiveMetalPage.
 // Order matches the Receive form's dropdown.
 const METAL_CARDS: { code: string; label: string; icon: string; accent: string }[] = [
-  { code: 'GOLD', label: 'Gold', icon: '🥇', accent: 'from-amber-400 to-yellow-500' },
+  { code: 'GOLD', label: 'Gold', icon: '🥇', accent: 'from-amber-400 to-amber-500' },
   { code: 'SILVER', label: 'Silver', icon: '🥈', accent: 'from-slate-400 to-slate-500' },
   { code: 'PLATINUM', label: 'Platinum', icon: '💎', accent: 'from-cyan-400 to-sky-500' },
-  { code: 'PALLADIUM', label: 'Palladium', icon: '🔷', accent: 'from-violet-400 to-purple-500' },
+  { code: 'PALLADIUM', label: 'Palladium', icon: '🔷', accent: 'from-violet-500 to-violet-700' },
 ];
 
 function PaymentBadge({ status }: { status: string }) {
   const cls =
     status === 'COMPLETE'
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-emerald-100 text-accent-emerald'
       : status === 'HALF'
       ? 'bg-amber-100 text-amber-800'
-      : 'bg-rose-100 text-rose-700';
+      : 'bg-rose-100 text-accent-ruby';
   const label =
     status === 'COMPLETE'
       ? 'Paid in Full'
@@ -80,12 +80,12 @@ function PaymentCell({
   onSettle: () => void;
 }) {
   if (txn.transactionType !== 'PURCHASE') {
-    return <span className="text-gray-400">—</span>;
+    return <span className="text-onyx-300">—</span>;
   }
 
   if (txn.isBillable !== true) {
     return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
         Non-billable
       </span>
     );
@@ -108,14 +108,14 @@ function PaymentCell({
           <button
             type="button"
             onClick={onSettle}
-            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+            className="text-xs font-medium text-champagne-700 hover:text-champagne-900 hover:underline"
           >
             Settle
           </button>
         )}
       </div>
       {/* Detail line — concise, no PII. */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-onyx-400">
         {status === 'COMPLETE' && (
           <>
             {mode ? `${mode} • ` : ''}
@@ -340,21 +340,21 @@ export default function MetalTransactionsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-champagne-700"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gradient-to-b from-slate-50 to-white min-h-screen">
+    <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
       <div className="max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
               Metal Transactions
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-onyx-500 mt-1">
               {summary.count} of {(transactions as any[]).length} transactions
               {hasActiveFilters && ' (filtered)'}
             </p>
@@ -369,19 +369,19 @@ export default function MetalTransactionsPage() {
           <SummaryCard
             label="Transactions"
             value={summary.count.toString()}
-            accent="from-indigo-500 to-indigo-600"
+            accent="from-champagne-700 to-onyx-800"
             icon="📋"
           />
           <SummaryCard
             label="Purchase Value"
             value={`₹${summary.purchaseValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-            accent="from-emerald-500 to-emerald-600"
+            accent="from-accent-emerald to-accent-emerald/85"
             icon="💰"
           />
           <SummaryCard
             label="Pending Due"
             value={`₹${summary.pendingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-            accent={summary.pendingDue > 0 ? 'from-rose-500 to-rose-600' : 'from-gray-400 to-gray-500'}
+            accent={summary.pendingDue > 0 ? 'from-accent-ruby to-accent-ruby/85' : 'from-onyx-300 to-onyx-500'}
             icon="⏳"
           />
         </div>
@@ -410,19 +410,19 @@ export default function MetalTransactionsPage() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-onyx-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
-              <span className="text-sm font-semibold text-gray-700">Filters</span>
+              <span className="text-sm font-semibold text-onyx-700">Filters</span>
             </div>
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="text-xs font-medium text-rose-600 hover:text-rose-800 hover:underline"
+                className="text-xs font-medium text-accent-ruby hover:text-accent-ruby hover:underline"
               >
                 Clear all
               </button>
@@ -431,7 +431,7 @@ export default function MetalTransactionsPage() {
 
           {/* Search row */}
           <div className="relative mb-3">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-onyx-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
             </svg>
             <input
@@ -439,7 +439,7 @@ export default function MetalTransactionsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by reference, vendor, notes, created by…"
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
             />
           </div>
 
@@ -494,35 +494,35 @@ export default function MetalTransactionsPage() {
               ]}
             />
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
+              <label className="block text-xs font-medium text-onyx-500 mb-1">From</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
+              <label className="block text-xs font-medium text-onyx-500 mb-1">To</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
               />
             </div>
           </div>
         </div>
 
         {/* Transactions Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 overflow-hidden">
           {selectedInView.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-              <div className="text-sm text-indigo-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-champagne-50 border-b border-champagne-100">
+              <div className="text-sm text-onyx-900">
                 <span className="font-semibold">{selectedInView.length}</span>{' '}
                 selected
                 {filteredIds.length !== selectedInView.length && (
-                  <span className="text-indigo-700">
+                  <span className="text-champagne-800">
                     {' '}
                     · {filteredIds.length} in current view
                   </span>
@@ -533,7 +533,7 @@ export default function MetalTransactionsPage() {
                   <button
                     type="button"
                     onClick={selectAllFiltered}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-champagne-700 hover:bg-champagne-800 transition-colors"
                   >
                     Select all {filteredIds.length}
                   </button>
@@ -541,7 +541,7 @@ export default function MetalTransactionsPage() {
                 <button
                   type="button"
                   onClick={deselectAllFiltered}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-champagne-800 bg-white border border-champagne-200 hover:bg-champagne-50 transition-colors"
                 >
                   Deselect all
                 </button>
@@ -562,7 +562,7 @@ export default function MetalTransactionsPage() {
                       }}
                       onChange={toggleHeaderCheckbox}
                       disabled={filteredIds.length === 0}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      className="h-4 w-4 rounded border-champagne-300 text-champagne-700 focus:ring-champagne-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     />
                   </th>
                   <Th>Date</Th>
@@ -582,18 +582,18 @@ export default function MetalTransactionsPage() {
                 {filteredTransactions.length === 0 && (
                   <tr>
                     <td colSpan={12} className="px-6 py-16 text-center">
-                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <div className="flex flex-col items-center gap-3 text-onyx-300">
                         <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
-                        <p className="text-sm font-medium text-gray-600">
+                        <p className="text-sm font-medium text-onyx-500">
                           {hasActiveFilters ? 'No transactions match your filters' : 'No transactions yet'}
                         </p>
                         {hasActiveFilters && (
                           <button
                             type="button"
                             onClick={clearAllFilters}
-                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                            className="text-xs font-medium text-champagne-700 hover:text-champagne-900 hover:underline"
                           >
                             Clear filters
                           </button>
@@ -605,9 +605,9 @@ export default function MetalTransactionsPage() {
                 {filteredTransactions.map((txn: any, idx: number) => (
                   <tr
                     key={txn.id}
-                    className={`hover:bg-indigo-50/40 transition-colors ${
+                    className={`hover:bg-champagne-50/40 transition-colors ${
                       selectedIds.has(txn.id)
-                        ? 'bg-indigo-50/70'
+                        ? 'bg-champagne-50/70'
                         : idx % 2 === 0
                         ? 'bg-white'
                         : 'bg-slate-50/40'
@@ -619,12 +619,12 @@ export default function MetalTransactionsPage() {
                         aria-label={`Select transaction ${txn.referenceNumber ?? txn.id}`}
                         checked={selectedIds.has(txn.id)}
                         onChange={() => toggleOne(txn.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        className="h-4 w-4 rounded border-champagne-300 text-champagne-700 focus:ring-champagne-500 cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-700">
                       <div>{new Date(txn.createdAt).toLocaleDateString('en-IN')}</div>
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-onyx-300">
                         {new Date(txn.createdAt).toLocaleTimeString('en-IN', {
                           hour: '2-digit',
                           minute: '2-digit',
@@ -635,12 +635,12 @@ export default function MetalTransactionsPage() {
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           txn.transactionType === 'PURCHASE'
-                            ? 'bg-emerald-100 text-emerald-800'
+                            ? 'bg-emerald-100 text-accent-emerald'
                             : txn.transactionType === 'SALE'
-                            ? 'bg-blue-100 text-blue-800'
+                            ? 'bg-champagne-100 text-champagne-800'
                             : txn.transactionType === 'WASTAGE'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-gray-100 text-gray-700'
+                            ? 'bg-rose-100 text-accent-ruby'
+                            : 'bg-champagne-100/60 text-onyx-700'
                         }`}
                       >
                         {txn.transactionType.replace(/_/g, ' ')}
@@ -649,15 +649,15 @@ export default function MetalTransactionsPage() {
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                       {txn.vendor ? (
                         <div className="min-w-0">
-                          <div className="font-medium text-gray-900 truncate max-w-[160px]">
+                          <div className="font-medium text-onyx-900 truncate max-w-[160px]">
                             {txn.vendor.name}
                           </div>
-                          <div className="text-[11px] text-gray-500 font-mono">
+                          <div className="text-[11px] text-onyx-400 font-mono">
                             {txn.vendor.uniqueCode}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-onyx-200">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -667,17 +667,17 @@ export default function MetalTransactionsPage() {
                             ? 'text-amber-600'
                             : txn.metalType === 'SILVER'
                             ? 'text-slate-500'
-                            : 'text-gray-900'
+                            : 'text-onyx-900'
                         }`}
                       >
                         {txn.metalType}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{txn.purity}K</td>
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-700">{txn.purity}K</td>
+                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-onyx-900">
                       {txn.grossWeight.toFixed(2)}g
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-onyx-900">
                       {txn.totalValue ? `₹${txn.totalValue.toLocaleString('en-IN')}` : '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
@@ -691,21 +691,21 @@ export default function MetalTransactionsPage() {
                       {txn.creditApplied || txn.creditGenerated ? (
                         <div className="space-y-0.5">
                           {txn.creditApplied ? (
-                            <span className="block text-indigo-700">
+                            <span className="block text-champagne-800">
                               Applied: ₹{txn.creditApplied.toLocaleString('en-IN')}
                             </span>
                           ) : null}
                           {txn.creditGenerated ? (
-                            <span className="block text-emerald-700">
+                            <span className="block text-accent-emerald">
                               Generated: ₹{txn.creditGenerated.toLocaleString('en-IN')}
                             </span>
                           ) : null}
                         </div>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-onyx-200">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-500">
                       {txn.createdBy?.name || '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
@@ -714,7 +714,7 @@ export default function MetalTransactionsPage() {
                           <button
                             type="button"
                             onClick={() => setEditTxn(txn)}
-                            className="px-2.5 py-1 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-xs font-medium transition-colors"
+                            className="px-2.5 py-1 rounded-lg text-champagne-800 bg-champagne-50 hover:bg-champagne-100 text-xs font-medium transition-colors"
                           >
                             Edit
                           </button>
@@ -726,12 +726,12 @@ export default function MetalTransactionsPage() {
                               setDeleteError(null);
                               setDeleteTxn(txn);
                             }}
-                            className="px-2.5 py-1 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-medium transition-colors"
+                            className="px-2.5 py-1 rounded-lg text-accent-ruby bg-rose-50 hover:bg-rose-100 text-xs font-medium transition-colors"
                           >
                             Delete
                           </button>
                         )}
-                        {!canEdit && !canDelete && <span className="text-gray-300">—</span>}
+                        {!canEdit && !canDelete && <span className="text-onyx-200">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -782,15 +782,15 @@ function SummaryCard({
   icon: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
       <div
         className={`w-11 h-11 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-xl shadow-sm`}
       >
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</div>
-        <div className="text-lg font-bold text-gray-900 truncate">{value}</div>
+        <div className="text-xs text-onyx-400 font-medium uppercase tracking-wide">{label}</div>
+        <div className="text-lg font-bold text-onyx-900 truncate">{value}</div>
       </div>
     </div>
   );
@@ -832,8 +832,8 @@ function MetalCard({
       onClick={onClick}
       className={`group relative text-left bg-white rounded-2xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${
         isActive
-          ? 'border-indigo-400 ring-2 ring-indigo-200 shadow-md'
-          : 'border-gray-200 shadow-sm'
+          ? 'border-champagne-400 ring-2 ring-champagne-300 shadow-md'
+          : 'border-champagne-200 shadow-sm'
       }`}
       aria-pressed={isActive}
       title={isActive ? `Click to clear ${label} filter` : `Filter by ${label}`}
@@ -848,17 +848,17 @@ function MetalCard({
         {/* Label + count + weight + value all in one column, single line each */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
+            <span className="text-xs font-semibold text-onyx-400 uppercase tracking-wide truncate">
               {label}
             </span>
-            <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            <span className="flex-shrink-0 text-[10px] font-semibold text-onyx-300 uppercase tracking-wider">
               {count} {count === 1 ? 'txn' : 'txns'}
             </span>
           </div>
-          <div className="text-lg font-bold text-gray-900 leading-tight truncate">
+          <div className="text-lg font-bold text-onyx-900 leading-tight truncate">
             {formatGrams(grams)}
           </div>
-          <div className="text-xs text-gray-500 truncate">
+          <div className="text-xs text-onyx-400 truncate">
             {value > 0
               ? `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
               : '—'}
@@ -866,7 +866,7 @@ function MetalCard({
         </div>
       </div>
       {isActive && (
-        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-champagne-500 animate-pulse" />
       )}
     </button>
   );
@@ -886,11 +886,11 @@ function FilterSelect({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-onyx-500 mb-1">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        className="w-full px-3 py-2 rounded-xl border border-champagne-300 text-sm bg-white focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -908,7 +908,7 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
     <th
       className={`px-4 py-3 ${
         align === 'right' ? 'text-right' : 'text-left'
-      } text-[11px] font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap`}
+      } text-[11px] font-semibold text-onyx-500 uppercase tracking-wider whitespace-nowrap`}
     >
       {children}
     </th>
@@ -941,24 +941,24 @@ function DeleteConfirmModal({
       >
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
-            <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-accent-ruby" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900">Delete this transaction?</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="text-lg font-bold text-onyx-900">Delete this transaction?</h3>
+            <p className="text-sm text-onyx-500 mt-1">
               <span className="font-medium">{t.transactionType?.replace(/_/g, ' ')}</span> —{' '}
               {t.metalType} {t.purity}K • {t.grossWeight?.toFixed(2)}g
               {t.totalValue ? ` • ₹${t.totalValue.toLocaleString('en-IN')}` : ''}
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-onyx-500 mt-2">
               Stock balances and vendor credit will be re-balanced automatically. This action cannot be undone.
             </p>
           </div>
         </div>
         {error && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+          <div className="mb-4 p-3 bg-rose-50 border border-accent-ruby/30 rounded-lg text-sm text-accent-ruby">
             {error}
           </div>
         )}
@@ -970,7 +970,7 @@ function DeleteConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={isPending}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-medium disabled:opacity-60"
+            className="px-4 py-2 rounded-xl bg-accent-ruby hover:bg-accent-ruby/90 text-white font-medium disabled:opacity-60"
           >
             {isPending ? 'Deleting…' : 'Delete Transaction'}
           </button>

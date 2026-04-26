@@ -23,13 +23,14 @@ export function statusBadgeClass(status: string | null | undefined): string {
   if (s === 'active') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
   if (s === 'cancelled' || s === 'canceled') return 'bg-rose-100 text-rose-800 border-rose-200';
   if (s === 'suspended') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (s === 'provisional') return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+  if (s === 'provisional') return 'bg-champagne-100 text-champagne-800 border-champagne-200';
   if (s === 'inactive') return 'bg-slate-100 text-slate-700 border-slate-200';
   return 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
 export function sourceLabel(source: GstDetails['source']): string {
   if (source === 'rapidapi') return 'Live · RapidAPI';
+  if (source === 'rapidapi-tool') return 'Live · RapidAPI';
   if (source === 'gstincheck') return 'Live · gstincheck';
   if (source === 'mastergst') return 'Live · MasterGST';
   if (source === 'manual') return 'Manual entry';
@@ -37,7 +38,7 @@ export function sourceLabel(source: GstDetails['source']): string {
 }
 
 export function isLiveSource(source: GstDetails['source']): boolean {
-  return source === 'rapidapi' || source === 'gstincheck' || source === 'mastergst';
+  return source === 'rapidapi' || source === 'rapidapi-tool' || source === 'gstincheck' || source === 'mastergst';
 }
 
 // ---------- Card ----------
@@ -60,33 +61,55 @@ export default function GstInfoCard({
   variant = 'modal',
 }: Props) {
   const [copiedAddr, setCopiedAddr] = useState(false);
-  const [showJurisdiction, setShowJurisdiction] = useState(false);
+  const [copiedGstin, setCopiedGstin] = useState(false);
   const live = isLiveSource(gstDetails.source);
   const isCancelled = (gstDetails.status || '').toLowerCase().startsWith('cancel');
   const eInvoice = (gstDetails.eInvoiceStatus || '').toLowerCase();
 
-  const copyAddress = async () => {
-    if (!gstDetails.address) return;
+  const copyText = async (text: string, setter: (v: boolean) => void) => {
     try {
-      await navigator.clipboard.writeText(gstDetails.address);
-      setCopiedAddr(true);
-      window.setTimeout(() => setCopiedAddr(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setter(true);
+      window.setTimeout(() => setter(false), 1500);
     } catch {
       /* clipboard denied — silent */
     }
   };
 
-  const ringClass = live
-    ? 'border-emerald-200 from-emerald-50'
-    : 'border-slate-200 from-slate-50';
+  // Build a friendly multi-line breakdown of address parts (only non-empty).
+  const ap = gstDetails.addressParts || {};
+  const addressLines: Array<[string, string]> = [];
+  if (ap.buildingNumber) addressLines.push(['Door / No.', ap.buildingNumber]);
+  if (ap.buildingName) addressLines.push(['Building', ap.buildingName]);
+  if (ap.floorNumber) addressLines.push(['Floor', ap.floorNumber]);
+  if (ap.street && ap.street !== '-') addressLines.push(['Street', ap.street]);
+  if (ap.locality && ap.locality !== ap.location) addressLines.push(['Locality', ap.locality]);
+  if (ap.location) addressLines.push(['Location', ap.location]);
+
+  const headerGradient = live
+    ? 'bg-gradient-to-r from-champagne-50 via-white to-pearl'
+    : 'bg-gradient-to-r from-slate-50 via-white to-slate-50';
+  const accentBorder = live ? 'border-champagne-200' : 'border-slate-200';
 
   return (
     <div
-      className={`rounded-xl border bg-gradient-to-br ${ringClass} to-white shadow-sm overflow-hidden`}
+      className={`rounded-2xl border ${accentBorder} bg-white shadow-sm overflow-hidden`}
     >
       {/* Header */}
-      <div className="px-4 py-2.5 bg-white/60 border-b border-emerald-100/60 flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm font-semibold text-gray-800">{gstDetails.gstin}</span>
+      <div
+        className={`px-4 py-3 ${headerGradient} border-b ${accentBorder} flex flex-wrap items-center gap-2`}
+      >
+        <button
+          type="button"
+          onClick={() => copyText(gstDetails.gstin, setCopiedGstin)}
+          className="font-mono text-sm font-semibold text-onyx-900 hover:text-champagne-800 transition flex items-center gap-1.5"
+          title="Copy GSTIN"
+        >
+          {gstDetails.gstin}
+          <span className="text-[10px] font-sans font-medium text-onyx-500">
+            {copiedGstin ? '✓ copied' : '📋'}
+          </span>
+        </button>
         {gstDetails.status && (
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${statusBadgeClass(gstDetails.status)}`}
@@ -98,7 +121,7 @@ export default function GstInfoCard({
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               eInvoice === 'yes'
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                ? 'bg-champagne-50 text-champagne-800 border-champagne-200'
                 : 'bg-slate-50 text-slate-600 border-slate-200'
             }`}
             title="e-Invoice eligibility (per GSTN)"
@@ -109,7 +132,7 @@ export default function GstInfoCard({
         <span
           className={`ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
             live
-              ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+              ? 'bg-onyx-900 text-pearl border-onyx-900'
               : 'bg-slate-50 text-slate-600 border-slate-200'
           }`}
         >
@@ -147,28 +170,37 @@ export default function GstInfoCard({
           )}
           <DetailRow label="State" value={`${gstDetails.state} (${gstDetails.stateCode})`} />
           <DetailRow label="PAN" value={gstDetails.pan} mono />
+          {gstDetails.entityNumber && (
+            <DetailRow label="Entity Number" value={gstDetails.entityNumber} mono />
+          )}
         </Grid>
       </Section>
 
       {/* Address */}
-      {(gstDetails.address || gstDetails.city || gstDetails.pincode) && (
-        <Section title="Registered Address" rightAction={
-          gstDetails.address ? (
-            <button
-              type="button"
-              onClick={copyAddress}
-              className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              {copiedAddr ? '✓ Copied' : '📋 Copy'}
-            </button>
-          ) : null
-        }>
+      {(gstDetails.address || gstDetails.city || gstDetails.pincode || addressLines.length > 0) && (
+        <Section
+          title="Registered Address"
+          rightAction={
+            gstDetails.address ? (
+              <button
+                type="button"
+                onClick={() => copyText(gstDetails.address!, setCopiedAddr)}
+                className="text-[11px] font-medium text-champagne-700 hover:text-champagne-800"
+              >
+                {copiedAddr ? '✓ Copied' : '📋 Copy'}
+              </button>
+            ) : null
+          }
+        >
           <Grid>
             {gstDetails.city && <DetailRow label="City / District" value={gstDetails.city} />}
             {gstDetails.pincode && <DetailRow label="Pincode" value={gstDetails.pincode} mono />}
+            {addressLines.map(([label, value]) => (
+              <DetailRow key={label} label={label} value={value} />
+            ))}
           </Grid>
           {gstDetails.address && (
-            <p className="mt-2 text-xs text-gray-800 leading-relaxed bg-white border border-gray-100 rounded-lg p-2.5">
+            <p className="mt-2.5 text-xs text-onyx-800 leading-relaxed bg-pearl/50 border border-champagne-100 rounded-lg p-2.5">
               {gstDetails.address}
             </p>
           )}
@@ -177,12 +209,12 @@ export default function GstInfoCard({
 
       {/* Business activity */}
       {gstDetails.natureOfBusinessActivity && gstDetails.natureOfBusinessActivity.length > 0 && (
-        <Section title="Nature of Business">
+        <Section title={`Nature of Business (${gstDetails.natureOfBusinessActivity.length})`}>
           <div className="flex flex-wrap gap-1.5">
             {gstDetails.natureOfBusinessActivity.map((n) => (
               <span
                 key={n}
-                className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-[11px] font-medium"
+                className="px-2 py-0.5 rounded-full bg-champagne-50 text-champagne-800 border border-champagne-200 text-[11px] font-medium"
               >
                 {n}
               </span>
@@ -191,39 +223,28 @@ export default function GstInfoCard({
         </Section>
       )}
 
-      {/* Jurisdictions (collapsible) */}
+      {/* Jurisdictions */}
       {(gstDetails.centerJurisdiction || gstDetails.stateJurisdiction) && (
-        <div className="px-4 pb-3">
-          <button
-            type="button"
-            onClick={() => setShowJurisdiction((v) => !v)}
-            className="text-[11px] font-medium text-gray-500 hover:text-gray-700"
-          >
-            {showJurisdiction ? '▾' : '▸'} Jurisdiction
-          </button>
-          {showJurisdiction && (
-            <div className="mt-2">
-              <Grid>
-                {gstDetails.centerJurisdiction && (
-                  <DetailRow label="Centre" value={gstDetails.centerJurisdiction} />
-                )}
-                {gstDetails.stateJurisdiction && (
-                  <DetailRow label="State" value={gstDetails.stateJurisdiction} />
-                )}
-              </Grid>
-            </div>
-          )}
-        </div>
+        <Section title="Jurisdiction">
+          <Grid>
+            {gstDetails.centerJurisdiction && (
+              <DetailRow label="Centre" value={gstDetails.centerJurisdiction} />
+            )}
+            {gstDetails.stateJurisdiction && (
+              <DetailRow label="State" value={gstDetails.stateJurisdiction} />
+            )}
+          </Grid>
+        </Section>
       )}
 
       {/* Action footer */}
       {variant === 'modal' && onUseDetails && (
-        <div className="px-4 pb-3 pt-1 flex flex-wrap items-center justify-end gap-2 border-t border-emerald-100/60">
+        <div className="px-4 py-3 flex flex-wrap items-center justify-end gap-2 border-t border-champagne-100 bg-pearl/40">
           {canRevert && onRevert && (
             <button
               type="button"
               onClick={onRevert}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-onyx-700 bg-white border border-champagne-300 hover:bg-champagne-50"
             >
               ↶ Revert auto-fill
             </button>
@@ -231,7 +252,7 @@ export default function GstInfoCard({
           <button
             type="button"
             onClick={onUseDetails}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 shadow-sm"
           >
             Use these details
           </button>
@@ -252,9 +273,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="px-4 py-3 border-t border-emerald-100/60 first:border-t-0">
+    <div className="px-4 py-3 border-t border-champagne-100 first:border-t-0">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500">
+        <span className="text-[10px] uppercase tracking-[0.12em] font-bold text-onyx-500">
           {title}
         </span>
         {rightAction}
@@ -266,17 +287,18 @@ function Section({
 
 function Grid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">{children}</div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-xs">{children}</div>
   );
 }
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500">{label}</span>
-      <span className={`text-gray-900 font-medium ${mono ? 'font-mono' : ''} truncate`} title={value}>
+    <div className="flex flex-col min-w-0">
+      <span className="text-[10px] uppercase tracking-wider font-semibold text-onyx-500">{label}</span>
+      <span className={`text-onyx-900 font-medium ${mono ? 'font-mono' : ''} break-words`} title={value}>
         {value}
       </span>
     </div>
   );
 }
+

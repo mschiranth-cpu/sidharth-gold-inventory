@@ -25,7 +25,7 @@ const SYMBOLS: Record<MetalKey, { code: string; label: string; emoji: string; gr
       code: 'XAU',
       label: 'Gold',
       emoji: '🥇',
-      gradient: 'from-amber-400 to-yellow-600',
+      gradient: 'from-amber-400 to-amber-600',
     },
     SILVER: {
       code: 'XAG',
@@ -43,7 +43,7 @@ const SYMBOLS: Record<MetalKey, { code: string; label: string; emoji: string; gr
       code: 'XPD',
       label: 'Palladium',
       emoji: '⚪',
-      gradient: 'from-violet-400 to-purple-600',
+      gradient: 'from-violet-500 to-violet-700',
     },
   };
 
@@ -134,21 +134,29 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
     refetchIntervalInBackground: false,
   });
 
-  // Fetch Bangalore (Ambicaa) rates from our backend (refreshes every 5 s)
+  // Fetch Bangalore (Ambicaa) rates from our backend
   const bangalore = useQuery({
     queryKey: ['bangalore-rates'],
     queryFn: fetchAmbicaaRates,
-    staleTime: 5_000,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     enabled: source === 'bangalore',
-    retry: 2,
+    retry: 1,
   });
 
   const usdInr = fx.data ?? 83;
   const isLoading =
     source === 'global' ? metals.isLoading || fx.isLoading : bangalore.isLoading;
-  const isError = source === 'global' ? metals.isError : bangalore.isError;
+  // Show error banner ONLY when we have no usable data at all.
+  // Bangalore mode: backend returns global-spot fallback when Ambicaa is down — that still counts as data.
+  const hasBangaloreData = !!bangalore.data?.data?.perGram?.gold24k;
+  const hasGlobalData = !!metals.data;
+  const isError =
+    source === 'global'
+      ? metals.isError && !hasGlobalData
+      : bangalore.isError && !hasBangaloreData && !hasGlobalData;
+  const usingFallback = source === 'bangalore' && bangalore.data?.data?.source === 'global-spot';
 
   // Compute INR/gram for each metal and apply purity factor for gold
   const cards = useMemo(() => {
@@ -201,8 +209,8 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
         : null;
 
   return (
-    <div className="mb-6 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
+    <div className="mb-6 bg-white rounded-2xl shadow-lg border border-champagne-100 overflow-hidden">
+      <div className="px-6 py-4 bg-gradient-to-r from-champagne-700 to-onyx-800 text-white flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-lg flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
@@ -211,9 +219,13 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
             </span>
             Live Market Rates
           </h3>
-          <p className="text-xs text-indigo-100 mt-0.5">
+          <p className="text-xs text-pearl mt-0.5">
             {source === 'bangalore' ? (
-              <>Bangalore retail • Ambicaa Sales Corp</>
+              usingFallback ? (
+                <>Bangalore unavailable — showing global spot · USD→INR @ ₹{usdInr.toFixed(2)}</>
+              ) : (
+                <>Bangalore retail • Ambicaa Sales Corp</>
+              )
             ) : (
               <>Global spot • USD→INR @ ₹{usdInr.toFixed(2)}</>
             )}
@@ -226,7 +238,7 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
               onClick={() => setSource('bangalore')}
               className={`px-2.5 py-1 rounded-md transition-all ${
                 source === 'bangalore'
-                  ? 'bg-white text-indigo-700 shadow'
+                  ? 'bg-white text-champagne-800 shadow'
                   : 'text-white/80 hover:text-white'
               }`}
             >
@@ -236,7 +248,7 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
               onClick={() => setSource('global')}
               className={`px-2.5 py-1 rounded-md transition-all ${
                 source === 'global'
-                  ? 'bg-white text-indigo-700 shadow'
+                  ? 'bg-white text-champagne-800 shadow'
                   : 'text-white/80 hover:text-white'
               }`}
             >
@@ -262,7 +274,7 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
 
       <div className="p-4">
         {isError && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+          <div className="text-sm text-accent-ruby bg-red-50 border border-accent-ruby/30 rounded-lg px-3 py-2 mb-3">
             Could not fetch live rates. Check your internet connection.
           </div>
         )}
@@ -299,19 +311,20 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
             // Override gold/silver tiles with Bangalore data; keep PT/PD from global spot
             if (source === 'bangalore' && bangalore.data?.data?.perGram) {
               const pg = bangalore.data.data.perGram;
+              const tileLabel = bangalore.data.data.source === 'global-spot' ? 'global' : 'ambicaa';
               for (const tile of tiles) {
                 if (tile.id === 'GOLD-24') {
                   tile.perGramInr = pg.gold24k;
                   tile.change = null;
-                  tile.tileSource = 'ambicaa';
+                  tile.tileSource = tileLabel;
                 } else if (tile.id === 'GOLD-22') {
                   tile.perGramInr = pg.gold22k;
                   tile.change = null;
-                  tile.tileSource = 'ambicaa';
+                  tile.tileSource = tileLabel;
                 } else if (tile.id === 'SILVER') {
                   tile.perGramInr = pg.silver;
                   tile.change = null;
-                  tile.tileSource = 'ambicaa';
+                  tile.tileSource = tileLabel;
                 }
                 // Platinum & Palladium fall through to the global spot values set above
               }
@@ -326,14 +339,14 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
                   key={t.id}
                   className={`relative rounded-xl p-3 border transition-all ${
                     isSelected
-                      ? 'border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-200'
-                      : 'border-gray-200 bg-gray-50/50'
+                      ? 'border-champagne-400 bg-champagne-50/50 ring-1 ring-champagne-300'
+                      : 'border-champagne-200 bg-pearl/50'
                   }`}
                 >
                   <div
                     className={`absolute -top-2 left-2 text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded ${
                       t.tileSource === 'ambicaa'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-accent-emerald text-white'
                         : 'bg-slate-500 text-white'
                     }`}
                   >
@@ -350,26 +363,26 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
                     {t.change !== null && (
                       <span
                         className={`text-xs font-medium ${
-                          t.change >= 0 ? 'text-green-600' : 'text-red-600'
+                          t.change >= 0 ? 'text-accent-emerald' : 'text-accent-ruby'
                         }`}
                       >
                         {t.change >= 0 ? '▲' : '▼'} {Math.abs(t.change).toFixed(2)}%
                       </span>
                     )}
                   </div>
-                  <div className="text-lg font-bold text-gray-900">
+                  <div className="text-lg font-bold text-onyx-900">
                     {isLoading || t.perGramInr === null
                       ? '—'
                       : `₹${t.perGramInr.toLocaleString('en-IN', {
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 0,
                         })}`}
-                    <span className="text-xs font-medium text-gray-500 ml-1">/g</span>
+                    <span className="text-xs font-medium text-onyx-400 ml-1">/g</span>
                   </div>
                   {isSelected && selectedRate !== null && onUseRate && (
                     <button
                       onClick={() => onUseRate(Math.round(selectedRate))}
-                      className="mt-2 w-full text-xs font-semibold px-2 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                      className="mt-2 w-full text-xs font-semibold px-2 py-1.5 rounded-lg bg-champagne-700 text-white hover:bg-champagne-800 transition-colors"
                     >
                       Use this rate
                     </button>
@@ -380,10 +393,8 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
           })()}
         </div>
 
-        <p className="mt-3 text-[11px] text-gray-400 text-center">
-          {source === 'bangalore'
-            ? 'Source: ambicaaspot.com (Ambicaa Sales Corp, Rajajinagar, Bangalore) • Indicative only — confirm with dealer before settlement'
-            : 'Source: gold-api.com (LBMA spot) • FX: open.er-api.com • Indicative only — not for settlement'}
+        <p className="mt-3 text-[11px] text-onyx-300 text-center">
+          Indicative only — confirm with dealer before settlement
         </p>
       </div>
     </div>

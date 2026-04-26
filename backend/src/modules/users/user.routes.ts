@@ -17,6 +17,7 @@ import { userService } from './user.service';
 import {
   createUserSchema,
   updateUserSchema,
+  updateSelfSchema,
   resetPasswordSchema,
   toggleStatusSchema,
   UserFilters,
@@ -123,6 +124,53 @@ router.get(
     }
   }
 );
+
+/**
+ * PUT /api/users/me
+ * Update own profile (any authenticated user). Restricted to name, phone, avatar.
+ */
+router.put('/me', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const validationResult = updateSelfSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationResult.error.errors,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const user = await userService.update(userId, validationResult.data);
+
+    logger.info(`User self-updated profile: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: user,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    if (error?.message === 'User not found') {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    next(error);
+  }
+});
 
 /**
  * GET /api/users/:id

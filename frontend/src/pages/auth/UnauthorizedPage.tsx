@@ -38,11 +38,11 @@ export default function UnauthorizedPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-indigo-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl via-white to-champagne-50 px-4 py-12">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gold-leaf rounded-full opacity-20 blur-3xl"></div>
       </div>
 
       <div className="relative text-center max-w-md">
@@ -65,7 +65,7 @@ export default function UnauthorizedPage() {
             <div className="mb-4">
               <p className="text-sm text-gray-500">Logged in as</p>
               <p className="font-medium text-gray-900">{user.name}</p>
-              <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full">
+              <span className="inline-block mt-1 px-2 py-0.5 bg-champagne-100 text-onyx-800 text-xs font-medium rounded-full">
                 {USER_ROLE_LABELS[user.role]}
               </span>
             </div>
@@ -92,7 +92,7 @@ export default function UnauthorizedPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={handleGoBack}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white font-semibold rounded-xl shadow-lg shadow-champagne-700/30 hover:shadow-champagne-700/40 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:ring-offset-2 transition-all duration-200"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -114,7 +114,7 @@ export default function UnauthorizedPage() {
         {/* Help Link */}
         <p className="text-sm text-gray-500 mt-6">
           Need access?{' '}
-          <Link to="/contact" className="text-indigo-600 hover:text-indigo-700 font-medium transition-colors">
+          <Link to="/contact" className="text-champagne-700 hover:text-onyx-800 font-medium transition-colors">
             Contact your administrator
           </Link>
         </p>

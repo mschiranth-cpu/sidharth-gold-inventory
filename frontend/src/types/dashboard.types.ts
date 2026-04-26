@@ -113,6 +113,8 @@ export interface MarketRatesPayload {
   gold22k: number | null;
   gold18k: number | null;
   silver: number | null;
+  platinum: number | null;
+  palladium: number | null;
   fetchedAt: string | null;
   healthy: boolean;
   ageMs: number;

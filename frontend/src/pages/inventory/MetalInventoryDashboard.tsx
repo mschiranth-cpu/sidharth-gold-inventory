@@ -16,21 +16,16 @@ export default function MetalInventoryDashboard() {
     queryFn: getMetalStockSummary,
   });
 
-  if (summaryLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="relative overflow-hidden rounded-3xl bg-onyx-gradient text-pearl shadow-onyx mb-8 p-6 md:p-8">
+          <div className="absolute inset-0 bg-gold-leaf-gradient opacity-10 pointer-events-none" />
+          <div className="relative flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Metal Inventory</h1>
-            <p className="text-gray-600">Track gold, silver, and platinum stock</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-2">Inventory · Precious Metal</p>
+            <h1 className="font-display text-3xl md:text-4xl font-semibold text-pearl mb-2">Metal Inventory</h1>
+            <p className="text-champagne-100/80 text-sm">Track gold, silver, platinum &amp; palladium stock at a glance.</p>
           </div>
           <div className="flex gap-3">
             <Link to="/app/inventory/metal/receive">
@@ -54,35 +49,46 @@ export default function MetalInventoryDashboard() {
               <Button variant="secondary">Issue Metal</Button>
             </Link>
           </div>
+          </div>
         </div>
 
         {/* Live Market Rates */}
         <LiveMetalRatesCard />
 
         {/* Stock Summary */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Stock Summary</h2>
+            <h2 className="text-xl font-bold text-onyx-900">Stock Summary</h2>
             <Link
               to="/app/inventory/metal/stock"
-              className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm"
+              className="text-champagne-700 hover:text-champagne-800 font-semibold text-sm"
             >
               View Details →
             </Link>
           </div>
-          {summary.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No stock entries yet. Receive metal to start tracking inventory.</p>
+          {summaryLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-4 bg-pearl rounded-xl border border-champagne-200 animate-pulse">
+                  <div className="h-4 w-24 bg-champagne-200 rounded mb-3" />
+                  <div className="h-7 w-32 bg-champagne-200 rounded mb-2" />
+                  <div className="h-3 w-20 bg-champagne-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : summary.length === 0 ? (
+            <p className="text-onyx-400 text-center py-8">No stock entries yet. Receive metal to start tracking inventory.</p>
           ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {summary.map((item: any, index: number) => (
-              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div key={index} className="p-4 bg-pearl rounded-xl border border-champagne-200">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold text-gray-700">
+                  <p className="text-sm font-semibold text-onyx-700">
                     {item.metalType} ({item.purity}K)
                   </p>
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-champagne-100 flex items-center justify-center">
                     <svg
-                      className="w-5 h-5 text-indigo-600"
+                      className="w-5 h-5 text-champagne-700"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -96,10 +102,10 @@ export default function MetalInventoryDashboard() {
                     </svg>
                   </div>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-onyx-900">
                   {item.totalGrossWeight.toFixed(2)}g
                 </p>
-                <p className="text-sm text-gray-600">Pure: {item.totalPureWeight.toFixed(2)}g</p>
+                <p className="text-sm text-onyx-500">Pure: {item.totalPureWeight.toFixed(2)}g</p>
               </div>
             ))}
           </div>
@@ -110,12 +116,12 @@ export default function MetalInventoryDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Link
             to="/app/inventory/metal/transactions"
-            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:border-indigo-300 hover:shadow-xl transition-all"
+            className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100 hover:border-champagne-400 hover:shadow-xl transition-all"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-champagne-100 flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-champagne-700"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -129,20 +135,20 @@ export default function MetalInventoryDashboard() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Transactions</h3>
-                <p className="text-sm text-gray-600">View all transactions</p>
+                <h3 className="font-bold text-onyx-900">Transactions</h3>
+                <p className="text-sm text-onyx-500">View all transactions</p>
               </div>
             </div>
           </Link>
 
           <Link
             to="/app/inventory/metal/melting"
-            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:border-indigo-300 hover:shadow-xl transition-all"
+            className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100 hover:border-champagne-400 hover:shadow-xl transition-all"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-champagne-100 flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-orange-600"
+                  className="w-6 h-6 text-champagne-700"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -156,20 +162,20 @@ export default function MetalInventoryDashboard() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Melting Batches</h3>
-                <p className="text-sm text-gray-600">Track melting records</p>
+                <h3 className="font-bold text-onyx-900">Melting Batches</h3>
+                <p className="text-sm text-onyx-500">Track melting records</p>
               </div>
             </div>
           </Link>
 
           <Link
             to="/app/inventory/metal/rates"
-            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:border-indigo-300 hover:shadow-xl transition-all"
+            className="bg-white rounded-2xl shadow-lg p-6 border border-champagne-100 hover:border-champagne-400 hover:shadow-xl transition-all"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-champagne-100 flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-green-600"
+                  className="w-6 h-6 text-accent-emerald"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -183,8 +189,8 @@ export default function MetalInventoryDashboard() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Rate Management</h3>
-                <p className="text-sm text-gray-600">Update metal rates</p>
+                <h3 className="font-bold text-onyx-900">Rate Management</h3>
+                <p className="text-sm text-onyx-500">Update metal rates</p>
               </div>
             </div>
           </Link>

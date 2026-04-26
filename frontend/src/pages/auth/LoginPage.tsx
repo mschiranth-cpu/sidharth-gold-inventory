@@ -97,27 +97,27 @@ export default function LoginPage() {
   // Show loading spinner during initial auth check
   if (isLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl to-champagne-100">
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-indigo-800 font-medium">Loading...</p>
+          <div className="w-12 h-12 border-4 border-champagne-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-onyx-800 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-indigo-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl via-white to-champagne-50 px-4 py-12">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-champagne-200 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gold-leaf rounded-full opacity-20 blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-champagne-600 via-champagne-700 to-onyx-800 rounded-2xl shadow-lg mb-4">
             <svg
               className="w-9 h-9 text-white"
               fill="none"
@@ -202,7 +202,7 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   {...register('email')}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.email
                       ? 'border-red-300 bg-red-50'
                       : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
@@ -241,7 +241,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   {...register('password')}
-                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.password
                       ? 'border-red-300 bg-red-50'
                       : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
@@ -291,7 +291,7 @@ export default function LoginPage() {
                 <input
                   type="checkbox"
                   {...register('rememberMe')}
-                  className="w-4 h-4 text-indigo-500 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  className="w-4 h-4 text-champagne-600 border-gray-300 rounded focus:ring-champagne-500 cursor-pointer"
                 />
                 <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
                   Remember me
@@ -299,7 +299,7 @@ export default function LoginPage() {
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                className="text-sm font-medium text-champagne-700 hover:text-onyx-800 transition-colors"
               >
                 Forgot password?
               </Link>
@@ -309,7 +309,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white font-semibold rounded-xl shadow-lg shadow-champagne-700/30 hover:shadow-champagne-700/40 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
             >
               {isSubmitting ? (
                 <>
@@ -338,7 +338,7 @@ export default function LoginPage() {
           Don't have an account?{' '}
           <Link
             to="/register"
-            className="font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+            className="font-medium text-champagne-700 hover:text-onyx-800 transition-colors"
           >
             Contact Admin
           </Link>

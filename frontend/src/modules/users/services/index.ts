@@ -90,6 +90,13 @@ export const usersService = {
   },
 
   /**
+   * Update OWN profile (any authenticated user). Limited to name, phone, avatar.
+   */
+  updateMe: async (data: { name?: string; phone?: string | null; avatar?: string | null }): Promise<UserResponse> => {
+    return apiPut(`${USERS_URL}/me`, data);
+  },
+
+  /**
    * Toggle user active status
    */
   toggleStatus: async (id: string, data: ToggleStatusRequest): Promise<UserResponse> => {

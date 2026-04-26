@@ -50,13 +50,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             className="absolute inset-y-0 left-3 flex items-center cursor-pointer"
           >
             <MagnifyingGlassIcon
-              className="h-5 w-5 text-gray-400 hover:text-indigo-500"
+              className="h-5 w-5 text-gray-400 hover:text-champagne-700"
               aria-hidden="true"
             />
           </button>
           <input
             id="search-field"
-            className="block w-full max-w-xl h-10 border border-gray-200 py-2 pl-10 pr-3 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white/80 rounded-xl outline-none"
+            className="block w-full max-w-xl h-10 border border-gray-200 py-2 pl-10 pr-3 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-champagne-600 focus:border-champagne-600 sm:text-sm bg-white/80 rounded-xl outline-none"
             placeholder="Search orders, customers..."
             type="search"
             name="search"
@@ -81,14 +81,22 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {/* Profile dropdown */}
           <Menu as="div" className="relative">
             <Menu.Button className="flex items-center gap-x-3 p-1.5 -m-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                {user?.name
-                  ?.split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2) || 'U'}
-              </div>
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="h-8 w-8 rounded-full object-cover ring-1 ring-champagne-300/40 shadow-sm"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-champagne-700 via-champagne-800 to-onyx-800 flex items-center justify-center text-white font-semibold text-sm shadow-sm ring-1 ring-champagne-300/40">
+                  {user?.name
+                    ?.split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2) || 'U'}
+                </div>
+              )}
               <span className="hidden lg:flex lg:items-center gap-2">
                 <div className="text-left">
                   <span className="text-sm font-medium text-gray-900 block">
@@ -118,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <Link
-                      to="/profile"
+                      to="/app/profile"
                       className={`${
                         active ? 'bg-gray-50' : ''
                       } block px-4 py-2 text-sm text-gray-700`}
@@ -130,7 +138,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <Menu.Item>
                   {({ active }) => (
                     <Link
-                      to="/settings"
+                      to="/app/settings"
                       className={`${
                         active ? 'bg-gray-50' : ''
                       } block px-4 py-2 text-sm text-gray-700`}

@@ -19,6 +19,7 @@ import {
   getNextVendorCode,
 } from '../services/vendor.service';
 import Button from './common/Button';
+import PhoneInput, { validatePhone } from './common/PhoneInput';
 import { isLiveSource, sourceLabel, statusBadgeClass, formatGstDate } from './GstInfoCard';
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -188,7 +189,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
   // Field-level error map; computed every render so it stays in sync.
   const errors: Record<string, string | undefined> = {
     name: !form.name.trim() ? 'Vendor name is required' : undefined,
-    phone: !form.phone?.trim() ? 'Phone number is required' : undefined,
+    phone: validatePhone(form.phone) || undefined,
     gstin:
       !noGst && gstinUpper.length > 0 && !gstinValid
         ? 'Enter a valid 15-character GSTIN (or tick “Vendor does not have GST”)'
@@ -261,7 +262,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
               type="checkbox"
               checked={noGst}
               onChange={(e) => toggleNoGst(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded border-gray-300 text-champagne-700 focus:ring-champagne-600"
             />
             <span className="text-sm font-medium text-gray-800">
               Vendor does not have GST
@@ -282,7 +283,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                   onBlur={() => setTouched((t) => ({ ...t, gstin: true }))}
                   maxLength={15}
                   className={`w-full px-4 py-2.5 pr-32 rounded-lg border font-mono uppercase text-sm focus:ring-2 focus:border-transparent ${
-                    gstinUpper.length === 0 ? 'border-gray-300 focus:ring-indigo-500'
+                    gstinUpper.length === 0 ? 'border-gray-300 focus:ring-champagne-600'
                       : gstinValid ? 'border-emerald-400 focus:ring-emerald-500'
                       : 'border-red-400 focus:ring-red-500'
                   }`}
@@ -290,8 +291,8 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs">
                   {gstStatus === 'loading' && (
-                    <span className="text-indigo-600 flex items-center gap-1">
-                      <span className="inline-block w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-champagne-700 flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 border-2 border-champagne-600 border-t-transparent rounded-full animate-spin" />
                       Fetching…
                     </span>
                   )}
@@ -331,7 +332,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                         {gstDetails.status}
                       </span>
                     )}
-                    <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-champagne-50 text-champagne-800 border border-champagne-200">
                       {isLiveSource(gstDetails.source) && <span>✓</span>}
                       {sourceLabel(gstDetails.source)}
                     </span>
@@ -382,7 +383,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                   <select
                     value={manual.stateCode || ''}
                     onChange={(e) => onStateCodeChange(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-champagne-600 focus:border-transparent bg-white text-sm"
                   >
                     <option value="">— Select State —</option>
                     {Object.entries(STATE_CODES).map(([code, name]) => (
@@ -399,7 +400,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                     maxLength={10}
                     placeholder="AAAAA9999A"
                     className={`w-full px-4 py-2.5 rounded-lg border font-mono uppercase text-sm focus:ring-2 focus:border-transparent ${
-                      panValid ? 'border-gray-300 focus:ring-indigo-500' : 'border-red-400 focus:ring-red-500'
+                      panValid ? 'border-gray-300 focus:ring-champagne-600' : 'border-red-400 focus:ring-red-500'
                     }`}
                   />
                 </Field>
@@ -414,7 +415,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                     onBlur={() => setTouched((t) => ({ ...t, pincode: true }))}
                     placeholder="560001"
                     className={`w-full px-4 py-2.5 rounded-lg border font-mono text-sm focus:ring-2 focus:border-transparent ${
-                      pincodeValid ? 'border-gray-300 focus:ring-indigo-500' : 'border-red-400 focus:ring-red-500'
+                      pincodeValid ? 'border-gray-300 focus:ring-champagne-600' : 'border-red-400 focus:ring-red-500'
                     }`}
                   />
                 </Field>
@@ -435,26 +436,22 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                 onChange={(e) => onNameChange(e.target.value)}
                 onBlur={() => setTouched((t) => ({ ...t, name: true }))}
                 className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:border-transparent text-sm ${
-                  showErr('name') ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  showErr('name') ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-champagne-600'
                 }`}
                 placeholder="Vendor display name"
               />
             </Field>
             <Field
               label="Phone Number *"
-              hint={!showErr('phone') ? 'Required — not available from GST' : undefined}
+              hint={!showErr('phone') ? 'Pick country, then enter digits only' : undefined}
               error={showErr('phone') ? errors.phone : undefined}
             >
-              <input
-                data-field="phone"
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              <PhoneInput
+                dataField="phone"
+                value={form.phone || ''}
+                onChange={(v) => setForm({ ...form, phone: v })}
                 onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
-                className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:border-transparent text-sm ${
-                  showErr('phone') ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
-                }`}
-                placeholder="+91 9XXXXXXXXX"
+                hasError={showErr('phone')}
               />
             </Field>
           </div>
@@ -467,7 +464,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
               value={form.address}
               onChange={(e) => onAddressChange(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-champagne-600 focus:border-transparent resize-none text-sm"
               placeholder="Street, City, State, PIN"
             />
           </Field>
@@ -582,7 +579,7 @@ function ManualInput({ value, onChange }: { value?: string; onChange: (v: string
     <input
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
+      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-champagne-600 focus:border-transparent bg-white text-sm"
     />
   );
 }

@@ -197,6 +197,7 @@ class UserService {
         ...(data.role && { role: data.role }),
         ...(data.department !== undefined && { department: data.department }),
         ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.avatar !== undefined && { avatar: data.avatar }),
       },
       select: userSelect,
     });

@@ -47,7 +47,7 @@ export interface GstDetails {
   cancelledDate?: string | null;
   centerJurisdiction?: string | null;
   stateJurisdiction?: string | null;
-  source: 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'manual';
+  source: 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'rapidapi-tool' | 'manual';
   notice?: string | null;
 }
 

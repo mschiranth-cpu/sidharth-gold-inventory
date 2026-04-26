@@ -77,11 +77,13 @@ export const HeroBar = ({
 
         {/* Rates strip */}
         <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs tabular-nums">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs tabular-nums">
             <RatePill label="Gold 24K" value={fmt(rates.gold24k)} healthy={rates.healthy} hasValue={rates.gold24k != null} />
             <RatePill label="Gold 22K" value={fmt(rates.gold22k)} healthy={rates.healthy} hasValue={rates.gold22k != null} />
             <RatePill label="Gold 18K" value={fmt(rates.gold18k)} healthy={rates.healthy} hasValue={rates.gold18k != null} />
             <RatePill label="Silver" value={fmt(rates.silver)} healthy={rates.healthy} hasValue={rates.silver != null} />
+            <RatePill label="Platinum" value={fmt(rates.platinum)} healthy={rates.healthy} hasValue={rates.platinum != null} />
+            <RatePill label="Palladium" value={fmt(rates.palladium)} healthy={rates.healthy} hasValue={rates.palladium != null} />
           </div>
           {!rates.healthy && rates.gold24k == null && (
             <p className="text-[10px] text-champagne-300/70 text-right">

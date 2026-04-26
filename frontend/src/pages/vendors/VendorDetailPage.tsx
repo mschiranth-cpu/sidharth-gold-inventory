@@ -95,7 +95,7 @@ export default function VendorDetailPage() {
   if (vendorLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-champagne-700" />
       </div>
     );
   }
@@ -118,7 +118,7 @@ export default function VendorDetailPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <Link to="/app/vendors" className="text-sm text-indigo-600 hover:underline">
+            <Link to="/app/vendors" className="text-sm text-champagne-700 hover:underline">
               ← Back to vendors
             </Link>
             <h1 className="text-3xl font-bold text-gray-900 mt-1">{vendor.name}</h1>
@@ -212,7 +212,7 @@ export default function VendorDetailPage() {
                         {txn.creditApplied || txn.creditGenerated ? (
                           <div className="space-y-0.5">
                             {txn.creditApplied ? (
-                              <span className="block text-indigo-700">Applied: ₹{fmt(txn.creditApplied)}</span>
+                              <span className="block text-champagne-800">Applied: ₹{fmt(txn.creditApplied)}</span>
                             ) : null}
                             {txn.creditGenerated ? (
                               <span className="block text-emerald-700">Generated: ₹{fmt(txn.creditGenerated)}</span>
@@ -233,7 +233,7 @@ export default function VendorDetailPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSettleTxn(txn)}
-                                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                                  className="text-xs font-medium text-champagne-700 hover:text-onyx-800 hover:underline"
                                 >
                                   Settle
                                 </button>

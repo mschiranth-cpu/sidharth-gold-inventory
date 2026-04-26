@@ -152,7 +152,7 @@ export default function RegisterPage() {
 
     if (strength <= 2) return { label: 'Weak', color: 'bg-red-500', width: 'w-1/4' };
     if (strength === 3) return { label: 'Fair', color: 'bg-yellow-500', width: 'w-2/4' };
-    if (strength === 4) return { label: 'Good', color: 'bg-indigo-500', width: 'w-3/4' };
+    if (strength === 4) return { label: 'Good', color: 'bg-champagne-500', width: 'w-3/4' };
     return { label: 'Strong', color: 'bg-green-500', width: 'w-full' };
   };
 
@@ -161,27 +161,27 @@ export default function RegisterPage() {
   // Show loading spinner during initial auth check
   if (isLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl to-champagne-100">
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-indigo-800 font-medium">Loading...</p>
+          <div className="w-12 h-12 border-4 border-champagne-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-onyx-800 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-indigo-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl via-white to-champagne-50 px-4 py-12">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-champagne-200 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gold-leaf rounded-full opacity-20 blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-lg">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-champagne-600 via-champagne-700 to-onyx-800 rounded-2xl shadow-lg mb-4">
             <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
@@ -214,11 +214,11 @@ export default function RegisterPage() {
           )}
 
           {/* Admin Notice */}
-          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-start gap-3">
-            <svg className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mb-6 p-4 bg-champagne-50 border border-champagne-200 rounded-xl flex items-start gap-3">
+            <svg className="w-5 h-5 text-champagne-700 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-sm text-indigo-800">
+            <p className="text-sm text-onyx-800">
               Only administrators can create new user accounts. The user will receive login credentials via email.
             </p>
           </div>
@@ -241,7 +241,7 @@ export default function RegisterPage() {
                   type="text"
                   autoComplete="name"
                   {...register('name')}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.name ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                   placeholder="John Doe"
@@ -268,7 +268,7 @@ export default function RegisterPage() {
                   type="email"
                   autoComplete="email"
                   {...register('email')}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                   placeholder="john@goldfactory.com"
@@ -295,7 +295,7 @@ export default function RegisterPage() {
                   type="tel"
                   autoComplete="tel"
                   {...register('phone')}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.phone ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                   placeholder="+91 98765 43210"
@@ -320,7 +320,7 @@ export default function RegisterPage() {
                 <select
                   id="role"
                   {...register('role')}
-                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors appearance-none ${
+                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors appearance-none ${
                     errors.role ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                 >
@@ -357,7 +357,7 @@ export default function RegisterPage() {
                   <select
                     id="departmentId"
                     {...register('departmentId')}
-                    className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors appearance-none ${
+                    className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors appearance-none ${
                       errors.departmentId ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                     }`}
                   >
@@ -396,7 +396,7 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   {...register('password')}
-                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                   placeholder="••••••••"
@@ -427,7 +427,7 @@ export default function RegisterPage() {
                   <p className={`text-xs mt-1 ${
                     passwordStrength.label === 'Weak' ? 'text-red-600' :
                     passwordStrength.label === 'Fair' ? 'text-yellow-600' :
-                    passwordStrength.label === 'Good' ? 'text-indigo-600' :
+                    passwordStrength.label === 'Good' ? 'text-champagne-700' :
                     'text-green-600'
                   }`}>
                     {passwordStrength.label && `Password strength: ${passwordStrength.label}`}
@@ -455,7 +455,7 @@ export default function RegisterPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   {...register('confirmPassword')}
-                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                  className={`block w-full pl-10 pr-10 py-2.5 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:border-transparent transition-colors ${
                     errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:bg-white focus:bg-white'
                   }`}
                   placeholder="••••••••"
@@ -486,7 +486,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white font-semibold rounded-xl shadow-lg shadow-champagne-700/30 hover:shadow-champagne-700/40 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
             >
               {isSubmitting ? (
                 <>
@@ -519,7 +519,7 @@ export default function RegisterPage() {
           <span className="text-gray-300">|</span>
           <Link 
             to="/app/users" 
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+            className="text-sm font-medium text-champagne-700 hover:text-onyx-800 transition-colors"
           >
             View All Users
           </Link>

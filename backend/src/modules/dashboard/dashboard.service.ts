@@ -148,6 +148,13 @@ export function resolveRange(
 // ============================================
 
 async function loadMarketRates(): Promise<MarketRatesPayload> {
+  // Always pull global spot in parallel — it's the only source for
+  // platinum/palladium (Ambicaa Bangalore retail covers gold + silver only).
+  const globalPromise = getGlobalMetalRates().catch((err) => {
+    logger.warn('Global metal rates fallback failed', { err: String(err) });
+    return null;
+  });
+
   // Primary: Bangalore retail (Ambicaa scraper).
   try {
     await ambicaaScraper.start();
@@ -155,14 +162,18 @@ async function loadMarketRates(): Promise<MarketRatesPayload> {
     logger.warn('Ambicaa scraper start failed', { err });
   }
   const { data, healthy, ageMs } = ambicaaScraper.getLatest();
+  const global = await globalPromise;
 
-  // If Bangalore is healthy AND has gold24k, use it as-is.
+  // If Bangalore is healthy AND has gold24k, use it for gold+silver and
+  // borrow platinum/palladium from global spot.
   if (healthy && data?.perGram.gold24k != null) {
     return {
       gold24k: data.perGram.gold24k,
       gold22k: data.perGram.gold22k,
       gold18k: data.perGram.gold18k,
       silver: data.perGram.silver,
+      platinum: global?.healthy ? global.platinum : null,
+      palladium: global?.healthy ? global.palladium : null,
       fetchedAt: data.fetchedAt,
       healthy: true,
       ageMs,
@@ -172,21 +183,18 @@ async function loadMarketRates(): Promise<MarketRatesPayload> {
   // Fallback: global spot rates (gold-api.com + USD/INR FX), same source the
   // frontend's LiveMetalRatesCard uses in "Global" mode. Keeps the dashboard
   // aligned with what users see on the Receive Metal page.
-  try {
-    const global = await getGlobalMetalRates();
-    if (global.healthy) {
-      return {
-        gold24k: global.gold24k,
-        gold22k: global.gold22k,
-        gold18k: global.gold18k,
-        silver: global.silver,
-        fetchedAt: global.fetchedAt,
-        healthy: true,
-        ageMs: global.ageMs,
-      };
-    }
-  } catch (err) {
-    logger.warn('Global metal rates fallback failed', { err: String(err) });
+  if (global?.healthy) {
+    return {
+      gold24k: global.gold24k,
+      gold22k: global.gold22k,
+      gold18k: global.gold18k,
+      silver: global.silver,
+      platinum: global.platinum,
+      palladium: global.palladium,
+      fetchedAt: global.fetchedAt,
+      healthy: true,
+      ageMs: global.ageMs,
+    };
   }
 
   // Last resort: whatever we had (likely all nulls).
@@ -195,6 +203,8 @@ async function loadMarketRates(): Promise<MarketRatesPayload> {
     gold22k: data?.perGram.gold22k ?? null,
     gold18k: data?.perGram.gold18k ?? null,
     silver: data?.perGram.silver ?? null,
+    platinum: null,
+    palladium: null,
     fetchedAt: data?.fetchedAt ?? null,
     healthy,
     ageMs,

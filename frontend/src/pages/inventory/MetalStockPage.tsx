@@ -55,10 +55,10 @@ async function fetchSpot(code: 'XPT' | 'XPD'): Promise<SpotResponse> {
 // ---------- Visual config ----------
 
 const METAL_CARDS: { code: string; label: string; icon: string; accent: string; ring: string }[] = [
-  { code: 'GOLD', label: 'Gold', icon: '🥇', accent: 'from-amber-400 to-yellow-500', ring: 'ring-amber-300' },
+  { code: 'GOLD', label: 'Gold', icon: '🥇', accent: 'from-amber-400 to-amber-500', ring: 'ring-amber-300' },
   { code: 'SILVER', label: 'Silver', icon: '🥈', accent: 'from-slate-400 to-slate-500', ring: 'ring-slate-300' },
   { code: 'PLATINUM', label: 'Platinum', icon: '💎', accent: 'from-cyan-400 to-sky-500', ring: 'ring-sky-300' },
-  { code: 'PALLADIUM', label: 'Palladium', icon: '🔷', accent: 'from-violet-400 to-purple-500', ring: 'ring-violet-300' },
+  { code: 'PALLADIUM', label: 'Palladium', icon: '🔷', accent: 'from-violet-500 to-violet-700', ring: 'ring-violet-300' },
 ];
 
 function metalTextClass(metal: string): string {
@@ -66,7 +66,7 @@ function metalTextClass(metal: string): string {
   if (metal === 'SILVER') return 'text-slate-500';
   if (metal === 'PLATINUM') return 'text-sky-600';
   if (metal === 'PALLADIUM') return 'text-violet-600';
-  return 'text-gray-900';
+  return 'text-onyx-900';
 }
 
 function formatGrams(g: number): string {
@@ -277,9 +277,9 @@ export default function MetalStockPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-gradient-to-b from-slate-50 to-white min-h-screen">
+      <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
         <div className="max-w-[1400px] mx-auto space-y-4">
-          <div className="h-10 w-72 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="h-10 w-72 bg-champagne-200 rounded-lg animate-pulse" />
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-24 bg-white rounded-2xl shadow-sm animate-pulse" />
@@ -292,15 +292,15 @@ export default function MetalStockPage() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-b from-slate-50 to-white min-h-screen">
+    <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
       <div className="max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
               Metal Stock Register
             </h1>
-            <p className="text-gray-600 mt-1 text-sm">
+            <p className="text-onyx-500 mt-1 text-sm">
               {summary.rows} of {(stocks as any[]).length} stock rows
               {hasActiveFilters && ' (filtered)'}
               {lastUpdated !== null && ` · refreshed ${lastUpdated}s ago`}
@@ -311,7 +311,7 @@ export default function MetalStockPage() {
               type="button"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="px-3 py-2 rounded-xl text-sm font-medium text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+              className="px-3 py-2 rounded-xl text-sm font-medium text-champagne-800 bg-white border border-champagne-200 hover:bg-champagne-50 disabled:opacity-50 transition-colors"
             >
               {isFetching ? 'Refreshing…' : '↻ Refresh'}
             </button>
@@ -319,7 +319,7 @@ export default function MetalStockPage() {
               type="button"
               onClick={exportCsv}
               disabled={sorted.length === 0}
-              className="px-3 py-2 rounded-xl text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="px-3 py-2 rounded-xl text-sm font-medium text-white bg-accent-emerald hover:bg-accent-emerald/90 disabled:opacity-50 transition-colors"
             >
               ⬇ Export CSV
             </button>
@@ -335,28 +335,28 @@ export default function MetalStockPage() {
             label="Stock Rows"
             value={summary.rows.toString()}
             sub={`${(stocks as any[]).length} total`}
-            accent="from-indigo-500 to-indigo-600"
+            accent="from-champagne-700 to-onyx-800"
             icon="📦"
           />
           <SummaryCard
             label="Pure Weight"
             value={formatGrams(summary.totalPure)}
             sub={`${formatGrams(summary.totalGross)} gross`}
-            accent="from-emerald-500 to-emerald-600"
+            accent="from-accent-emerald to-accent-emerald/85"
             icon="⚖️"
           />
           <SummaryCard
             label="Estimated Value"
             value={formatINR(summary.totalValue)}
             sub="@ live Bangalore rates"
-            accent="from-amber-500 to-orange-500"
+            accent="from-amber-500 to-champagne-700"
             icon="💰"
           />
           <SummaryCard
             label="Distinct Vendors"
             value={summary.vendors.toString()}
             sub="across filtered rows"
-            accent="from-violet-500 to-purple-600"
+            accent="from-violet-500 to-violet-700"
             icon="🤝"
           />
         </div>
@@ -374,7 +374,7 @@ export default function MetalStockPage() {
                 className={`text-left p-4 bg-white rounded-2xl shadow-sm border transition-all ${
                   active
                     ? `border-transparent ring-2 ${m.ring}`
-                    : 'border-gray-200 hover:shadow-md hover:-translate-y-0.5'
+                    : 'border-champagne-200 hover:shadow-md hover:-translate-y-0.5'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -384,18 +384,18 @@ export default function MetalStockPage() {
                     {m.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-[10px] font-bold tracking-wider text-gray-500 uppercase">
+                    <div className="flex items-center gap-2 text-[10px] font-bold tracking-wider text-onyx-400 uppercase">
                       <span>{m.label}</span>
-                      <span className="text-gray-300">·</span>
+                      <span className="text-onyx-200">·</span>
                       <span>{b?.rows ?? 0} ROWS</span>
                       {active && (
-                        <span className="ml-auto inline-flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="ml-auto inline-flex h-2 w-2 rounded-full bg-champagne-500 animate-pulse" />
                       )}
                     </div>
-                    <div className="text-xl font-bold text-gray-900 mt-0.5">
+                    <div className="text-xl font-bold text-onyx-900 mt-0.5">
                       {formatGrams(b?.grams ?? 0)}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-onyx-400">
                       {b?.value ? formatINR(b.value) : '—'}
                     </div>
                   </div>
@@ -406,12 +406,12 @@ export default function MetalStockPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 p-4 mb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
             <div className="lg:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
+              <label className="block text-xs font-medium text-onyx-500 mb-1">Search</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                <span className="absolute inset-y-0 left-3 flex items-center text-onyx-300">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -421,7 +421,7 @@ export default function MetalStockPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Vendor, vendor code, location, batch…"
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
                 />
               </div>
             </div>
@@ -458,7 +458,7 @@ export default function MetalStockPage() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="text-xs font-medium text-champagne-700 hover:text-champagne-900 hover:underline"
               >
                 Clear all filters
               </button>
@@ -467,11 +467,11 @@ export default function MetalStockPage() {
         </div>
 
         {/* Live-rate ribbon */}
-        <div className="mb-4 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
-          <span className="font-semibold text-indigo-800 flex items-center gap-1.5">
+        <div className="mb-4 px-4 py-2 rounded-xl bg-gradient-to-r from-pearl to-champagne-100/60 border border-champagne-100 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+          <span className="font-semibold text-champagne-900 flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-emerald" />
             </span>
             Valuation rates
           </span>
@@ -479,11 +479,11 @@ export default function MetalStockPage() {
           <RateChip label="Silver" value={ratePerGramSilver} />
           <RateChip label="Platinum" value={ratePerGramPlatinum} />
           <RateChip label="Palladium" value={ratePerGramPalladium} />
-          <span className="text-gray-500 ml-auto">Indicative · per gram pure</span>
+          <span className="text-onyx-400 ml-auto">Indicative · per gram pure</span>
         </div>
 
         {/* Stock Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gradient-to-r from-slate-100 to-slate-50">
@@ -503,18 +503,18 @@ export default function MetalStockPage() {
                 {sorted.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-6 py-16 text-center">
-                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <div className="flex flex-col items-center gap-3 text-onyx-300">
                         <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
-                        <p className="text-sm font-medium text-gray-600">
+                        <p className="text-sm font-medium text-onyx-500">
                           {hasActiveFilters ? 'No stock matches your filters' : 'No metal stock yet'}
                         </p>
                         {hasActiveFilters && (
                           <button
                             type="button"
                             onClick={clearAll}
-                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                            className="text-xs font-medium text-champagne-700 hover:text-champagne-900 hover:underline"
                           >
                             Clear filters
                           </button>
@@ -528,7 +528,7 @@ export default function MetalStockPage() {
                   return (
                     <tr
                       key={stock.id}
-                      className={`hover:bg-indigo-50/40 transition-colors ${
+                      className={`hover:bg-champagne-50/40 transition-colors ${
                         idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
                       }`}
                     >
@@ -537,20 +537,20 @@ export default function MetalStockPage() {
                           {stock.metalType}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-700">
                         {stock.purity}K
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-500">
                         {stock.form || '—'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-onyx-900">
                         {formatGrams(stock.grossWeight ?? 0)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-onyx-700">
                         {formatGrams(stock.pureWeight ?? 0)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">
-                        {value !== null ? formatINR(value) : <span className="text-gray-300">—</span>}
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-onyx-900">
+                        {value !== null ? formatINR(value) : <span className="text-onyx-200">—</span>}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {stock.vendors && stock.vendors.length > 0 ? (
@@ -558,23 +558,23 @@ export default function MetalStockPage() {
                             {stock.vendors.slice(0, 3).map((v: any) => (
                               <span
                                 key={v.id}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-[11px]"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-champagne-50 border border-champagne-100 text-[11px]"
                                 title={v.name}
                               >
-                                <span className="font-medium text-indigo-900 truncate max-w-[100px]">
+                                <span className="font-medium text-onyx-900 truncate max-w-[100px]">
                                   {v.name}
                                 </span>
-                                <span className="font-mono text-indigo-500">{v.uniqueCode}</span>
+                                <span className="font-mono text-champagne-600">{v.uniqueCode}</span>
                               </span>
                             ))}
                             {stock.vendors.length > 3 && (
-                              <span className="text-[11px] text-gray-500 self-center">
+                              <span className="text-[11px] text-onyx-400 self-center">
                                 +{stock.vendors.length - 3} more
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-onyx-200">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
@@ -583,14 +583,14 @@ export default function MetalStockPage() {
                             📍 {stock.location}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-onyx-200">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {stock.batchNumber ? (
-                          <span className="font-mono text-xs text-gray-600">{stock.batchNumber}</span>
+                          <span className="font-mono text-xs text-onyx-500">{stock.batchNumber}</span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-onyx-200">—</span>
                         )}
                       </td>
                     </tr>
@@ -598,18 +598,18 @@ export default function MetalStockPage() {
                 })}
               </tbody>
               {sorted.length > 0 && (
-                <tfoot className="bg-slate-50 border-t border-gray-200">
+                <tfoot className="bg-slate-50 border-t border-champagne-200">
                   <tr>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-700" colSpan={3}>
+                    <td className="px-4 py-3 text-sm font-semibold text-onyx-700" colSpan={3}>
                       Totals ({summary.rows} rows)
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-onyx-900">
                       {formatGrams(summary.totalGross)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-onyx-900">
                       {formatGrams(summary.totalPure)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-700">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-accent-emerald">
                       {formatINR(summary.totalValue)}
                     </td>
                     <td colSpan={3} />
@@ -640,16 +640,16 @@ function SummaryCard({
   icon: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
+    <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 p-4 flex items-center gap-3">
       <div
         className={`w-12 h-12 rounded-xl bg-gradient-to-br ${accent} text-white text-xl flex items-center justify-center shadow-sm`}
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase">{label}</div>
-        <div className="text-xl font-bold text-gray-900 truncate">{value}</div>
-        {sub && <div className="text-[11px] text-gray-500 truncate">{sub}</div>}
+        <div className="text-[10px] font-bold tracking-wider text-onyx-400 uppercase">{label}</div>
+        <div className="text-xl font-bold text-onyx-900 truncate">{value}</div>
+        {sub && <div className="text-[11px] text-onyx-400 truncate">{sub}</div>}
       </div>
     </div>
   );
@@ -668,11 +668,11 @@ function FilterSelect({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-onyx-500 mb-1">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+        className="w-full px-3 py-2 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none bg-white"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -687,7 +687,7 @@ function FilterSelect({
 function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
   return (
     <th
-      className={`px-4 py-3 text-${align} text-[10px] font-bold tracking-wider text-gray-500 uppercase`}
+      className={`px-4 py-3 text-${align} text-[10px] font-bold tracking-wider text-onyx-400 uppercase`}
     >
       {children}
     </th>
@@ -711,12 +711,12 @@ function SortableTh({
 }) {
   const active = sortKey === k;
   return (
-    <th className={`px-4 py-3 text-${align} text-[10px] font-bold tracking-wider text-gray-500 uppercase`}>
+    <th className={`px-4 py-3 text-${align} text-[10px] font-bold tracking-wider text-onyx-400 uppercase`}>
       <button
         type="button"
         onClick={() => onClick(k)}
-        className={`inline-flex items-center gap-1 hover:text-indigo-700 transition-colors ${
-          active ? 'text-indigo-700' : ''
+        className={`inline-flex items-center gap-1 hover:text-champagne-800 transition-colors ${
+          active ? 'text-champagne-800' : ''
         }`}
       >
         {label}
@@ -731,8 +731,8 @@ function SortableTh({
 function RateChip({ label, value }: { label: string; value: number | null }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-semibold text-gray-900">
+      <span className="text-onyx-400">{label}</span>
+      <span className="font-semibold text-onyx-900">
         {value !== null ? `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}/g` : '—'}
       </span>
     </span>

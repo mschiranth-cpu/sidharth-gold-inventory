@@ -62,16 +62,16 @@ export default function CreateMeltingBatchPage() {
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Melting Batch</h1>
-          <p className="text-gray-600">Record melting process with wastage tracking</p>
+          <h1 className="text-3xl font-bold text-onyx-900 mb-2">Create Melting Batch</h1>
+          <p className="text-onyx-500">Record melting process with wastage tracking</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-champagne-100">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Input Metals */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Input Metals</h3>
+                <h3 className="text-lg font-semibold text-onyx-900">Input Metals</h3>
                 <Button type="button" variant="secondary" size="sm" onClick={addInputMetal}>
                   + Add Metal
                 </Button>
@@ -81,7 +81,7 @@ export default function CreateMeltingBatchPage() {
                 {inputMetals.map((metal, index) => (
                   <div key={index} className="flex gap-3 items-end">
                     <div className="flex-1">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-onyx-700 mb-2">
                         Purity
                       </label>
                       <select
@@ -89,7 +89,7 @@ export default function CreateMeltingBatchPage() {
                         onChange={(e) =>
                           updateInputMetal(index, 'purity', parseFloat(e.target.value))
                         }
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                       >
                         <option value="24">24K</option>
                         <option value="22">22K</option>
@@ -98,7 +98,7 @@ export default function CreateMeltingBatchPage() {
                       </select>
                     </div>
                     <div className="flex-1">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-onyx-700 mb-2">
                         Weight (g)
                       </label>
                       <input
@@ -108,15 +108,15 @@ export default function CreateMeltingBatchPage() {
                         onChange={(e) =>
                           updateInputMetal(index, 'weight', parseFloat(e.target.value))
                         }
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Form</label>
+                      <label className="block text-sm font-semibold text-onyx-700 mb-2">Form</label>
                       <select
                         value={metal.form}
                         onChange={(e) => updateInputMetal(index, 'form', e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                       >
                         <option value="SCRAP">Scrap</option>
                         <option value="BAR">Bar</option>
@@ -137,8 +137,8 @@ export default function CreateMeltingBatchPage() {
                 ))}
               </div>
 
-              <div className="mt-4 p-4 bg-blue-50 rounded-xl">
-                <p className="text-sm text-gray-700">
+              <div className="mt-4 p-4 bg-champagne-50 rounded-xl">
+                <p className="text-sm text-onyx-700">
                   Total Input Weight:{' '}
                   <span className="font-bold">{totalInputWeight.toFixed(3)}g</span>
                 </p>
@@ -146,11 +146,11 @@ export default function CreateMeltingBatchPage() {
             </div>
 
             {/* Output Metal */}
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Output Metal</h3>
+            <div className="border-t border-champagne-200 pt-6">
+              <h3 className="text-lg font-semibold text-onyx-900 mb-4">Output Metal</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Output Purity *
                   </label>
                   <select
@@ -159,7 +159,7 @@ export default function CreateMeltingBatchPage() {
                     onChange={(e) =>
                       setOutputData({ ...outputData, outputPurity: parseFloat(e.target.value) })
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   >
                     <option value="24">24K</option>
                     <option value="22">22K</option>
@@ -167,7 +167,7 @@ export default function CreateMeltingBatchPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Output Weight (g) *
                   </label>
                   <input
@@ -178,18 +178,18 @@ export default function CreateMeltingBatchPage() {
                     onChange={(e) =>
                       setOutputData({ ...outputData, outputWeight: parseFloat(e.target.value) })
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
                     Output Form *
                   </label>
                   <select
                     required
                     value={outputData.outputForm}
                     onChange={(e) => setOutputData({ ...outputData, outputForm: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
                   >
                     <option value="BAR">Bar</option>
                     <option value="WIRE">Wire</option>
@@ -203,28 +203,28 @@ export default function CreateMeltingBatchPage() {
             <div
               className={`p-4 rounded-xl ${
                 wastagePercent > 2
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-green-50 border border-green-200'
+                  ? 'bg-red-50 border border-accent-ruby/30'
+                  : 'bg-green-50 border border-emerald-200'
               }`}
             >
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="text-sm text-gray-600">Wastage Weight</p>
-                  <p className="text-2xl font-bold text-gray-900">{wastageWeight.toFixed(3)}g</p>
+                  <p className="text-sm text-onyx-500">Wastage Weight</p>
+                  <p className="text-2xl font-bold text-onyx-900">{wastageWeight.toFixed(3)}g</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Wastage %</p>
+                  <p className="text-sm text-onyx-500">Wastage %</p>
                   <p
                     className={`text-2xl font-bold ${
-                      wastagePercent > 2 ? 'text-red-600' : 'text-green-600'
+                      wastagePercent > 2 ? 'text-accent-ruby' : 'text-accent-emerald'
                     }`}
                   >
                     {wastagePercent.toFixed(2)}%
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Output Weight</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-onyx-500">Output Weight</p>
+                  <p className="text-2xl font-bold text-onyx-900">
                     {outputData.outputWeight.toFixed(3)}g
                   </p>
                 </div>
@@ -233,12 +233,12 @@ export default function CreateMeltingBatchPage() {
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+              <label className="block text-sm font-semibold text-onyx-700 mb-2">Notes</label>
               <textarea
                 rows={3}
                 value={outputData.notes}
                 onChange={(e) => setOutputData({ ...outputData, notes: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 rounded-xl border border-champagne-300 focus:ring-2 focus:ring-champagne-500"
               />
             </div>
 
