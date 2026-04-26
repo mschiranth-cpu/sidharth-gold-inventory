@@ -135,7 +135,7 @@ docker-compose up -d
 | [API Docs](http://localhost:5000/api-docs) | Swagger UI |
 | [User Guide](docs/USER_GUIDE.md) | End-user documentation |
 | [Admin Guide](docs/ADMIN_GUIDE.md) | System administration |
-| [Deployment](docs/DEPLOYMENT.md) | Production deployment |
+| [Deployment](../DEPLOY_SSH.md) | Production deployment (direct SSH/SCP) |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues |
 
 ## 🤝 Contributing

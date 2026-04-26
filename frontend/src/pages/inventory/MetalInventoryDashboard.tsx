@@ -6,8 +6,9 @@
 
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getMetalStockSummary, getCurrentMetalRates } from '../../services/metal.service';
+import { getMetalStockSummary } from '../../services/metal.service';
 import Button from '../../components/common/Button';
+import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 
 export default function MetalInventoryDashboard() {
   const { data: summary = [], isLoading: summaryLoading } = useQuery({
@@ -15,12 +16,7 @@ export default function MetalInventoryDashboard() {
     queryFn: getMetalStockSummary,
   });
 
-  const { data: rates = [], isLoading: ratesLoading } = useQuery({
-    queryKey: ['metal-rates'],
-    queryFn: getCurrentMetalRates,
-  });
-
-  if (summaryLoading || ratesLoading) {
+  if (summaryLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -60,28 +56,8 @@ export default function MetalInventoryDashboard() {
           </div>
         </div>
 
-        {/* Current Rates */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Current Gold Rates (INR/gram)</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {rates
-              .filter((r) => r.metalType === 'GOLD')
-              .map((rate) => (
-                <div
-                  key={rate.id}
-                  className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-200"
-                >
-                  <p className="text-sm text-gray-600 mb-1">{rate.purity}K Gold</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    ₹{rate.ratePerGram.toLocaleString('en-IN')}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(rate.effectiveDate).toLocaleDateString('en-IN')}
-                  </p>
-                </div>
-              ))}
-          </div>
-        </div>
+        {/* Live Market Rates */}
+        <LiveMetalRatesCard />
 
         {/* Stock Summary */}
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
@@ -94,6 +70,9 @@ export default function MetalInventoryDashboard() {
               View Details →
             </Link>
           </div>
+          {summary.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No stock entries yet. Receive metal to start tracking inventory.</p>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {summary.map((item: any, index: number) => (
               <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
@@ -124,6 +103,7 @@ export default function MetalInventoryDashboard() {
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* Quick Actions */}

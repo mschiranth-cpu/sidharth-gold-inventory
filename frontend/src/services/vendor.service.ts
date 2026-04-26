@@ -1,4 +1,5 @@
 import api from './api';
+import type { MetalTransaction } from './metal.service';
 
 export interface Vendor {
   id: string;
@@ -8,6 +9,8 @@ export interface Vendor {
   gstNumber: string | null;
   gstDetails: GstDetails | null;
   address: string | null;
+  /** Outstanding credit owed back to the vendor (over-payments parked here). */
+  creditBalance: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,9 +24,42 @@ export interface GstDetails {
   legalName: string | null;
   tradeName: string | null;
   address: string | null;
+  city?: string | null;
+  pincode?: string | null;
   status: string | null;
   registrationDate: string | null;
-  source: 'parsed' | 'gstincheck' | 'mastergst';
+  businessType?: string | null;
+  addressParts?: {
+    buildingNumber?: string;
+    buildingName?: string;
+    floorNumber?: string;
+    street?: string;
+    locality?: string;
+    location?: string;
+    district?: string;
+    stateCode?: string;
+    pincode?: string;
+  } | null;
+  taxType?: string | null;
+  natureOfBusinessActivity?: string[] | null;
+  eInvoiceStatus?: string | null;
+  lastUpdateDate?: string | null;
+  cancelledDate?: string | null;
+  centerJurisdiction?: string | null;
+  stateJurisdiction?: string | null;
+  source: 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'manual';
+  notice?: string | null;
+}
+
+export interface ManualVendorDetails {
+  legalName?: string;
+  tradeName?: string;
+  state?: string;
+  stateCode?: string;
+  pan?: string;
+  city?: string;
+  pincode?: string;
+  address?: string;
 }
 
 export interface VendorInput {
@@ -31,6 +67,7 @@ export interface VendorInput {
   phone?: string;
   gstNumber?: string;
   address?: string;
+  manualDetails?: ManualVendorDetails;
 }
 
 export async function getNextVendorCode(): Promise<string> {
@@ -59,5 +96,40 @@ export async function deleteVendor(id: string): Promise<void> {
 
 export async function lookupGstin(gstin: string): Promise<GstDetails> {
   const r = await api.get(`/vendors/gst/${encodeURIComponent(gstin)}`);
+  return r.data.data;
+}
+
+export async function getVendor(id: string): Promise<Vendor> {
+  const r = await api.get(`/vendors/${id}`);
+  return r.data.data;
+}
+
+export interface VendorOutstanding {
+  vendorId: string;
+  name: string;
+  uniqueCode: string;
+  totalBillable: number;
+  totalPaid: number;
+  outstanding: number;
+  openCount: number;
+}
+
+export async function listVendorOutstanding(): Promise<VendorOutstanding[]> {
+  const r = await api.get('/vendors/outstanding');
+  return r.data.data;
+}
+
+export async function getVendorOutstanding(id: string): Promise<VendorOutstanding | null> {
+  try {
+    const r = await api.get(`/vendors/${id}/outstanding`);
+    return r.data.data ?? null;
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function getVendorTransactions(id: string): Promise<MetalTransaction[]> {
+  const r = await api.get(`/vendors/${id}/transactions`);
   return r.data.data;
 }

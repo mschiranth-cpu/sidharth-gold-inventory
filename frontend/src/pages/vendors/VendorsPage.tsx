@@ -1,37 +1,187 @@
 /**
  * Vendor Info — list, add, edit, delete with realtime GST auto-fetch.
+ * Enhanced: KPI strip, filter chips, sortable table, CSV export, avatars,
+ * skeleton loading, sticky header.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import {
+  PlusIcon,
+  ArrowDownTrayIcon,
+  ArrowPathIcon,
+  CheckBadgeIcon,
+  BuildingOffice2Icon,
+  BanknotesIcon,
+  ExclamationTriangleIcon,
+  WalletIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  ChevronUpDownIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  UsersIcon,
+} from '@heroicons/react/24/outline';
 import {
   Vendor,
-  VendorInput,
-  GstDetails,
   listVendors,
-  createVendor,
-  updateVendor,
   deleteVendor,
-  lookupGstin,
-  getNextVendorCode,
+  listVendorOutstanding,
+  type VendorOutstanding,
 } from '../../services/vendor.service';
-import Button from '../../components/common/Button';
+import VendorFormModal from '../../components/VendorFormModal';
 
-const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+type FilterKey = 'all' | 'verified' | 'noGst' | 'outstanding' | 'credit';
+type SortKey = 'name' | 'outstanding' | 'paid' | 'credit';
+type SortDir = 'asc' | 'desc';
+
+const AVATAR_PALETTE = [
+  'bg-indigo-100 text-indigo-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-sky-100 text-sky-700',
+  'bg-violet-100 text-violet-700',
+  'bg-teal-100 text-teal-700',
+  'bg-fuchsia-100 text-fuchsia-700',
+];
+
+function getAvatar(name: string) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('');
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  const cls = AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+  return { initials: initials || '?', cls };
+}
+
+function isVerified(v: Vendor) {
+  const s = v.gstDetails?.source;
+  return s === 'rapidapi' || s === 'gstincheck' || s === 'mastergst';
+}
+
+function downloadCsv(rows: any[][], filename: string) {
+  const escape = (s: any) => {
+    const v = s == null ? '' : String(s);
+    return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const csv = rows.map((r) => r.map(escape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function VendorsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], isLoading, isFetching } = useQuery({
     queryKey: ['vendors', search],
     queryFn: () => listVendors(search || undefined),
   });
 
+  const { data: outstanding = [], isLoading: outstandingLoading } = useQuery({
+    queryKey: ['vendors-outstanding'],
+    queryFn: listVendorOutstanding,
+  });
+
+  const outstandingMap = useMemo(() => {
+    const m = new Map<string, VendorOutstanding>();
+    outstanding.forEach((o) => m.set(o.vendorId, o));
+    return m;
+  }, [outstanding]);
+
+  const fmt = (n: number) =>
+    n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtCompact = (n: number) =>
+    n >= 10000000
+      ? `₹${(n / 10000000).toFixed(2)} Cr`
+      : n >= 100000
+      ? `₹${(n / 100000).toFixed(2)} L`
+      : `₹${fmt(n)}`;
+
+  // KPI roll-ups
+  const kpis = useMemo(() => {
+    const totalOut = vendors.reduce((s, v) => s + (outstandingMap.get(v.id)?.outstanding ?? 0), 0);
+    const totalCredit = vendors.reduce((s, v) => s + (v.creditBalance ?? 0), 0);
+    const verifiedCount = vendors.filter(isVerified).length;
+    const withGstCount = vendors.filter((v) => !!v.gstNumber).length;
+    return {
+      total: vendors.length,
+      verified: verifiedCount,
+      withGst: withGstCount,
+      totalOut,
+      totalCredit,
+    };
+  }, [vendors, outstandingMap]);
+
+  // Filter + sort
+  const visible = useMemo(() => {
+    let list = vendors.filter((v) => {
+      const o = outstandingMap.get(v.id);
+      switch (filter) {
+        case 'verified':
+          return isVerified(v);
+        case 'noGst':
+          return !v.gstNumber;
+        case 'outstanding':
+          return (o?.outstanding ?? 0) > 0;
+        case 'credit':
+          return (v.creditBalance ?? 0) > 0;
+        default:
+          return true;
+      }
+    });
+    list = [...list].sort((a, b) => {
+      const oa = outstandingMap.get(a.id);
+      const ob = outstandingMap.get(b.id);
+      let cmp = 0;
+      switch (sortKey) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+          break;
+        case 'outstanding':
+          cmp = (oa?.outstanding ?? 0) - (ob?.outstanding ?? 0);
+          break;
+        case 'paid':
+          cmp = (oa?.totalPaid ?? 0) - (ob?.totalPaid ?? 0);
+          break;
+        case 'credit':
+          cmp = (a.creditBalance ?? 0) - (b.creditBalance ?? 0);
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [vendors, outstandingMap, filter, sortKey, sortDir]);
+
   const removeMut = useMutation({
     mutationFn: deleteVendor,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendors'] });
+      qc.invalidateQueries({ queryKey: ['vendors-outstanding'] });
+      setDeleteTarget(null);
+      setDeleteError(null);
+    },
+    onError: (e: any) => setDeleteError(e?.response?.data?.error || e?.message || 'Delete failed'),
   });
 
   const handleEdit = (v: Vendor) => {
@@ -42,92 +192,438 @@ export default function VendorsPage() {
     setEditing(null);
     setIsOpen(true);
   };
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['vendors'] });
+    qc.invalidateQueries({ queryKey: ['vendors-outstanding'] });
+  };
+
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(k);
+      setSortDir(k === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortIcon = (k: SortKey) => {
+    if (sortKey !== k) return <ChevronUpDownIcon className="w-3.5 h-3.5 opacity-40" />;
+    return sortDir === 'asc' ? (
+      <ChevronUpIcon className="w-3.5 h-3.5" />
+    ) : (
+      <ChevronDownIcon className="w-3.5 h-3.5" />
+    );
+  };
+
+  const exportCsv = () => {
+    const header = [
+      'Name',
+      'Unique Code',
+      'Phone',
+      'GSTIN',
+      'Verified',
+      'Status',
+      'Legal Name',
+      'Trade Name',
+      'State',
+      'City',
+      'Pincode',
+      'Business Type',
+      'Outstanding',
+      'Paid',
+      'Credit',
+      'Open Bills',
+    ];
+    const rows = [header];
+    visible.forEach((v) => {
+      const o = outstandingMap.get(v.id);
+      rows.push([
+        v.name,
+        v.uniqueCode,
+        v.phone || '',
+        v.gstNumber || '',
+        isVerified(v) ? 'Yes' : '',
+        v.gstDetails?.status || '',
+        v.gstDetails?.legalName || '',
+        v.gstDetails?.tradeName || '',
+        v.gstDetails?.state || '',
+        v.gstDetails?.city || '',
+        v.gstDetails?.pincode || '',
+        v.gstDetails?.businessType || '',
+        (o?.outstanding ?? 0).toFixed(2),
+        (o?.totalPaid ?? 0).toFixed(2),
+        (v.creditBalance ?? 0).toFixed(2),
+        o?.openCount ?? 0,
+      ]);
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(rows, `vendors-${stamp}.csv`);
+  };
+
+  const filterChips: { key: FilterKey; label: string; count: number; cls: string }[] = [
+    { key: 'all', label: 'All', count: vendors.length, cls: 'bg-slate-100 text-slate-700' },
+    {
+      key: 'verified',
+      label: 'GST Verified',
+      count: kpis.verified,
+      cls: 'bg-emerald-100 text-emerald-800',
+    },
+    {
+      key: 'noGst',
+      label: 'No GST',
+      count: vendors.filter((v) => !v.gstNumber).length,
+      cls: 'bg-amber-100 text-amber-800',
+    },
+    {
+      key: 'outstanding',
+      label: 'Has Outstanding',
+      count: vendors.filter((v) => (outstandingMap.get(v.id)?.outstanding ?? 0) > 0).length,
+      cls: 'bg-rose-100 text-rose-800',
+    },
+    {
+      key: 'credit',
+      label: 'Has Credit',
+      count: vendors.filter((v) => (v.creditBalance ?? 0) > 0).length,
+      cls: 'bg-sky-100 text-sky-800',
+    },
+  ];
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Info</h1>
-            <p className="text-gray-600">
-              Manage vendors with realtime GST auto-fetch
+            <h1 className="text-3xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <BuildingOffice2Icon className="w-8 h-8 text-indigo-600" />
+              Vendor Info
+            </h1>
+            <p className="text-gray-600 text-sm">
+              Manage vendors with realtime GST auto-fetch &middot; live outstanding &amp; credit
             </p>
           </div>
-          <Button variant="primary" onClick={handleAdd}>
-            + Add Vendor
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refresh}
+              disabled={isFetching}
+              title="Refresh"
+              className="p-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={exportCsv}
+              disabled={visible.length === 0}
+              className="px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4" /> Export CSV
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-indigo-500/20"
+            >
+              <PlusIcon className="w-4 h-4" /> Add Vendor
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100 mb-6">
-          <input
-            type="text"
-            placeholder="Search by name, code, GSTIN or phone…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        {/* KPI strip */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <KpiCard
+            icon={<UsersIcon className="w-5 h-5" />}
+            label="Total Vendors"
+            value={String(kpis.total)}
+            tint="indigo"
+          />
+          <KpiCard
+            icon={<CheckBadgeIcon className="w-5 h-5" />}
+            label="GST Verified"
+            value={`${kpis.verified}`}
+            sub={`of ${kpis.withGst} with GST`}
+            tint="emerald"
+          />
+          <KpiCard
+            icon={<ExclamationTriangleIcon className="w-5 h-5" />}
+            label="Total Outstanding"
+            value={fmtCompact(kpis.totalOut)}
+            tint="rose"
+          />
+          <KpiCard
+            icon={<WalletIcon className="w-5 h-5" />}
+            label="Total Credit"
+            value={fmtCompact(kpis.totalCredit)}
+            tint="sky"
+          />
+          <KpiCard
+            icon={<BanknotesIcon className="w-5 h-5" />}
+            label="With GST"
+            value={`${kpis.withGst}`}
+            sub={`${kpis.total - kpis.withGst} without`}
+            tint="violet"
           />
         </div>
 
+        {/* Search + filters */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
+          <div className="relative mb-3">
+            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, code, GSTIN or phone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 focus:bg-white transition"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-100 text-gray-400"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {filterChips.map((c) => {
+              const active = filter === c.key;
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setFilter(c.key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                    active
+                      ? 'border-indigo-500 bg-indigo-600 text-white shadow-sm'
+                      : `border-transparent ${c.cls} hover:brightness-95`
+                  }`}
+                >
+                  {c.label}
+                  <span
+                    className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${
+                      active ? 'bg-white/25' : 'bg-white/70'
+                    }`}
+                  >
+                    {c.count}
+                  </span>
+                </button>
+              );
+            })}
+            <span className="ml-auto text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-700">{visible.length}</span> of{' '}
+              {vendors.length}
+            </span>
+          </div>
+        </div>
+
+        {/* Table / states */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : vendors.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center text-gray-500">
-            No vendors yet. Click <span className="font-semibold">Add Vendor</span> to create one.
-          </div>
+          <SkeletonTable />
+        ) : visible.length === 0 ? (
+          <EmptyState onAdd={handleAdd} hasSearch={!!search || filter !== 'all'} />
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Unique Code</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">GSTIN</th>
-                  <th className="px-4 py-3">State</th>
-                  <th className="px-4 py-3">Address</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {vendors.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      {v.name}
-                      {v.gstDetails?.legalName && (
-                        <div className="text-xs font-normal text-gray-500">
-                          {v.gstDetails.legalName}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">{v.uniqueCode}</td>
-                    <td className="px-4 py-3">{v.phone || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{v.gstNumber || '—'}</td>
-                    <td className="px-4 py-3">{v.gstDetails?.state || '—'}</td>
-                    <td className="px-4 py-3 max-w-xs truncate" title={v.address || ''}>
-                      {v.address || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => handleEdit(v)}
-                        className="text-indigo-600 hover:text-indigo-800 font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete vendor "${v.name}"?`)) removeMut.mutate(v.id);
-                        }}
-                        className="text-red-600 hover:text-red-800 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200 sticky top-0 z-10">
+                  <tr className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <Th onClick={() => toggleSort('name')}>
+                      <span className="flex items-center gap-1">Name {sortIcon('name')}</span>
+                    </Th>
+                    <Th>Code</Th>
+                    <Th>Phone</Th>
+                    <Th>GSTIN</Th>
+                    <Th>Location</Th>
+                    <Th align="right" onClick={() => toggleSort('outstanding')}>
+                      <span className="flex items-center justify-end gap-1">
+                        Outstanding {sortIcon('outstanding')}
+                      </span>
+                    </Th>
+                    <Th align="right" onClick={() => toggleSort('paid')}>
+                      <span className="flex items-center justify-end gap-1">
+                        Paid {sortIcon('paid')}
+                      </span>
+                    </Th>
+                    <Th align="right" onClick={() => toggleSort('credit')}>
+                      <span className="flex items-center justify-end gap-1">
+                        Credit {sortIcon('credit')}
+                      </span>
+                    </Th>
+                    <Th align="center">Open</Th>
+                    <Th align="right">Actions</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {visible.map((v) => {
+                    const o = outstandingMap.get(v.id);
+                    const verified = isVerified(v);
+                    const status = v.gstDetails?.status || '';
+                    const statusLower = status.toLowerCase();
+                    const statusCls =
+                      statusLower === 'active'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : statusLower === 'cancelled' || statusLower === 'canceled'
+                        ? 'bg-rose-100 text-rose-800'
+                        : statusLower === 'suspended'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-700';
+                    const av = getAvatar(v.name);
+                    return (
+                      <tr
+                        key={v.id}
+                        className="hover:bg-indigo-50/40 cursor-pointer transition"
+                        onClick={() => navigate(`/app/vendors/${v.id}`)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${av.cls}`}
+                            >
+                              {av.initials}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-gray-900 truncate max-w-[240px]">
+                                {v.name}
+                              </div>
+                              {v.gstDetails?.legalName &&
+                                v.gstDetails.legalName !== v.name && (
+                                  <div className="text-xs font-normal text-gray-500 truncate max-w-[240px]">
+                                    {v.gstDetails.legalName}
+                                  </div>
+                                )}
+                              {v.gstDetails?.businessType && (
+                                <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">
+                                  {v.gstDetails.businessType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                          {v.uniqueCode}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {v.phone || <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {v.gstNumber ? (
+                            <div className="flex flex-col gap-1">
+                              <span>{v.gstNumber}</span>
+                              <div className="flex flex-wrap gap-1">
+                                {verified ? (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                                    <CheckBadgeIcon className="w-3 h-3" /> Verified
+                                  </span>
+                                ) : v.gstDetails ? (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200 text-[10px] font-semibold">
+                                    Structural
+                                  </span>
+                                ) : null}
+                                {status && (
+                                  <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusCls}`}
+                                  >
+                                    {status}
+                                  </span>
+                                )}
+                                {(v.gstDetails?.eInvoiceStatus || '').toLowerCase() === 'yes' && (
+                                  <span
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold"
+                                    title="e-Invoice eligible"
+                                  >
+                                    ⚡ e-Inv
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {v.gstDetails?.state || v.gstDetails?.city ? (
+                            <div className="flex flex-col">
+                              {v.gstDetails?.state && (
+                                <span className="text-gray-900 text-sm">
+                                  {v.gstDetails.state}
+                                </span>
+                              )}
+                              {v.gstDetails?.city && (
+                                <span className="text-gray-500 text-xs">
+                                  {v.gstDetails.city}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td
+                          className={`px-4 py-3 text-right tabular-nums ${
+                            o && o.outstanding > 0
+                              ? 'text-rose-600 font-semibold'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          {outstandingLoading ? (
+                            <span className="text-gray-300">—</span>
+                          ) : (
+                            `₹${fmt(o?.outstanding ?? 0)}`
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-700 tabular-nums">
+                          {outstandingLoading ? (
+                            <span className="text-gray-300">—</span>
+                          ) : (
+                            `₹${fmt(o?.totalPaid ?? 0)}`
+                          )}
+                        </td>
+                        <td
+                          className={`px-4 py-3 text-right tabular-nums ${
+                            v.creditBalance > 0
+                              ? 'text-emerald-600 font-semibold'
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          {v.creditBalance > 0 ? `₹${fmt(v.creditBalance)}` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {outstandingLoading || !o || o.openCount === 0 ? (
+                            <span className="text-gray-300">—</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                              {o.openCount}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(v);
+                              }}
+                              title="Edit vendor"
+                              className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <PencilSquareIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteError(null);
+                                setDeleteTarget(v);
+                              }}
+                              title="Delete vendor"
+                              className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -138,7 +634,22 @@ export default function VendorsPage() {
             onSaved={() => {
               setIsOpen(false);
               qc.invalidateQueries({ queryKey: ['vendors'] });
+              qc.invalidateQueries({ queryKey: ['vendors-outstanding'] });
             }}
+          />
+        )}
+
+        {deleteTarget && (
+          <ConfirmDeleteModal
+            vendor={deleteTarget}
+            error={deleteError}
+            isPending={removeMut.isPending}
+            onCancel={() => {
+              if (removeMut.isPending) return;
+              setDeleteTarget(null);
+              setDeleteError(null);
+            }}
+            onConfirm={() => removeMut.mutate(deleteTarget.id)}
           />
         )}
       </div>
@@ -146,281 +657,198 @@ export default function VendorsPage() {
   );
 }
 
-// ============ Modal ============
+/* ----------------------------- Sub-components ----------------------------- */
 
-function VendorFormModal({
-  vendor,
-  onClose,
-  onSaved,
+const TINTS: Record<string, { ring: string; bg: string; text: string; iconBg: string }> = {
+  indigo: {
+    ring: 'ring-indigo-100',
+    bg: 'bg-white',
+    text: 'text-indigo-700',
+    iconBg: 'bg-indigo-50 text-indigo-600',
+  },
+  emerald: {
+    ring: 'ring-emerald-100',
+    bg: 'bg-white',
+    text: 'text-emerald-700',
+    iconBg: 'bg-emerald-50 text-emerald-600',
+  },
+  rose: {
+    ring: 'ring-rose-100',
+    bg: 'bg-white',
+    text: 'text-rose-700',
+    iconBg: 'bg-rose-50 text-rose-600',
+  },
+  sky: {
+    ring: 'ring-sky-100',
+    bg: 'bg-white',
+    text: 'text-sky-700',
+    iconBg: 'bg-sky-50 text-sky-600',
+  },
+  violet: {
+    ring: 'ring-violet-100',
+    bg: 'bg-white',
+    text: 'text-violet-700',
+    iconBg: 'bg-violet-50 text-violet-600',
+  },
+};
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  sub,
+  tint,
 }: {
-  vendor: Vendor | null;
-  onClose: () => void;
-  onSaved: () => void;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  tint: keyof typeof TINTS;
 }) {
-  const [form, setForm] = useState<VendorInput>({
-    name: vendor?.name ?? '',
-    phone: vendor?.phone ?? '',
-    gstNumber: vendor?.gstNumber ?? '',
-    address: vendor?.address ?? '',
-  });
-  const [previewCode, setPreviewCode] = useState<string>(vendor?.uniqueCode ?? '…');
-
-  // Fetch the next auto-generated code when creating a new vendor
-  useEffect(() => {
-    if (vendor) return;
-    let cancelled = false;
-    getNextVendorCode()
-      .then((c) => {
-        if (!cancelled) setPreviewCode(c);
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewCode('VEN-001');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [vendor]);
-  const [gstDetails, setGstDetails] = useState<GstDetails | null>(vendor?.gstDetails ?? null);
-  const [gstStatus, setGstStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  const [gstError, setGstError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const gstinUpper = (form.gstNumber || '').toUpperCase().trim();
-  const gstinValid = useMemo(() => GSTIN_REGEX.test(gstinUpper), [gstinUpper]);
-
-  // Auto-fetch GST details after user finishes typing a valid GSTIN (debounced 500 ms)
-  useEffect(() => {
-    if (!gstinValid) {
-      if (gstinUpper.length === 0) {
-        setGstStatus('idle');
-        setGstError(null);
-        setGstDetails(null);
-      } else {
-        setGstStatus('idle');
-      }
-      return;
-    }
-    let cancelled = false;
-    setGstStatus('loading');
-    setGstError(null);
-    const t = window.setTimeout(async () => {
-      try {
-        const d = await lookupGstin(gstinUpper);
-        if (cancelled) return;
-        setGstDetails(d);
-        setGstStatus('ok');
-        // Auto-fill Name and Address from GST when the provider returns them.
-        // Only fill empty fields so we don't clobber user input.
-        setForm((f) => {
-          const gstName = d.legalName || d.tradeName || '';
-          return {
-            ...f,
-            name: f.name && f.name.trim() ? f.name : gstName || f.name,
-            address: f.address && f.address.trim() ? f.address : d.address || f.address,
-          };
-        });
-      } catch (e: any) {
-        if (cancelled) return;
-        setGstStatus('error');
-        setGstError(e?.response?.data?.error || e?.message || 'Lookup failed');
-      }
-    }, 500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [gstinUpper, gstinValid]);
-
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const payload: VendorInput = {
-        name: form.name.trim(),
-        phone: form.phone?.trim() || undefined,
-        gstNumber: gstinUpper || undefined,
-        address: form.address?.trim() || undefined,
-      };
-      if (vendor) return updateVendor(vendor.id, payload);
-      return createVendor(payload);
-    },
-    onSuccess: onSaved,
-    onError: (e: any) => setSubmitError(e?.response?.data?.error || 'Save failed'),
-  });
-
-  const canSave =
-    form.name.trim().length > 0 && (gstinUpper.length === 0 || gstinValid);
-
+  const t = TINTS[tint];
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-          <h2 className="text-xl font-bold text-gray-900">
-            {vendor ? 'Edit Vendor' : 'Add Vendor'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">
-            ×
-          </button>
+    <div
+      className={`rounded-2xl p-4 ${t.bg} ring-1 ${t.ring} shadow-sm hover:shadow-md transition`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+        <div className={`p-1.5 rounded-lg ${t.iconBg}`}>{icon}</div>
+      </div>
+      <div className={`text-2xl font-bold ${t.text}`}>{value}</div>
+      {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+function Th({
+  children,
+  align = 'left',
+  onClick,
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right' | 'center';
+  onClick?: () => void;
+}) {
+  const cls =
+    align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+  return (
+    <th
+      onClick={onClick}
+      className={`px-4 py-3 ${cls} ${onClick ? 'cursor-pointer select-none hover:text-indigo-600' : ''}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+function SkeletonTable() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 animate-pulse">
+          <div className="w-9 h-9 rounded-full bg-gray-200" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-gray-200 rounded w-1/3" />
+            <div className="h-2 bg-gray-100 rounded w-1/4" />
+          </div>
+          <div className="h-3 bg-gray-200 rounded w-20" />
+          <div className="h-3 bg-gray-200 rounded w-24" />
+          <div className="h-3 bg-gray-200 rounded w-16" />
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSubmitError(null);
-            if (canSave) saveMut.mutate();
-          }}
-          className="p-6 space-y-4"
-        >
-          <Field label="Name *">
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </Field>
+      ))}
+    </div>
+  );
+}
 
-          <Field
-            label="Unique Code"
-            hint={vendor ? 'Auto-generated and immutable' : 'Auto-generated on save'}
-          >
-            <input
-              readOnly
-              value={previewCode}
-              tabIndex={-1}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-100 text-gray-700 font-mono cursor-not-allowed select-all"
-            />
-          </Field>
-
-          <Field label="Phone Number" hint="Not available from GST — enter manually">
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="+91 9XXXXXXXXX"
-            />
-          </Field>
-
-          <Field label="GSTIN" hint="15-character GST number — auto-fetches details">
-            <div className="relative">
-              <input
-                value={form.gstNumber}
-                onChange={(e) =>
-                  setForm({ ...form, gstNumber: e.target.value.toUpperCase() })
-                }
-                maxLength={15}
-                className={`w-full px-4 py-2.5 pr-28 rounded-lg border font-mono uppercase focus:ring-2 focus:border-transparent ${
-                  gstinUpper.length === 0
-                    ? 'border-gray-300 focus:ring-indigo-500'
-                    : gstinValid
-                    ? 'border-emerald-400 focus:ring-emerald-500'
-                    : 'border-red-400 focus:ring-red-500'
-                }`}
-                placeholder="29AABCU9603R1ZX"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs">
-                {gstStatus === 'loading' && (
-                  <span className="text-indigo-600 flex items-center gap-1">
-                    <span className="inline-block w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    Fetching…
-                  </span>
-                )}
-                {gstStatus === 'ok' && (
-                  <span className="text-emerald-600 font-semibold">✓ Verified</span>
-                )}
-                {gstStatus === 'error' && (
-                  <span className="text-red-600 font-semibold">✗ Failed</span>
-                )}
-                {gstStatus === 'idle' && gstinUpper.length > 0 && !gstinValid && (
-                  <span className="text-red-500">Invalid format</span>
-                )}
-              </div>
+function ConfirmDeleteModal({
+  vendor,
+  error,
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  vendor: Vendor;
+  error: string | null;
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <ExclamationTriangleIcon className="w-5 h-5" />
             </div>
-            {gstError && <p className="mt-1 text-xs text-red-600">{gstError}</p>}
-            {gstDetails && gstStatus !== 'error' && (
-              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
-                <Row k="State" v={`${gstDetails.state} (${gstDetails.stateCode})`} />
-                <Row k="PAN" v={gstDetails.pan} mono />
-                {gstDetails.legalName && <Row k="Legal Name" v={gstDetails.legalName} />}
-                {gstDetails.tradeName && <Row k="Trade Name" v={gstDetails.tradeName} />}
-                {gstDetails.status && <Row k="Status" v={gstDetails.status} />}
-                <Row
-                  k="Source"
-                  v={
-                    gstDetails.source === 'parsed'
-                      ? 'Structural (offline)'
-                      : gstDetails.source
-                  }
-                />
-                {gstDetails.source === 'parsed' && (
-                  <div className="mt-2 pt-2 border-t border-emerald-200 text-[11px] text-emerald-800">
-                    💡 To fetch <strong>Legal Name</strong> &amp; <strong>Address</strong>{' '}
-                    automatically, set <code className="font-mono bg-white px-1 rounded">GST_API_KEY</code>{' '}
-                    in <code className="font-mono bg-white px-1 rounded">backend/.env</code>{' '}
-                    (gstincheck.co.in or mastergst.com). Phone numbers are not
-                    published via GSTN — always entered manually.
-                  </div>
-                )}
-              </div>
-            )}
-          </Field>
-
-          <Field label="Address">
-            <textarea
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-              placeholder="Street, City, State, PIN"
-            />
-          </Field>
-
-          {submitError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {submitError}
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-gray-900">Delete vendor?</h3>
+              <p className="text-sm text-gray-600 mt-0.5">
+                This will permanently remove <span className="font-semibold">{vendor.name}</span>{' '}
+                <span className="font-mono text-xs text-gray-500">({vendor.uniqueCode})</span>.
+                This action cannot be undone.
+              </p>
+            </div>
+          </div>
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mt-2">
+              {error}
             </div>
           )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={saveMut.isPending}
-              disabled={!canSave || saveMut.isPending}
-            >
-              {vendor ? 'Save Changes' : 'Create Vendor'}
-            </Button>
-          </div>
-        </form>
+        </div>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+          >
+            {isPending && (
+              <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function EmptyState({ onAdd, hasSearch }: { onAdd: () => void; hasSearch: boolean }) {
   return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
-    </div>
-  );
-}
-
-function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
-  return (
-    <div className="flex">
-      <span className="text-gray-600 w-24 flex-shrink-0">{k}:</span>
-      <span className={`text-gray-900 font-medium ${mono ? 'font-mono' : ''}`}>{v}</span>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto mb-4 flex items-center justify-center">
+        <BuildingOffice2Icon className="w-8 h-8" />
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+        {hasSearch ? 'No vendors match your filters' : 'No vendors yet'}
+      </h3>
+      <p className="text-sm text-gray-500 mb-5">
+        {hasSearch
+          ? 'Try adjusting your search or filter to see more results.'
+          : 'Add your first vendor to start tracking purchases, payments and GST details.'}
+      </p>
+      {!hasSearch && (
+        <button
+          onClick={onAdd}
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-md shadow-indigo-500/20"
+        >
+          <PlusIcon className="w-4 h-4" /> Add Vendor
+        </button>
+      )}
     </div>
   );
 }

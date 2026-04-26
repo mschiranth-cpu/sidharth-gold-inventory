@@ -58,17 +58,6 @@ async function main() {
       },
     }),
     prisma.featureModule.upsert({
-      where: { name: 'party_metal' },
-      update: {},
-      create: {
-        name: 'party_metal',
-        displayName: 'Party Metal',
-        description: 'Party metal accounts and transactions',
-        icon: 'briefcase',
-        isGlobal: true,
-      },
-    }),
-    prisma.featureModule.upsert({
       where: { name: 'factory_inventory' },
       update: {},
       create: {
@@ -213,39 +202,6 @@ async function main() {
     });
     console.log('✅ Created 5 metal rates\n');
   }
-
-  // 4. Create Sample Parties
-  console.log('📝 Creating Sample Parties...');
-  await prisma.party.createMany({
-    data: [
-      {
-        name: 'Ramesh Karigar',
-        type: 'KARIGAR',
-        phone: '+91 9876543210',
-        address: 'Shop 15, Zaveri Bazaar, Mumbai',
-        gstNumber: '27AABCR1234F1Z5',
-        panNumber: 'AABCR1234F',
-      },
-      {
-        name: 'Suresh Gold Suppliers',
-        type: 'SUPPLIER',
-        phone: '+91 9876543211',
-        address: 'Gold Market, Surat',
-        gstNumber: '24AABCS5678G1Z6',
-        panNumber: 'AABCS5678G',
-      },
-      {
-        name: 'Priya Jewellers',
-        type: 'CUSTOMER',
-        phone: '+91 9876543212',
-        address: 'MG Road, Bangalore',
-        gstNumber: '29AABCP9012H1Z7',
-        panNumber: 'AABCP9012H',
-      },
-    ],
-    skipDuplicates: true,
-  });
-  console.log('✅ Created 3 parties\n');
 
   // 5. Create Factory Item Categories
   console.log('📝 Creating Factory Item Categories...');

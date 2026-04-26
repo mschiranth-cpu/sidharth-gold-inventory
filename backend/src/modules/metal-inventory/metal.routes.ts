@@ -13,11 +13,15 @@ import {
   getMetalStockSummaryController,
   createMetalStockController,
   createMetalTransactionController,
+  updateMetalTransactionController,
+  deleteMetalTransactionController,
   createMeltingBatchController,
   getAllMetalTransactionsController,
   getCurrentMetalRatesController,
   createMetalRateController,
   getMeltingBatchesController,
+  settleMetalPaymentController,
+  getMetalPaymentsController,
 } from './metal.controller';
 
 const router = Router();
@@ -54,6 +58,41 @@ router.post(
   authenticate,
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   createMetalTransactionController
+);
+
+// Edit a metal transaction. Reverses the old row's stock effect and applies
+// the new one inside a single $transaction. Refuses to edit billable PURCHASE
+// rows that already have payments/credit activity (use the Settle flow).
+router.patch(
+  '/transactions/:id',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  updateMetalTransactionController
+);
+
+// Delete a metal transaction. Reverses stock + vendor credit, then deletes.
+// Refuses if the row has any settlement-ledger entries.
+router.delete(
+  '/transactions/:id',
+  authenticate,
+  requireRoles(UserRole.ADMIN),
+  deleteMetalTransactionController
+);
+
+// Settle a partial / pending payment against a billable PURCHASE row.
+router.patch(
+  '/transactions/:id/payment',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  settleMetalPaymentController
+);
+
+// List payment ledger entries for a transaction.
+router.get(
+  '/transactions/:id/payments',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER),
+  getMetalPaymentsController
 );
 
 // Melting batch routes

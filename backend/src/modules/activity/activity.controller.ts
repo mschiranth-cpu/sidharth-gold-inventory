@@ -70,3 +70,27 @@ export const getActivitySummary = async (req: Request, res: Response, next: Next
     });
   }
 };
+
+/**
+ * Get most recent activities across all orders
+ */
+export const getRecentActivities = async (req: Request, res: Response, _next: NextFunction) => {
+  try {
+    const limitRaw = parseInt((req.query.limit as string) || '10', 10);
+    const limit = Number.isFinite(limitRaw) ? limitRaw : 10;
+    const userId = (req.query.userId as string) || undefined;
+
+    const activities = await activityService.getRecentActivities(limit, userId);
+
+    return res.status(200).json({
+      success: true,
+      data: activities,
+    });
+  } catch (error) {
+    logger.error('Error fetching recent activities', { error });
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent activities',
+    });
+  }
+};

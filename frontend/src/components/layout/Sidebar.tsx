@@ -1,7 +1,7 @@
 import React, { Fragment, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import {
   HomeIcon,
   ClipboardDocumentListIcon,
@@ -11,15 +11,36 @@ import {
   TruckIcon,
   DocumentCheckIcon,
   ChartBarIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '../../utils/helpers';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/auth.types';
 
 // Navigation items with role-based visibility
-const getNavigation = (userRole: UserRole) => {
-  const allItems = [
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ForwardRefExoticComponent<any>;
+  roles: UserRole[] | 'all';
+  children?: { name: string; href: string }[];
+};
+
+const getNavigation = (userRole: UserRole): NavItem[] => {
+  const allItems: NavItem[] = [
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: 'all' },
+    {
+      name: 'Main Inventory',
+      href: '/app/inventory',
+      icon: ArchiveBoxIcon,
+      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
+      children: [
+        { name: 'Metal Inventory', href: '/app/inventory/metal' },
+        { name: 'Diamond Inventory', href: '/app/inventory/diamonds' },
+        { name: 'Real Stone', href: '/app/inventory/real-stones' },
+        { name: 'Stone Inventory', href: '/app/inventory/stone-packets' },
+      ],
+    },
     {
       name: 'Orders',
       href: '/app/orders',
@@ -82,36 +103,6 @@ const getNavigation = (userRole: UserRole) => {
       roles: [UserRole.ADMIN],
     },
     {
-      name: 'Metal Inventory',
-      href: '/app/inventory/metal',
-      icon: CubeIcon,
-      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
-    },
-    {
-      name: 'Party Metal',
-      href: '/app/inventory/parties',
-      icon: UsersIcon,
-      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
-    },
-    {
-      name: 'Diamond Inventory',
-      href: '/app/inventory/diamonds',
-      icon: CubeIcon,
-      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
-    },
-    {
-      name: 'Real Stone',
-      href: '/app/inventory/real-stones',
-      icon: CubeIcon,
-      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
-    },
-    {
-      name: 'Stone Inventory',
-      href: '/app/inventory/stone-packets',
-      icon: CubeIcon,
-      roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER],
-    },
-    {
       name: 'Factory Inventory',
       href: '/app/inventory/factory',
       icon: BuildingOfficeIcon,
@@ -147,6 +138,27 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const navigate = useNavigate();
   const navigation = getNavigation(user?.role || UserRole.DEPARTMENT_WORKER);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean | undefined>>({});
+  const location = useLocation();
+
+  // Auto-expand the inventory group if we're on a child inventory page
+  // (but NOT Factory Inventory, which is a separate sidebar item).
+  const inventoryChildPaths = ['/app/inventory/metal', '/app/inventory/diamonds', '/app/inventory/real-stones', '/app/inventory/stone-packets'];
+  const isInventoryActive = location.pathname === '/app/inventory' || inventoryChildPaths.some((p) => location.pathname.startsWith(p));
+
+  const isGroupOpen = (name: string) => {
+    // If user explicitly toggled, respect their choice
+    if (expandedGroups[name] !== undefined) return expandedGroups[name]!;
+    // Otherwise auto-expand if on an inventory child page
+    return isInventoryActive;
+  };
+
+  const toggleGroup = (name: string) => {
+    setExpandedGroups((prev) => {
+      const current = prev[name] !== undefined ? prev[name]! : isInventoryActive;
+      return { ...prev, [name]: !current };
+    });
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -157,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const CollapsedSidebar = () => (
     <div
       className={cn(
-        'flex flex-col h-full bg-white/95 backdrop-blur-xl border-r border-gray-200/50 relative overflow-hidden',
+        'flex flex-col h-full bg-pearl/95 backdrop-blur-xl border-r border-champagne-200/60 relative overflow-hidden',
         'transition-[width,padding] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
         isExpanded ? 'w-72 px-4' : 'w-20 px-3'
       )}
@@ -166,10 +178,10 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     >
       {/* Decorative gradient orbs */}
       <div
-        className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-3xl pointer-events-none transition-opacity duration-700"
+        className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-champagne-300/30 to-gold-leaf/15 rounded-full blur-3xl pointer-events-none transition-opacity duration-700"
         style={{ opacity: isExpanded ? 1 : 0.5 }}
       />
-      <div className="absolute bottom-20 left-0 w-24 h-24 bg-gradient-to-tr from-violet-500/10 to-fuchsia-500/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute bottom-20 left-0 w-24 h-24 bg-gradient-to-tr from-gold-leaf/15 to-champagne-200/10 rounded-full blur-2xl pointer-events-none" />
 
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center pt-2">
@@ -181,7 +193,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
         >
           <div
             className={cn(
-              'rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/30 flex-shrink-0 transition-all duration-500 ease-out',
+              'rounded-xl bg-gradient-to-br from-onyx-800 via-onyx-900 to-onyx-700 flex items-center justify-center shadow-xl shadow-onyx flex-shrink-0 transition-all duration-500 ease-out',
               isExpanded ? 'h-12 w-12' : 'h-11 w-11'
             )}
           >
@@ -208,28 +220,156 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
               isExpanded ? 'opacity-100 max-w-[150px] ml-0' : 'opacity-0 max-w-0 ml-0'
             )}
           >
-            <span className="text-gray-900 font-bold text-base tracking-tight block">
+            <span className="text-onyx-900 font-bold text-base tracking-tight block">
               Gold Factory
             </span>
-            <p className="text-xs text-indigo-500 font-medium">Inventory System</p>
+            <p className="text-xs text-champagne-700 font-medium">Inventory System</p>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col mt-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+      <nav className="flex flex-1 flex-col mt-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-champagne-300 scrollbar-track-transparent">
         <ul role="list" className="flex flex-1 flex-col gap-y-2 pb-4">
           <li>
             <ul role="list" className="space-y-0.5">
-              {navigation.map((item) => (
+              {navigation.map((item) => {
+                const hasChildren = item.children && item.children.length > 0;
+                const groupOpen = hasChildren && isGroupOpen(item.name);
+                const isParentActive =
+                  hasChildren && (location.pathname === item.href || item.children!.some((c) => location.pathname.startsWith(c.href)));
+
+                if (hasChildren) {
+                  // Collapsed: render as a regular NavLink (pixel-perfect match with other icons)
+                  if (!isExpanded) {
+                    return (
+                      <li key={item.name} className="relative group">
+                        <NavLink
+                          to={item.href}
+                          className={({ isActive }) =>
+                            cn(
+                              isActive || isParentActive
+                                ? 'bg-gradient-to-r from-champagne-700 to-champagne-800 text-pearl shadow-lg shadow-luxe'
+                                : 'text-onyx-600 hover:text-onyx-900 hover:bg-champagne-100/70',
+                              'flex items-center rounded-xl p-2 text-sm font-medium',
+                              'transition-all duration-300 ease-out',
+                              'hover:translate-x-1',
+                              'justify-center'
+                            )
+                          }
+                        >
+                          {({ isActive }) => (
+                            <div
+                              className={cn(
+                                'flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0',
+                                'transition-all duration-300 ease-out',
+                                isActive || isParentActive
+                                  ? 'bg-white/20 shadow-inner'
+                                  : 'bg-champagne-50 group-hover:bg-champagne-100 group-hover:scale-110'
+                              )}
+                            >
+                              <item.icon
+                                className={cn(
+                                  'shrink-0 h-6 w-6 transition-transform duration-300',
+                                  !(isActive || isParentActive) && 'group-hover:scale-110 group-hover:text-champagne-800'
+                                )}
+                                aria-hidden="true"
+                              />
+                            </div>
+                          )}
+                        </NavLink>
+                        <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-2.5 bg-onyx-900 backdrop-blur-sm text-white text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-onyx-700/60 group-hover:translate-x-1">
+                          <span className="relative z-10">{item.name}</span>
+                          <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-onyx-900" />
+                        </div>
+                      </li>
+                    );
+                  }
+
+                  // Expanded: render as toggle button with collapsible children
+                  return (
+                    <li key={item.name} className="relative group">
+                      <button
+                        onClick={() => toggleGroup(item.name)}
+                        className={cn(
+                          isParentActive
+                            ? 'bg-gradient-to-r from-champagne-700 to-champagne-800 text-pearl shadow-lg shadow-luxe'
+                            : 'text-onyx-600 hover:text-onyx-900 hover:bg-champagne-100/70',
+                          'w-full flex items-center gap-x-3 rounded-xl p-2 text-sm font-medium',
+                          'transition-all duration-300 ease-out',
+                          'hover:translate-x-1'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0',
+                            'transition-all duration-300 ease-out',
+                            isParentActive
+                              ? 'bg-white/20 shadow-inner'
+                              : 'bg-champagne-50 group-hover:bg-champagne-100 group-hover:scale-110'
+                          )}
+                        >
+                          <item.icon
+                            className={cn(
+                              'shrink-0 h-6 w-6 transition-transform duration-300',
+                              !isParentActive && 'group-hover:scale-110 group-hover:text-champagne-800'
+                            )}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <span className="whitespace-nowrap flex-1 text-left">
+                          {item.name}
+                        </span>
+                        <ChevronDownIcon
+                          className={cn(
+                            'h-4 w-4 flex-shrink-0 transition-transform duration-300',
+                            groupOpen ? 'rotate-180' : ''
+                          )}
+                        />
+                      </button>
+
+                      {/* Children */}
+                      <div
+                        className={cn(
+                          'overflow-hidden transition-all duration-300 ease-out',
+                          groupOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                        )}
+                      >
+                        <ul className="ml-6 pl-4 border-l-2 border-champagne-200/60 space-y-0.5">
+                          {item.children!.map((child) => (
+                            <li key={child.name}>
+                              <NavLink
+                                to={child.href}
+                                onClick={() => setIsExpanded(false)}
+                                className={({ isActive }) =>
+                                  cn(
+                                    isActive
+                                      ? 'text-champagne-800 font-semibold bg-champagne-100'
+                                      : 'text-onyx-500 hover:text-onyx-900 hover:bg-champagne-50',
+                                    'block rounded-lg px-3 py-2 text-sm transition-all duration-200'
+                                  )
+                                }
+                              >
+                                {child.name}
+                              </NavLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </li>
+                  );
+                }
+
+                return (
                 <li key={item.name} className="relative group">
                   <NavLink
                     to={item.href}
+                    onClick={() => setIsExpanded(false)}
                     className={({ isActive }) =>
                       cn(
                         isActive
-                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80',
+                          ? 'bg-gradient-to-r from-champagne-700 to-champagne-800 text-pearl shadow-lg shadow-luxe'
+                          : 'text-onyx-600 hover:text-onyx-900 hover:bg-champagne-100/70',
                         'flex items-center rounded-xl p-2 text-sm font-medium',
                         'transition-all duration-300 ease-out',
                         'hover:translate-x-1',
@@ -245,7 +385,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                             'transition-all duration-300 ease-out',
                             isActive
                               ? 'bg-white/20 shadow-inner'
-                              : 'bg-gray-100 group-hover:bg-indigo-100 group-hover:scale-110'
+                              : 'bg-champagne-50 group-hover:bg-champagne-100 group-hover:scale-110'
                           )}
                         >
                           <item.icon
@@ -253,7 +393,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                               'shrink-0 transition-transform duration-300',
                               isActive
                                 ? 'h-6 w-6'
-                                : 'h-6 w-6 group-hover:scale-110 group-hover:text-indigo-600'
+                                : 'h-6 w-6 group-hover:scale-110 group-hover:text-champagne-800'
                             )}
                             aria-hidden="true"
                           />
@@ -278,30 +418,31 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
                   {/* Tooltip for collapsed state */}
                   {!isExpanded && (
-                    <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-2.5 bg-gray-900 backdrop-blur-sm text-white text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-gray-700/50 group-hover:translate-x-1">
+                    <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-2.5 bg-onyx-900 backdrop-blur-sm text-white text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-onyx-700/60 group-hover:translate-x-1">
                       <span className="relative z-10">{item.name}</span>
-                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-gray-900" />
+                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-onyx-900" />
                     </div>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </li>
 
           {/* User Info & Logout at bottom */}
           <li className="mt-auto pb-4">
-            <div className="border-t border-gray-200/50 pt-4">
+            <div className="border-t border-champagne-200/60 pt-4">
               {user && (
                 <div
                   className={cn(
-                    'flex items-center mb-3 bg-gradient-to-r from-gray-100/80 to-gray-50/80 rounded-xl border border-gray-200/50 relative group backdrop-blur-sm',
-                    'transition-all duration-500 ease-out hover:border-indigo-300/50',
+                    'flex items-center mb-3 bg-gradient-to-r from-champagne-50/80 to-pearl/80 rounded-xl border border-champagne-200/60 relative group backdrop-blur-sm',
+                    'transition-all duration-500 ease-out hover:border-champagne-400/60',
                     isExpanded ? 'gap-3 px-3 py-3' : 'justify-center p-2.5'
                   )}
                 >
                   <div
                     className={cn(
-                      'rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/25 flex-shrink-0',
+                      'rounded-xl bg-gradient-to-br from-onyx-800 via-onyx-900 to-onyx-700 flex items-center justify-center text-white font-bold shadow-lg shadow-luxe flex-shrink-0',
                       'transition-all duration-500 ease-out',
                       isExpanded ? 'h-10 w-10 text-sm' : 'h-9 w-9 text-xs'
                     )}
@@ -319,16 +460,16 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                       isExpanded ? 'opacity-100 max-w-[150px]' : 'opacity-0 max-w-0'
                     )}
                   >
-                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <p className="text-sm font-semibold text-onyx-900 truncate">{user.name}</p>
+                    <p className="text-xs text-onyx-500 truncate">{user.email}</p>
                   </div>
 
                   {/* Tooltip for collapsed state */}
                   {!isExpanded && (
-                    <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-3 bg-gray-900 backdrop-blur-sm text-white text-sm rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-gray-700/50 group-hover:translate-x-1">
+                    <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-3 bg-onyx-900 backdrop-blur-sm text-white text-sm rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-onyx-700/60 group-hover:translate-x-1">
                       <p className="font-semibold text-white">{user.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{user.email}</p>
-                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-gray-900" />
+                      <p className="text-xs text-champagne-300 mt-0.5">{user.email}</p>
+                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-onyx-900" />
                     </div>
                   )}
                 </div>
@@ -337,16 +478,16 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
               <button
                 onClick={handleLogout}
                 className={cn(
-                  'w-full flex items-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl text-sm font-medium group relative',
+                  'w-full flex items-center text-onyx-500 hover:text-accent-ruby hover:bg-accent-ruby/10 rounded-xl text-sm font-medium group relative',
                   'transition-all duration-300 ease-out hover:translate-x-1',
                   isExpanded ? 'gap-3 px-3 py-2.5' : 'justify-center p-2.5'
                 )}
               >
                 <div
                   className={cn(
-                    'flex items-center justify-center rounded-xl bg-gray-100 flex-shrink-0',
+                    'flex items-center justify-center rounded-xl bg-champagne-50 flex-shrink-0',
                     'transition-all duration-300 ease-out',
-                    'group-hover:bg-red-100 group-hover:scale-110',
+                    'group-hover:bg-accent-ruby/15 group-hover:scale-110',
                     isExpanded ? 'w-9 h-9' : 'w-9 h-9'
                   )}
                 >
@@ -375,9 +516,9 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
                 {/* Tooltip for collapsed state */}
                 {!isExpanded && (
-                  <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-2.5 bg-gray-900/95 backdrop-blur-sm text-white text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-gray-700/50 group-hover:translate-x-1">
+                  <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-4 py-2.5 bg-onyx-900/95 backdrop-blur-sm text-white text-sm font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out whitespace-nowrap z-50 shadow-2xl border border-onyx-700/60 group-hover:translate-x-1">
                     Sign Out
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-gray-900/95" />
+                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-8 border-transparent border-r-onyx-900/95" />
                   </div>
                 )}
               </button>
@@ -392,11 +533,11 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const MobileSidebarContent = () => (
     <div className="flex grow flex-col gap-y-3 overflow-y-auto bg-white px-4 pb-3 relative">
       {/* Decorative gradient orb */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-champagne-300/30 to-gold-leaf/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="flex h-16 shrink-0 items-center pt-1">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/30">
+          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-onyx-800 via-onyx-900 to-onyx-700 flex items-center justify-center shadow-xl shadow-onyx">
             <svg
               className="w-6 h-6 text-white drop-shadow-sm"
               fill="none"
@@ -412,8 +553,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             </svg>
           </div>
           <div>
-            <span className="text-gray-900 font-bold text-lg tracking-tight">Gold Factory</span>
-            <p className="text-xs text-indigo-500 font-medium">Inventory System</p>
+            <span className="text-onyx-900 font-bold text-lg tracking-tight">Gold Factory</span>
+            <p className="text-xs text-champagne-700 font-medium">Inventory System</p>
           </div>
         </div>
       </div>
@@ -421,11 +562,76 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-4">
           <li>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">
+            <p className="text-xs font-semibold text-onyx-500 uppercase tracking-wider mb-2 px-2">
               Main Menu
             </p>
             <ul role="list" className="-mx-2 space-y-1">
-              {navigation.map((item) => (
+              {navigation.map((item) => {
+                const hasChildren = item.children && item.children.length > 0;
+                const groupOpen = hasChildren && isGroupOpen(item.name);
+                const isParentActive =
+                  hasChildren && (location.pathname === item.href || item.children!.some((c) => location.pathname.startsWith(c.href)));
+
+                if (hasChildren) {
+                  return (
+                    <li key={item.name}>
+                      <button
+                        onClick={() => toggleGroup(item.name)}
+                        className={cn(
+                          isParentActive
+                            ? 'bg-gradient-to-r from-champagne-700 to-champagne-800 text-pearl shadow-lg shadow-luxe'
+                            : 'text-onyx-600 hover:text-onyx-900 hover:bg-champagne-100',
+                          'w-full group flex gap-x-2.5 rounded-lg p-2 text-sm leading-5 font-medium transition-all duration-300'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300',
+                            isParentActive ? 'bg-white/20' : 'bg-champagne-50 group-hover:bg-champagne-100'
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </div>
+                        <span className="my-auto flex-1 text-left">{item.name}</span>
+                        <ChevronDownIcon
+                          className={cn(
+                            'h-4 w-4 my-auto transition-transform duration-300',
+                            groupOpen ? 'rotate-180' : ''
+                          )}
+                        />
+                      </button>
+                      <div
+                        className={cn(
+                          'overflow-hidden transition-all duration-300',
+                          groupOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                        )}
+                      >
+                        <ul className="ml-4 pl-4 border-l-2 border-champagne-200/60 space-y-0.5">
+                          {item.children!.map((child) => (
+                            <li key={child.name}>
+                              <NavLink
+                                to={child.href}
+                                onClick={() => setSidebarOpen(false)}
+                                className={({ isActive }) =>
+                                  cn(
+                                    isActive
+                                      ? 'text-champagne-800 font-semibold bg-champagne-100'
+                                      : 'text-onyx-500 hover:text-onyx-900 hover:bg-champagne-50',
+                                    'block rounded-lg px-3 py-2 text-sm transition-all duration-200'
+                                  )
+                                }
+                              >
+                                {child.name}
+                              </NavLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </li>
+                  );
+                }
+
+                return (
                 <li key={item.name}>
                   <NavLink
                     to={item.href}
@@ -433,8 +639,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                     className={({ isActive }) =>
                       cn(
                         isActive
-                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+                          ? 'bg-gradient-to-r from-champagne-700 to-champagne-800 text-pearl shadow-lg shadow-luxe'
+                          : 'text-onyx-600 hover:text-onyx-900 hover:bg-champagne-100',
                         'group flex gap-x-2.5 rounded-lg p-2 text-sm leading-5 font-medium transition-all duration-300'
                       )
                     }
@@ -444,7 +650,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                         <div
                           className={cn(
                             'flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300',
-                            isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-indigo-100'
+                            isActive ? 'bg-white/20' : 'bg-champagne-50 group-hover:bg-champagne-100'
                           )}
                         >
                           <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -457,16 +663,17 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                     )}
                   </NavLink>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </li>
 
           {/* User Info & Logout at bottom */}
           <li className="mt-auto">
-            <div className="border-t border-gray-200/50 pt-3">
+            <div className="border-t border-champagne-200/60 pt-3">
               {user && (
-                <div className="flex items-center gap-2.5 px-2.5 py-2.5 mb-2 bg-gradient-to-r from-gray-100/80 to-gray-50/80 rounded-lg border border-gray-200/50">
-                  <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-indigo-500/20">
+                <div className="flex items-center gap-2.5 px-2.5 py-2.5 mb-2 bg-gradient-to-r from-champagne-50/80 to-pearl/80 rounded-lg border border-champagne-200/60">
+                  <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-onyx-800 via-onyx-900 to-onyx-700 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-luxe">
                     {user.name
                       .split(' ')
                       .map((n) => n[0])
@@ -475,16 +682,16 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                       .slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <p className="text-sm font-semibold text-onyx-900 truncate">{user.name}</p>
+                    <p className="text-xs text-onyx-500 truncate">{user.email}</p>
                   </div>
                 </div>
               )}
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium transition-all duration-300 group"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-onyx-500 hover:text-accent-ruby hover:bg-accent-ruby/10 rounded-lg text-sm font-medium transition-all duration-300 group"
               >
-                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 group-hover:bg-red-100 transition-all duration-300">
+                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-champagne-50 group-hover:bg-accent-ruby/15 transition-all duration-300">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
@@ -517,7 +724,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm" />
+            <div className="fixed inset-0 bg-onyx-900/80 backdrop-blur-sm" />
           </Transition.Child>
 
           <div className="fixed inset-0 flex">

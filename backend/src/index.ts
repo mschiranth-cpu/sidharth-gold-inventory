@@ -48,7 +48,6 @@ import workersRoutes from './modules/workers/workers.routes';
 import { featuresRoutes } from './modules/features';
 import { clientsRoutes } from './modules/clients';
 import { metalRoutes } from './modules/metal-inventory';
-import { partyRoutes } from './modules/party-metal';
 import { diamondRoutes } from './modules/diamond-inventory';
 import { stoneRoutes } from './modules/stone-inventory';
 import { factoryInventoryRoutes } from './modules/factory-inventory';
@@ -56,6 +55,7 @@ import { attendanceRoutes } from './modules/attendance';
 import { payrollRoutes } from './modules/payroll';
 import marketRatesRoutes from './routes/market-rates.routes';
 import vendorRoutes from './routes/vendors.routes';
+import { dashboardRoutes } from './modules/dashboard';
 
 // Import Socket.io setup
 import { initializeSocketServer } from './modules/socket/socket.setup';
@@ -180,7 +180,6 @@ app.use('/api/workers', workersRoutes); // Worker-specific operations
 app.use('/api/features', featuresRoutes); // Feature toggle system (Phase 1)
 app.use('/api/clients', clientsRoutes); // Client portal (Phase 1)
 app.use('/api/metal', metalRoutes); // Metal inventory (Phase 2)
-app.use('/api/parties', partyRoutes); // Party metal inventory (Phase 2)
 app.use('/api/diamonds', diamondRoutes); // Diamond inventory (Phase 3)
 app.use('/api/stones', stoneRoutes); // Real stone & stone inventory (Phase 3)
 app.use('/api/factory-inventory', factoryInventoryRoutes); // Factory inventory (Phase 4)
@@ -188,6 +187,7 @@ app.use('/api/attendance', attendanceRoutes); // Attendance system (Phase 5)
 app.use('/api/payroll', payrollRoutes); // Payroll system (Phase 5)
 app.use('/api/market-rates', marketRatesRoutes); // Live Bangalore bullion rates (scraped from Ambicaa)
 app.use('/api/vendors', vendorRoutes); // Vendor master + GST realtime lookup
+app.use('/api/dashboard', dashboardRoutes); // Unified dashboard aggregator (admin/office + worker)
 
 // ============================================
 // FRONTEND (Production SPA)

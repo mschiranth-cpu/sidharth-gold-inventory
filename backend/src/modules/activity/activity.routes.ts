@@ -11,9 +11,15 @@
 
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { getOrderActivities, getActivitySummary } from './activity.controller';
+import { getOrderActivities, getActivitySummary, getRecentActivities } from './activity.controller';
 
 const router = Router();
+
+/**
+ * GET /api/activities/recent
+ * Recent activities across all orders (for dashboard)
+ */
+router.get('/recent', authenticate, getRecentActivities);
 
 /**
  * GET /api/activities/orders/:orderId

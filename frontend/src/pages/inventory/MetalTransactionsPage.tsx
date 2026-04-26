@@ -4,19 +4,338 @@
  * ============================================
  */
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getAllMetalTransactions } from '../../services/metal.service';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  deleteMetalTransaction,
+  getAllMetalTransactions,
+  type MetalTransaction,
+} from '../../services/metal.service';
 import { Link } from 'react-router-dom';
 import Button from '../../components/common/Button';
+import SettlePaymentModal from '../../components/SettlePaymentModal';
+import EditMetalTransactionModal from '../../components/EditMetalTransactionModal';
+import { useAuth } from '../../contexts/AuthContext';
+
+const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
+const EDIT_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
+const DELETE_ROLES = new Set(['ADMIN']);
+
+// Per-metal stat card config — one entry per metal supported in ReceiveMetalPage.
+// Order matches the Receive form's dropdown.
+const METAL_CARDS: { code: string; label: string; icon: string; accent: string }[] = [
+  { code: 'GOLD', label: 'Gold', icon: '🥇', accent: 'from-amber-400 to-yellow-500' },
+  { code: 'SILVER', label: 'Silver', icon: '🥈', accent: 'from-slate-400 to-slate-500' },
+  { code: 'PLATINUM', label: 'Platinum', icon: '💎', accent: 'from-cyan-400 to-sky-500' },
+  { code: 'PALLADIUM', label: 'Palladium', icon: '🔷', accent: 'from-violet-400 to-purple-500' },
+];
+
+function PaymentBadge({ status }: { status: string }) {
+  const cls =
+    status === 'COMPLETE'
+      ? 'bg-emerald-100 text-emerald-700'
+      : status === 'HALF'
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-rose-100 text-rose-700';
+  const label =
+    status === 'COMPLETE'
+      ? 'Paid in Full'
+      : status === 'HALF'
+      ? 'Partially Paid'
+      : 'Payment Pending';
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+// Friendly label for the cached paymentMode column.
+function modeLabel(mode: string | null | undefined): string {
+  if (!mode) return '';
+  if (mode === 'CASH') return 'Cash';
+  if (mode === 'NEFT') return 'NEFT';
+  if (mode === 'BOTH') return 'Cash + NEFT';
+  return mode;
+}
+
+function formatINR(n: number): string {
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Payment cell.
+ *  - Non-PURCHASE rows have no payment concept → "—"
+ *  - Non-billable PURCHASE → muted "Non-billable" tag
+ *  - Billable PURCHASE → meaningful status (Paid in Full / Partially Paid / Pending)
+ *    plus payment mode and amount paid / balance due where useful.
+ */
+function PaymentCell({
+  txn,
+  canSettle,
+  onSettle,
+}: {
+  txn: any;
+  canSettle: boolean;
+  onSettle: () => void;
+}) {
+  if (txn.transactionType !== 'PURCHASE') {
+    return <span className="text-gray-400">—</span>;
+  }
+
+  if (txn.isBillable !== true) {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
+        Non-billable
+      </span>
+    );
+  }
+
+  // isBillable === true but no cached paymentStatus — older rows from before
+  // the payment fields existed. Show the badge as Pending so the user can
+  // still settle / edit.
+  const status = txn.paymentStatus || 'PENDING';
+  const totalValue = txn.totalValue ?? 0;
+  const amountPaid = txn.amountPaid ?? 0;
+  const balanceDue = Math.max(0, totalValue - amountPaid);
+  const mode = modeLabel(txn.paymentMode);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <PaymentBadge status={status} />
+        {canSettle && (status === 'HALF' || status === 'PENDING') && (
+          <button
+            type="button"
+            onClick={onSettle}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+          >
+            Settle
+          </button>
+        )}
+      </div>
+      {/* Detail line — concise, no PII. */}
+      <div className="text-xs text-gray-500">
+        {status === 'COMPLETE' && (
+          <>
+            {mode ? `${mode} • ` : ''}
+            {formatINR(totalValue)}
+          </>
+        )}
+        {status === 'HALF' && (
+          <>
+            {formatINR(amountPaid)} paid · {formatINR(balanceDue)} due
+            {mode ? ` · ${mode}` : ''}
+          </>
+        )}
+        {status === 'PENDING' && (
+          <>
+            {formatINR(balanceDue || totalValue)} due
+            {mode ? ` · ${mode}` : ''}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function MetalTransactionsPage() {
+  const { user } = useAuth();
+  const canSettle = SETTLE_ROLES.has(String(user?.role ?? ''));
+  const canEdit = EDIT_ROLES.has(String(user?.role ?? ''));
+  const canDelete = DELETE_ROLES.has(String(user?.role ?? ''));
   const [filters, setFilters] = useState({ metalType: '', transactionType: '' });
+  // Client-side filters (the backend list endpoint only supports metalType +
+  // transactionType, so we slice the rest in memory).
+  const [search, setSearch] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<string>(''); // '', COMPLETE, HALF, PENDING, NON_BILLABLE
+  const [vendorFilter, setVendorFilter] = useState<string>(''); // vendor.id or ''
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [settleTxn, setSettleTxn] = useState<MetalTransaction | null>(null);
+  const [editTxn, setEditTxn] = useState<MetalTransaction | null>(null);
+  const [deleteTxn, setDeleteTxn] = useState<MetalTransaction | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteMetalTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metal-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['metal-stock-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['metal-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      setDeleteTxn(null);
+      setDeleteError(null);
+    },
+    onError: (e: any) => {
+      setDeleteError(
+        e?.response?.data?.error?.message || e?.message || 'Failed to delete transaction'
+      );
+    },
+  });
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['metal-transactions', filters],
     queryFn: () => getAllMetalTransactions(filters),
   });
+
+  // Apply client-side filters.
+  const filteredTransactions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const fromTs = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
+    const toTs = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
+
+    return (transactions as any[]).filter((t) => {
+      // Date range
+      if (fromTs !== null || toTs !== null) {
+        const created = new Date(t.createdAt).getTime();
+        if (fromTs !== null && created < fromTs) return false;
+        if (toTs !== null && created > toTs) return false;
+      }
+      // Vendor
+      if (vendorFilter && t.vendor?.id !== vendorFilter) return false;
+      // Payment filter
+      if (paymentFilter) {
+        if (paymentFilter === 'NON_BILLABLE') {
+          if (!(t.transactionType === 'PURCHASE' && t.isBillable !== true)) return false;
+        } else {
+          if (t.transactionType !== 'PURCHASE' || t.isBillable !== true) return false;
+          const status = t.paymentStatus || 'PENDING';
+          if (status !== paymentFilter) return false;
+        }
+      }
+      // Free-text search across reference, notes, vendor name/code, createdBy
+      if (q) {
+        const hay = [
+          t.referenceNumber,
+          t.notes,
+          t.vendor?.name,
+          t.vendor?.uniqueCode,
+          t.createdBy?.name,
+          t.metalType,
+          t.transactionType,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [transactions, search, paymentFilter, vendorFilter, dateFrom, dateTo]);
+
+  // Selection derived from the current filtered view so toolbar counts and
+  // select-all/deselect-all always reflect what the user is looking at.
+  const filteredIds = useMemo(
+    () => filteredTransactions.map((t: any) => t.id as string),
+    [filteredTransactions]
+  );
+  const selectedInView = useMemo(
+    () => filteredIds.filter((id) => selectedIds.has(id)),
+    [filteredIds, selectedIds]
+  );
+  const allFilteredSelected =
+    filteredIds.length > 0 && selectedInView.length === filteredIds.length;
+  const someFilteredSelected =
+    selectedInView.length > 0 && !allFilteredSelected;
+
+  const selectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of filteredIds) next.add(id);
+      return next;
+    });
+  };
+  const deselectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of filteredIds) next.delete(id);
+      return next;
+    });
+  };
+  const toggleHeaderCheckbox = () => {
+    if (allFilteredSelected) deselectAllFiltered();
+    else selectAllFiltered();
+  };
+
+  // Build the Vendor filter dropdown options from the currently-loaded rows
+  // so users only see vendors that actually have transactions.
+  const vendorOptions = useMemo(() => {    const map = new Map<string, { id: string; name: string; code: string }>();
+    for (const t of transactions as any[]) {
+      if (t.vendor?.id && !map.has(t.vendor.id)) {
+        map.set(t.vendor.id, {
+          id: t.vendor.id,
+          name: t.vendor.name,
+          code: t.vendor.uniqueCode,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [transactions]);
+
+  // Summary computed over the FILTERED set so users see totals matching what
+  // they're actually looking at.
+  const summary = useMemo(() => {
+    let purchaseValue = 0;
+    let pendingDue = 0;
+    // Per-metal aggregates (grams + total purchase value), keyed by metal code.
+    const byMetal: Record<string, { grams: number; value: number; count: number }> = {
+      GOLD: { grams: 0, value: 0, count: 0 },
+      SILVER: { grams: 0, value: 0, count: 0 },
+      PLATINUM: { grams: 0, value: 0, count: 0 },
+      PALLADIUM: { grams: 0, value: 0, count: 0 },
+    };
+    for (const t of filteredTransactions) {
+      if (t.transactionType === 'PURCHASE' && t.totalValue) {
+        purchaseValue += t.totalValue;
+        if (t.isBillable === true) {
+          const due = Math.max(0, (t.totalValue ?? 0) - (t.amountPaid ?? 0));
+          pendingDue += due;
+        }
+      }
+      const bucket = byMetal[t.metalType];
+      if (bucket) {
+        bucket.grams += t.grossWeight || 0;
+        bucket.value += t.totalValue || 0;
+        bucket.count += 1;
+      }
+    }
+    return {
+      count: filteredTransactions.length,
+      purchaseValue,
+      pendingDue,
+      byMetal,
+    };
+  }, [filteredTransactions]);
+
+  const hasActiveFilters =
+    filters.metalType ||
+    filters.transactionType ||
+    paymentFilter ||
+    vendorFilter ||
+    dateFrom ||
+    dateTo ||
+    search.trim().length > 0;
+
+  const clearAllFilters = () => {
+    setFilters({ metalType: '', transactionType: '' });
+    setPaymentFilter('');
+    setVendorFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setSearch('');
+  };
 
   if (isLoading) {
     return (
@@ -27,114 +346,634 @@ export default function MetalTransactionsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="p-6 bg-gradient-to-b from-slate-50 to-white min-h-screen">
+      <div className="max-w-[1400px] mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Metal Transactions</h1>
-            <p className="text-gray-600">View all metal transactions</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+              Metal Transactions
+            </h1>
+            <p className="text-gray-600 mt-1">
+              {summary.count} of {(transactions as any[]).length} transactions
+              {hasActiveFilters && ' (filtered)'}
+            </p>
           </div>
           <Link to="/app/inventory/metal">
             <Button variant="secondary">Back to Dashboard</Button>
           </Link>
         </div>
 
+        {/* KPI cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <SummaryCard
+            label="Transactions"
+            value={summary.count.toString()}
+            accent="from-indigo-500 to-indigo-600"
+            icon="📋"
+          />
+          <SummaryCard
+            label="Purchase Value"
+            value={`₹${summary.purchaseValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+            accent="from-emerald-500 to-emerald-600"
+            icon="💰"
+          />
+          <SummaryCard
+            label="Pending Due"
+            value={`₹${summary.pendingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+            accent={summary.pendingDue > 0 ? 'from-rose-500 to-rose-600' : 'from-gray-400 to-gray-500'}
+            icon="⏳"
+          />
+        </div>
+
+        {/* Per-metal cards — one per metal supported in the Receive form. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {METAL_CARDS.map((m) => (
+            <MetalCard
+              key={m.code}
+              code={m.code}
+              label={m.label}
+              icon={m.icon}
+              accent={m.accent}
+              grams={summary.byMetal[m.code]?.grams || 0}
+              value={summary.byMetal[m.code]?.value || 0}
+              count={summary.byMetal[m.code]?.count || 0}
+              isActive={filters.metalType === m.code}
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  metalType: f.metalType === m.code ? '' : m.code,
+                }))
+              }
+            />
+          ))}
+        </div>
+
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100 mb-6">
-          <div className="flex gap-4">
-            <select
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-700">Filters</span>
+            </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-medium text-rose-600 hover:text-rose-800 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {/* Search row */}
+          <div className="relative mb-3">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by reference, vendor, notes, created by…"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            />
+          </div>
+
+          {/* Filter selects */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <FilterSelect
+              label="Metal"
               value={filters.metalType}
-              onChange={(e) => setFilters({ ...filters, metalType: e.target.value })}
-              className="px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Metals</option>
-              <option value="GOLD">Gold</option>
-              <option value="SILVER">Silver</option>
-              <option value="PLATINUM">Platinum</option>
-            </select>
-            <select
+              onChange={(v) => setFilters({ ...filters, metalType: v })}
+              options={[
+                { value: '', label: 'All Metals' },
+                { value: 'GOLD', label: 'Gold' },
+                { value: 'SILVER', label: 'Silver' },
+                { value: 'PLATINUM', label: 'Platinum' },
+              ]}
+            />
+            <FilterSelect
+              label="Type"
               value={filters.transactionType}
-              onChange={(e) => setFilters({ ...filters, transactionType: e.target.value })}
-              className="px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Types</option>
-              <option value="PURCHASE">Purchase</option>
-              <option value="SALE">Sale</option>
-              <option value="ISSUE_TO_DEPARTMENT">Issue to Department</option>
-              <option value="RETURN_FROM_DEPARTMENT">Return from Department</option>
-              <option value="WASTAGE">Wastage</option>
-            </select>
+              onChange={(v) => setFilters({ ...filters, transactionType: v })}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'PURCHASE', label: 'Purchase' },
+                { value: 'SALE', label: 'Sale' },
+                { value: 'ISSUE_TO_DEPARTMENT', label: 'Issue to Dept' },
+                { value: 'RETURN_FROM_DEPARTMENT', label: 'Return from Dept' },
+                { value: 'WASTAGE', label: 'Wastage' },
+              ]}
+            />
+            <FilterSelect
+              label="Vendor"
+              value={vendorFilter}
+              onChange={setVendorFilter}
+              options={[
+                { value: '', label: 'All Vendors' },
+                ...vendorOptions.map((v) => ({
+                  value: v.id,
+                  label: `${v.name} (${v.code})`,
+                })),
+              ]}
+            />
+            <FilterSelect
+              label="Payment"
+              value={paymentFilter}
+              onChange={setPaymentFilter}
+              options={[
+                { value: '', label: 'All Payments' },
+                { value: 'COMPLETE', label: 'Paid in Full' },
+                { value: 'HALF', label: 'Partially Paid' },
+                { value: 'PENDING', label: 'Payment Pending' },
+                { value: 'NON_BILLABLE', label: 'Non-billable' },
+              ]}
+            />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              />
+            </div>
           </div>
         </div>
 
         {/* Transactions Table */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          {selectedInView.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+              <div className="text-sm text-indigo-900">
+                <span className="font-semibold">{selectedInView.length}</span>{' '}
+                selected
+                {filteredIds.length !== selectedInView.length && (
+                  <span className="text-indigo-700">
+                    {' '}
+                    · {filteredIds.length} in current view
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!allFilteredSelected && (
+                  <button
+                    type="button"
+                    onClick={selectAllFiltered}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  >
+                    Select all {filteredIds.length}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={deselectAllFiltered}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                >
+                  Deselect all
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full">
+              <thead className="bg-gradient-to-r from-slate-100 to-slate-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Date
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      aria-label={allFilteredSelected ? 'Deselect all' : 'Select all'}
+                      checked={allFilteredSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someFilteredSelected;
+                      }}
+                      onChange={toggleHeaderCheckbox}
+                      disabled={filteredIds.length === 0}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                    />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Metal
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Purity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Weight
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Value
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Created By
-                  </th>
+                  <Th>Date</Th>
+                  <Th>Type</Th>
+                  <Th>Vendor</Th>
+                  <Th>Metal</Th>
+                  <Th>Purity</Th>
+                  <Th>Weight</Th>
+                  <Th>Value</Th>
+                  <Th>Payment</Th>
+                  <Th>Credit</Th>
+                  <Th>Created By</Th>
+                  <Th align="right">Actions</Th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {transactions.map((txn: any) => (
-                  <tr key={txn.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(txn.createdAt).toLocaleDateString('en-IN')}
+              <tbody className="divide-y divide-gray-100">
+                {filteredTransactions.length === 0 && (
+                  <tr>
+                    <td colSpan={12} className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                        <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p className="text-sm font-medium text-gray-600">
+                          {hasActiveFilters ? 'No transactions match your filters' : 'No transactions yet'}
+                        </p>
+                        {hasActiveFilters && (
+                          <button
+                            type="button"
+                            onClick={clearAllFilters}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                          >
+                            Clear filters
+                          </button>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  </tr>
+                )}
+                {filteredTransactions.map((txn: any, idx: number) => (
+                  <tr
+                    key={txn.id}
+                    className={`hover:bg-indigo-50/40 transition-colors ${
+                      selectedIds.has(txn.id)
+                        ? 'bg-indigo-50/70'
+                        : idx % 2 === 0
+                        ? 'bg-white'
+                        : 'bg-slate-50/40'
+                    }`}
+                  >
+                    <td className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select transaction ${txn.referenceNumber ?? txn.id}`}
+                        checked={selectedIds.has(txn.id)}
+                        onChange={() => toggleOne(txn.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      <div>{new Date(txn.createdAt).toLocaleDateString('en-IN')}</div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(txn.createdAt).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           txn.transactionType === 'PURCHASE'
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-emerald-100 text-emerald-800'
                             : txn.transactionType === 'SALE'
                             ? 'bg-blue-100 text-blue-800'
                             : txn.transactionType === 'WASTAGE'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-gray-100 text-gray-700'
                         }`}
                       >
                         {txn.transactionType.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">
-                      {txn.metalType}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {txn.vendor ? (
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 truncate max-w-[160px]">
+                            {txn.vendor.name}
+                          </div>
+                          <div className="text-[11px] text-gray-500 font-mono">
+                            {txn.vendor.uniqueCode}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">{txn.purity}K</td>
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={`font-semibold ${
+                          txn.metalType === 'GOLD'
+                            ? 'text-amber-600'
+                            : txn.metalType === 'SILVER'
+                            ? 'text-slate-500'
+                            : 'text-gray-900'
+                        }`}
+                      >
+                        {txn.metalType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{txn.purity}K</td>
+                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">
                       {txn.grossWeight.toFixed(2)}g
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                      {txn.totalValue ? `₹${txn.totalValue.toLocaleString('en-IN')}` : '-'}
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-900">
+                      {txn.totalValue ? `₹${txn.totalValue.toLocaleString('en-IN')}` : '—'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {txn.createdBy?.name || '-'}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <PaymentCell
+                        txn={txn}
+                        canSettle={canSettle}
+                        onSettle={() => setSettleTxn(txn)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs">
+                      {txn.creditApplied || txn.creditGenerated ? (
+                        <div className="space-y-0.5">
+                          {txn.creditApplied ? (
+                            <span className="block text-indigo-700">
+                              Applied: ₹{txn.creditApplied.toLocaleString('en-IN')}
+                            </span>
+                          ) : null}
+                          {txn.creditGenerated ? (
+                            <span className="block text-emerald-700">
+                              Generated: ₹{txn.creditGenerated.toLocaleString('en-IN')}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      {txn.createdBy?.name || '—'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+                      <div className="flex items-center justify-end gap-2">
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => setEditTxn(txn)}
+                            className="px-2.5 py-1 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-xs font-medium transition-colors"
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDeleteTxn(txn);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-medium transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
+                        {!canEdit && !canDelete && <span className="text-gray-300">—</span>}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+      {settleTxn && (
+        <SettlePaymentModal
+          transaction={settleTxn}
+          onClose={() => setSettleTxn(null)}
+        />
+      )}
+      {editTxn && (
+        <EditMetalTransactionModal
+          transaction={editTxn}
+          onClose={() => setEditTxn(null)}
+        />
+      )}
+      {deleteTxn && (
+        <DeleteConfirmModal
+          transaction={deleteTxn}
+          error={deleteError}
+          isPending={deleteMutation.isPending}
+          onCancel={() => {
+            setDeleteTxn(null);
+            setDeleteError(null);
+          }}
+          onConfirm={() => deleteMutation.mutate(deleteTxn.id)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Compact summary card for the top KPI row. */
+function SummaryCard({
+  label,
+  value,
+  accent,
+  icon,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+  icon: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+      <div
+        className={`w-11 h-11 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-xl shadow-sm`}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</div>
+        <div className="text-lg font-bold text-gray-900 truncate">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Per-metal stat card. Clickable — toggles the metal filter.
+ * Highlighted (ring + accented bg) when the matching metal filter is active.
+ */
+function MetalCard({
+  code: _code,
+  label,
+  icon,
+  accent,
+  grams,
+  value,
+  count,
+  isActive,
+  onClick,
+}: {
+  code: string;
+  label: string;
+  icon: string;
+  accent: string;
+  grams: number;
+  value: number;
+  count: number;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const formatGrams = (g: number) => {
+    if (g === 0) return '0g';
+    if (g >= 1000) return `${(g / 1000).toFixed(2)}kg`;
+    return `${g.toFixed(2)}g`;
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative text-left bg-white rounded-2xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${
+        isActive
+          ? 'border-indigo-400 ring-2 ring-indigo-200 shadow-md'
+          : 'border-gray-200 shadow-sm'
+      }`}
+      aria-pressed={isActive}
+      title={isActive ? `Click to clear ${label} filter` : `Filter by ${label}`}
+    >
+      <div className="flex items-center gap-3">
+        {/* Icon */}
+        <div
+          className={`flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-xl shadow-sm`}
+        >
+          {icon}
+        </div>
+        {/* Label + count + weight + value all in one column, single line each */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
+              {label}
+            </span>
+            <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              {count} {count === 1 ? 'txn' : 'txns'}
+            </span>
+          </div>
+          <div className="text-lg font-bold text-gray-900 leading-tight truncate">
+            {formatGrams(grams)}
+          </div>
+          <div className="text-xs text-gray-500 truncate">
+            {value > 0
+              ? `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+              : '—'}
+          </div>
+        </div>
+      </div>
+      {isActive && (
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+      )}
+    </button>
+  );
+}
+
+/** Labeled select used in the filter bar. */
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Compact, consistent table header cell. */
+function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+  return (
+    <th
+      className={`px-4 py-3 ${
+        align === 'right' ? 'text-right' : 'text-left'
+      } text-[11px] font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap`}
+    >
+      {children}
+    </th>
+  );
+}
+
+/** Inline confirmation modal for deleting a transaction. */
+function DeleteConfirmModal({
+  transaction,
+  error,
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  transaction: MetalTransaction;
+  error: string | null;
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = transaction as any;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-4 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">Delete this transaction?</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              <span className="font-medium">{t.transactionType?.replace(/_/g, ' ')}</span> —{' '}
+              {t.metalType} {t.purity}K • {t.grossWeight?.toFixed(2)}g
+              {t.totalValue ? ` • ₹${t.totalValue.toLocaleString('en-IN')}` : ''}
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Stock balances and vendor credit will be re-balanced automatically. This action cannot be undone.
+            </p>
+          </div>
+        </div>
+        {error && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </Button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-medium disabled:opacity-60"
+          >
+            {isPending ? 'Deleting…' : 'Delete Transaction'}
+          </button>
         </div>
       </div>
     </div>

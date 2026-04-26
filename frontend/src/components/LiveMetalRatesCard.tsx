@@ -88,12 +88,12 @@ async function fetchAmbicaaRates(): Promise<AmbicaaResponse> {
 type Source = 'global' | 'bangalore';
 
 interface Props {
-  selectedMetal: MetalKey;
-  selectedPurity: number; // karats (24, 22, 18, 14). Ignored for non-gold.
-  onUseRate: (ratePerGramInr: number) => void;
+  selectedMetal?: MetalKey;
+  selectedPurity?: number; // karats (24, 22, 18, 14). Ignored for non-gold.
+  onUseRate?: (ratePerGramInr: number) => void;
 }
 
-export default function LiveMetalRatesCard({ selectedMetal, selectedPurity, onUseRate }: Props) {
+export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPurity = 24, onUseRate }: Props) {
   const [now, setNow] = useState(Date.now());
   const [source, setSource] = useState<Source>('bangalore');
 
@@ -366,7 +366,7 @@ export default function LiveMetalRatesCard({ selectedMetal, selectedPurity, onUs
                         })}`}
                     <span className="text-xs font-medium text-gray-500 ml-1">/g</span>
                   </div>
-                  {isSelected && selectedRate !== null && (
+                  {isSelected && selectedRate !== null && onUseRate && (
                     <button
                       onClick={() => onUseRate(Math.round(selectedRate))}
                       className="mt-2 w-full text-xs font-semibold px-2 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"

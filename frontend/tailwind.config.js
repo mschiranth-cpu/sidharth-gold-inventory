@@ -63,6 +63,39 @@ export default {
           500: '#f59e0b',
           600: '#d97706',
         },
+        // ============================================
+        // V2 Dashboard luxe palette — champagne + onyx
+        // ============================================
+        champagne: {
+          50: '#FBF7EF',
+          100: '#F4ECD8',
+          200: '#EADDB7',
+          300: '#DCC791',
+          400: '#CFB16C',
+          500: '#BC9750',
+          600: '#9C7A3D',
+          700: '#7A5E2E',
+          800: '#5A4421',
+          900: '#3B2D16',
+        },
+        onyx: {
+          50: '#F5F5F7',
+          100: '#E2E2E6',
+          200: '#B7B7BD',
+          300: '#8A8A92',
+          400: '#5C5C66',
+          500: '#3A3A42',
+          600: '#26262C',
+          700: '#1A1A1F',
+          800: '#141418',
+          900: '#0F0F12',
+        },
+        'gold-leaf': '#C9A55C',
+        pearl: '#F8F4ED',
+        accent: {
+          emerald: '#1F8A6F',
+          ruby: '#B43A4A',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
@@ -85,12 +118,21 @@ export default {
         gold: '0 4px 14px 0 rgba(234, 179, 8, 0.39)',
         'gold-lg': '0 10px 40px 0 rgba(234, 179, 8, 0.3)',
         'inner-gold': 'inset 0 2px 4px 0 rgba(234, 179, 8, 0.1)',
+        luxe: '0 18px 48px -16px rgba(58, 44, 22, 0.28), 0 4px 14px -6px rgba(58, 44, 22, 0.18)',
+        onyx: '0 24px 60px -20px rgba(15, 15, 18, 0.55), 0 6px 18px -8px rgba(15, 15, 18, 0.4)',
+        pearl: '0 1px 2px 0 rgba(58, 44, 22, 0.06), 0 8px 22px -10px rgba(58, 44, 22, 0.18)',
       },
       backgroundImage: {
         'gold-gradient': 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
         'gold-gradient-radial':
           'radial-gradient(ellipse at center, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
         'dark-gold-gradient': 'linear-gradient(135deg, #92400e 0%, #78350f 50%, #451a03 100%)',
+        'champagne-gradient':
+          'linear-gradient(135deg, #FBF7EF 0%, #F4ECD8 45%, #EADDB7 100%)',
+        'onyx-gradient':
+          'linear-gradient(135deg, #1A1A1F 0%, #141418 50%, #0F0F12 100%)',
+        'gold-leaf-gradient':
+          'linear-gradient(135deg, #DCC791 0%, #C9A55C 50%, #9C7A3D 100%)',
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',

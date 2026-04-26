@@ -229,6 +229,30 @@ export const activityService = {
       metadata: { fileName, fileType },
     });
   },
+
+  /**
+   * Get recent activities across all orders (for dashboard)
+   */
+  async getRecentActivities(limit: number = 10, userId?: string) {
+    try {
+      return await prisma.orderActivity.findMany({
+        where: userId ? { userId } : undefined,
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, avatar: true },
+          },
+          order: {
+            select: { id: true, orderNumber: true, status: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(Math.max(limit, 1), 100),
+      });
+    } catch (error) {
+      logger.error('Failed to fetch recent activities', { error });
+      return [];
+    }
+  },
 };
 
 export default activityService;

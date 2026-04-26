@@ -106,8 +106,10 @@ const FeatureTogglePage = lazy(() => import('./pages/admin/FeatureTogglePage'));
 const ClientApprovalPage = lazy(() => import('./pages/admin/ClientApprovalPage'));
 const OrderApprovalPage = lazy(() => import('./pages/admin/OrderApprovalPage'));
 const VendorsPage = lazy(() => import('./pages/vendors/VendorsPage'));
+const VendorDetailPage = lazy(() => import('./pages/vendors/VendorDetailPage'));
 
 // Inventory Pages (Phase 2)
+const MainInventoryDashboard = lazy(() => import('./pages/inventory/MainInventoryDashboard'));
 const MetalInventoryDashboard = lazy(() => import('./pages/inventory/MetalInventoryDashboard'));
 const MetalStockPage = lazy(() => import('./pages/inventory/MetalStockPage'));
 const ReceiveMetalPage = lazy(() => import('./pages/inventory/ReceiveMetalPage'));
@@ -115,8 +117,6 @@ const IssueMetalPage = lazy(() => import('./pages/inventory/IssueMetalPage'));
 const MetalTransactionsPage = lazy(() => import('./pages/inventory/MetalTransactionsPage'));
 const MeltingBatchPage = lazy(() => import('./pages/inventory/MeltingBatchPage'));
 const RateManagementPage = lazy(() => import('./pages/inventory/RateManagementPage'));
-const PartyListPage = lazy(() => import('./pages/inventory/PartyListPage'));
-const PartyDetailPage = lazy(() => import('./pages/inventory/PartyDetailPage'));
 
 // Phase 3 Inventory Pages
 const DiamondListPage = lazy(() => import('./pages/inventory/DiamondListPage'));
@@ -477,6 +477,17 @@ function App() {
             }
           />
 
+          <Route
+            path="vendors/:id"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <VendorDetailPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
           {/* Order Approval - Admin/Office Staff */}
           <Route
             path="admin/order-approvals"
@@ -484,6 +495,20 @@ function App() {
               <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
                 <LazyRoute>
                   <OrderApprovalPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Main Inventory Dashboard */}
+          <Route
+            path="inventory"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <MainInventoryDashboard />
                 </LazyRoute>
               </ProtectedRoute>
             }
@@ -562,32 +587,6 @@ function App() {
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <LazyRoute>
                   <RateManagementPage />
-                </LazyRoute>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Party Metal Inventory - Admin/Office Staff/Factory Manager */}
-          <Route
-            path="inventory/parties"
-            element={
-              <ProtectedRoute
-                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
-              >
-                <LazyRoute>
-                  <PartyListPage />
-                </LazyRoute>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="inventory/parties/:partyId"
-            element={
-              <ProtectedRoute
-                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
-              >
-                <LazyRoute>
-                  <PartyDetailPage />
                 </LazyRoute>
               </ProtectedRoute>
             }

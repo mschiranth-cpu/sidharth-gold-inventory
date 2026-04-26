@@ -89,8 +89,10 @@
 # 2. Run audit
 node scripts/pre-launch-audit.js --verbose
 
-# 3. Deploy
-./scripts/deploy.sh production
+# 3. Deploy (see ../DEPLOY_SSH.md for the direct-SCP procedure)
+#    Backend .ts:  scp + npm.cmd run build + Restart-Service
+#    Frontend:     scp + npx.cmd vite build
+#    Schema:       SQL patch in backend/prisma/sql-patches/ + psql
 
 # 4. Run smoke tests
 ./scripts/smoke-test.sh production

@@ -11,13 +11,18 @@ import {
   getMetalStockSummary,
   createMetalStock,
   createMetalTransaction,
+  updateMetalTransaction,
+  deleteMetalTransaction,
   createMeltingBatch,
   getAllMetalTransactions,
   getCurrentMetalRates,
   createMetalRate,
   getMeltingBatches,
+  settleMetalPayment,
+  getMetalPayments,
 } from './metal.service';
 import { logger } from '../../utils/logger';
+import { ApiError } from '../../middleware/errorHandler';
 
 export async function getAllMetalStockController(req: Request, res: Response) {
   try {
@@ -67,6 +72,56 @@ export async function createMetalTransactionController(req: Request, res: Respon
       .json({
         success: false,
         error: { message: error.message || 'Failed to create transaction' },
+      });
+  }
+}
+
+export async function updateMetalTransactionController(req: Request, res: Response) {
+  try {
+    const transaction = await updateMetalTransaction(req.params.id, req.body);
+    res.json({ success: true, data: transaction });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      logger.warn('Update transaction rejected', {
+        transactionId: req.params.id,
+        statusCode: error.statusCode,
+        message: error.message,
+      });
+      return res
+        .status(error.statusCode)
+        .json({ success: false, error: { message: error.message } });
+    }
+    logger.error('Update transaction error', { error });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: { message: error.message || 'Failed to update transaction' },
+      });
+  }
+}
+
+export async function deleteMetalTransactionController(req: Request, res: Response) {
+  try {
+    const result = await deleteMetalTransaction(req.params.id);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      logger.warn('Delete transaction rejected', {
+        transactionId: req.params.id,
+        statusCode: error.statusCode,
+        message: error.message,
+      });
+      return res
+        .status(error.statusCode)
+        .json({ success: false, error: { message: error.message } });
+    }
+    logger.error('Delete transaction error', { error });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: { message: error.message || 'Failed to delete transaction' },
       });
   }
 }
@@ -130,5 +185,51 @@ export async function getMeltingBatchesController(req: Request, res: Response) {
   } catch (error) {
     logger.error('Get batches error', { error });
     res.status(500).json({ success: false, error: { message: 'Failed to fetch batches' } });
+  }
+}
+
+export async function settleMetalPaymentController(req: Request, res: Response) {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const transaction = await settleMetalPayment(
+      req.params.id,
+      req.body,
+      authReq.user.userId
+    );
+    res.json({ success: true, data: transaction });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      logger.warn('Settle payment rejected', {
+        transactionId: req.params.id,
+        statusCode: error.statusCode,
+        message: error.message,
+      });
+      return res
+        .status(error.statusCode)
+        .json({ success: false, error: { message: error.message } });
+    }
+    logger.error('Settle payment error', { error });
+    res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Failed to settle payment' },
+    });
+  }
+}
+
+export async function getMetalPaymentsController(req: Request, res: Response) {
+  try {
+    const payments = await getMetalPayments(req.params.id);
+    res.json({ success: true, data: payments });
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      return res
+        .status(error.statusCode)
+        .json({ success: false, error: { message: error.message } });
+    }
+    logger.error('Get metal payments error', { error });
+    res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Failed to fetch payments' },
+    });
   }
 }
