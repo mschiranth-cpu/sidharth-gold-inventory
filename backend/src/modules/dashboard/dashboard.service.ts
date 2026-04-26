@@ -17,6 +17,7 @@ import { getMetalStockSummary } from '../metal-inventory/metal.service';
 import { getNotifications } from '../notifications/notifications.service';
 import { getAllAttendance } from '../attendance/attendance.service';
 import { ambicaaScraper } from '../../services/ambicaaScraper';
+import { getGlobalMetalRates } from '../../services/globalMetalRates';
 import activityService from '../../services/activity.service';
 import type {
   DashboardOverview,
@@ -147,12 +148,48 @@ export function resolveRange(
 // ============================================
 
 async function loadMarketRates(): Promise<MarketRatesPayload> {
+  // Primary: Bangalore retail (Ambicaa scraper).
   try {
     await ambicaaScraper.start();
   } catch (err) {
     logger.warn('Ambicaa scraper start failed', { err });
   }
   const { data, healthy, ageMs } = ambicaaScraper.getLatest();
+
+  // If Bangalore is healthy AND has gold24k, use it as-is.
+  if (healthy && data?.perGram.gold24k != null) {
+    return {
+      gold24k: data.perGram.gold24k,
+      gold22k: data.perGram.gold22k,
+      gold18k: data.perGram.gold18k,
+      silver: data.perGram.silver,
+      fetchedAt: data.fetchedAt,
+      healthy: true,
+      ageMs,
+    };
+  }
+
+  // Fallback: global spot rates (gold-api.com + USD/INR FX), same source the
+  // frontend's LiveMetalRatesCard uses in "Global" mode. Keeps the dashboard
+  // aligned with what users see on the Receive Metal page.
+  try {
+    const global = await getGlobalMetalRates();
+    if (global.healthy) {
+      return {
+        gold24k: global.gold24k,
+        gold22k: global.gold22k,
+        gold18k: global.gold18k,
+        silver: global.silver,
+        fetchedAt: global.fetchedAt,
+        healthy: true,
+        ageMs: global.ageMs,
+      };
+    }
+  } catch (err) {
+    logger.warn('Global metal rates fallback failed', { err: String(err) });
+  }
+
+  // Last resort: whatever we had (likely all nulls).
   return {
     gold24k: data?.perGram.gold24k ?? null,
     gold22k: data?.perGram.gold22k ?? null,
