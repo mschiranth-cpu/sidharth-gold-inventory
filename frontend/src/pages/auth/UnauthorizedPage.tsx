@@ -1,28 +1,22 @@
 /**
  * ============================================
- * UNAUTHORIZED PAGE
+ * UNAUTHORIZED PAGE — Onyx & Gold Edition
  * ============================================
- * 
- * Displayed when a user tries to access a route
- * they don't have permission for.
- * 
- * @author Gold Factory Dev Team
- * @version 1.0.0
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowRightOnRectangleIcon, ExclamationTriangleIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDefaultRedirectPath, USER_ROLE_LABELS, UserRole } from '../../types/auth.types';
+import AuthShell from '../../components/common/AuthShell';
 
 export default function UnauthorizedPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  // Get required roles from location state
   const requiredRoles = (location.state as { requiredRoles?: UserRole[] })?.requiredRoles || [];
 
-  // Handle go back
   const handleGoBack = () => {
     if (user) {
       navigate(getDefaultRedirectPath(user.role));
@@ -31,54 +25,46 @@ export default function UnauthorizedPage() {
     }
   };
 
-  // Handle logout
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pearl via-white to-champagne-50 px-4 py-12">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gold-leaf rounded-full opacity-20 blur-3xl"></div>
-      </div>
-
-      <div className="relative text-center max-w-md">
-        {/* Icon */}
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl shadow-lg mb-6">
-          <svg className="w-11 h-11 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+    <AuthShell>
+      <div className="w-full max-w-md text-center">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-rose-500/20 via-rose-500/15 to-onyx-800 ring-1 ring-rose-400/40 shadow-[0_15px_40px_-10px_rgba(244,63,94,0.4)] mb-6">
+          <ExclamationTriangleIcon className="w-10 h-10 text-rose-300" />
         </div>
 
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">Access Denied</h1>
-        <p className="text-gray-600 mb-6">
-          Sorry, you don't have permission to access this page.
+        <p className="text-[11px] tracking-[0.18em] uppercase text-rose-300 font-semibold">Access Denied</p>
+        <h1 className="mt-2 font-serif text-4xl sm:text-5xl font-semibold leading-tight text-pearl">
+          Restricted <span className="bg-gradient-to-r from-champagne-200 via-champagne-300 to-champagne-500 bg-clip-text text-transparent">workspace</span>.
+        </h1>
+        <p className="mt-3 text-pearl/60 text-sm">
+          You don't have permission to view this page with your current role.
         </p>
 
         {/* Details Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-6 text-left">
+        <div className="mt-8 rounded-2xl border border-champagne-500/15 bg-onyx-800/70 backdrop-blur-md p-6 text-left shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)]">
           {user && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-500">Logged in as</p>
-              <p className="font-medium text-gray-900">{user.name}</p>
-              <span className="inline-block mt-1 px-2 py-0.5 bg-champagne-100 text-onyx-800 text-xs font-medium rounded-full">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-champagne-300 font-semibold">Logged in as</p>
+              <p className="mt-1 font-serif text-xl text-pearl">{user.name}</p>
+              <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-champagne-400/15 text-champagne-200 border border-champagne-400/30">
                 {USER_ROLE_LABELS[user.role]}
               </span>
             </div>
           )}
 
           {requiredRoles.length > 0 && (
-            <div className="pt-4 border-t border-gray-100">
-              <p className="text-sm text-gray-500 mb-2">Required access level</p>
+            <div className="mt-5 pt-5 border-t border-champagne-500/15">
+              <p className="text-[11px] uppercase tracking-wide text-champagne-300 font-semibold mb-2">Required access level</p>
               <div className="flex flex-wrap gap-2">
                 {requiredRoles.map((role) => (
-                  <span 
+                  <span
                     key={role}
-                    className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full"
+                    className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-onyx-900/60 text-pearl/80 border border-champagne-500/20"
                   >
                     {USER_ROLE_LABELS[role]}
                   </span>
@@ -88,42 +74,31 @@ export default function UnauthorizedPage() {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={handleGoBack}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:via-onyx-700 hover:to-onyx-900 text-white font-semibold rounded-xl shadow-lg shadow-champagne-700/30 hover:shadow-champagne-700/40 focus:outline-none focus:ring-2 focus:ring-champagne-500 focus:ring-offset-2 transition-all duration-200"
+            className="group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-champagne-300 via-champagne-400 to-champagne-600 text-onyx-900 font-semibold shadow-[0_10px_30px_-10px_rgba(232,198,132,0.6)] hover:-translate-y-0.5 hover:shadow-[0_15px_40px_-10px_rgba(232,198,132,0.7)] transition-all duration-300 overflow-hidden"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            Go to Dashboard
+            <HomeIcon className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">Go to Dashboard</span>
+            <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-20deg] -translate-x-full group-hover:translate-x-[300%] transition-transform duration-700 ease-out" />
           </button>
-
           <button
             onClick={handleLogout}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border border-gray-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 transition-all duration-200"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-onyx-800/70 backdrop-blur border border-champagne-500/25 text-pearl font-semibold hover:bg-onyx-700/80 hover:border-champagne-400/50 transition"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <ArrowRightOnRectangleIcon className="w-4 h-4" />
             Sign Out
           </button>
         </div>
 
-        {/* Help Link */}
-        <p className="text-sm text-gray-500 mt-6">
+        <p className="text-sm text-pearl/55 mt-6">
           Need access?{' '}
-          <Link to="/contact" className="text-champagne-700 hover:text-onyx-800 font-medium transition-colors">
+          <Link to="/contact" className="font-medium text-champagne-300 hover:text-champagne-200 transition">
             Contact your administrator
           </Link>
         </p>
-
-        {/* Copyright */}
-        <p className="text-center text-xs text-gray-400 mt-8">
-          © {new Date().getFullYear()} Gold Factory Inventory System
-        </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

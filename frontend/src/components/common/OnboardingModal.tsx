@@ -15,7 +15,7 @@ interface OnboardingStep {
 
 const onboardingSteps: OnboardingStep[] = [
   {
-    title: 'Welcome to Gold Factory Inventory!',
+    title: 'Welcome to Ativa Jewels!',
     description:
       "This system helps you track gold jewelry orders from creation to delivery. Let's take a quick tour.",
     image: '/images/onboarding/welcome.png',

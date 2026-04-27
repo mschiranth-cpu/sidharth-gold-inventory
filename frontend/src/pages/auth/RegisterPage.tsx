@@ -527,7 +527,7 @@ export default function RegisterPage() {
 
         {/* Copyright */}
         <p className="text-center text-xs text-gray-400 mt-4">
-          © {new Date().getFullYear()} Gold Factory Inventory System
+          © {new Date().getFullYear()} Ativa Jewels
         </p>
       </div>
     </div>

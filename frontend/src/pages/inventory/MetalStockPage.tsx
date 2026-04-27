@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import Button from '../../components/common/Button';
 import { getAllMetalStock } from '../../services/metal.service';
+import { useRefreshInterval } from '../../contexts/RefreshIntervalContext';
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const GRAMS_PER_TROY_OZ = 31.1034768;
@@ -92,22 +93,26 @@ export default function MetalStockPage() {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  const userMs = useRefreshInterval();
+  const ourMs: number | false = userMs === false ? false : Math.max(500, userMs);
+  const spotMs: number | false = userMs === false ? false : Math.max(60_000, userMs);
+
   const { data: stocks = [], isLoading, dataUpdatedAt, refetch, isFetching } = useQuery({
     queryKey: ['metal-stock-all'],
     queryFn: () => getAllMetalStock(),
-    refetchInterval: 30_000,
+    refetchInterval: ourMs,
   });
 
-  // Live rates (refresh every 60s; values used to estimate stock worth)
+  // Live rates (scraper-cached on backend; respects user's interval)
   const bangalore = useQuery({
     queryKey: ['bangalore-rates-stockpage'],
     queryFn: fetchAmbicaaRates,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: ourMs,
+    staleTime: ourMs === false ? 30_000 : Math.max(500, Math.min(ourMs, 30_000)),
   });
   const fx = useQuery({ queryKey: ['fx-usd-inr'], queryFn: fetchUsdInr, staleTime: 5 * 60_000 });
-  const platinum = useQuery({ queryKey: ['spot-XPT'], queryFn: () => fetchSpot('XPT'), refetchInterval: 60_000 });
-  const palladium = useQuery({ queryKey: ['spot-XPD'], queryFn: () => fetchSpot('XPD'), refetchInterval: 60_000 });
+  const platinum = useQuery({ queryKey: ['spot-XPT'], queryFn: () => fetchSpot('XPT'), refetchInterval: spotMs });
+  const palladium = useQuery({ queryKey: ['spot-XPD'], queryFn: () => fetchSpot('XPD'), refetchInterval: spotMs });
 
   const ratePerGram24k = bangalore.data?.data?.perGram?.gold24k ?? null;
   const ratePerGramSilver = bangalore.data?.data?.perGram?.silver ?? null;

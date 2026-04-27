@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useRefreshInterval } from '../contexts/RefreshIntervalContext';
 
 const GRAMS_PER_TROY_OZ = 31.1034768;
 
@@ -97,11 +98,16 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
   const [now, setNow] = useState(Date.now());
   const [source, setSource] = useState<Source>('bangalore');
 
-  // Refresh "last updated" label every 30s
+  // Site-wide refresh cadence (set via header picker).
+  const userInterval = useRefreshInterval();
+  const pollMs: number | false = userInterval === false ? false : Math.max(500, userInterval);
+
+  // Refresh "last updated" label — same cadence as polling, capped to 1s for the UI.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
+    const labelMs = pollMs === false ? 30_000 : Math.max(1_000, Math.min(pollMs, 30_000));
+    const id = setInterval(() => setNow(Date.now()), labelMs);
     return () => clearInterval(id);
-  }, []);
+  }, [pollMs]);
 
   // Fetch FX rate (cached 5 min)
   const fx = useQuery({
@@ -111,9 +117,10 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
     refetchInterval: 5 * 60 * 1000,
   });
 
-  // Fetch all four metal prices in parallel (cached 60s).
-  // Always enabled so Platinum/Palladium tiles work even in Bangalore mode
-  // (Ambicaa doesn't publish PT/PD).
+  // Fetch all four metal prices in parallel from the global spot API.
+  // The free api.gold-api.com endpoint updates ~every minute, so we floor the
+  // poll interval at 60s for the global tab regardless of the user's preference.
+  const globalMs: number | false = pollMs === false ? false : Math.max(60_000, pollMs);
   const metals = useQuery({
     queryKey: ['live-metal-prices'],
     queryFn: async () => {
@@ -130,16 +137,18 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
       return Object.fromEntries(entries) as Record<MetalKey, ApiResponse | null>;
     },
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: globalMs,
     refetchIntervalInBackground: false,
   });
 
-  // Fetch Bangalore (Ambicaa) rates from our backend
+  // Fetch Bangalore (Ambicaa) rates from our backend.
+  // Backend cache is refreshed by the Playwright scraper every 1s, so honour
+  // the user's chosen cadence right down to per-second polling.
   const bangalore = useQuery({
     queryKey: ['bangalore-rates'],
     queryFn: fetchAmbicaaRates,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: pollMs === false ? 30_000 : Math.max(500, Math.min(pollMs, 30_000)),
+    refetchInterval: pollMs,
     refetchIntervalInBackground: false,
     enabled: source === 'bangalore',
     retry: 1,
@@ -255,20 +264,6 @@ export default function LiveMetalRatesCard({ selectedMetal = 'GOLD', selectedPur
               🌐 Global
             </button>
           </div>
-          <button
-            onClick={() => {
-              if (source === 'global') {
-                metals.refetch();
-                fx.refetch();
-              } else {
-                bangalore.refetch();
-              }
-            }}
-            disabled={metals.isFetching || bangalore.isFetching}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-all disabled:opacity-50"
-          >
-            {metals.isFetching || bangalore.isFetching ? '…' : '↻'}
-          </button>
         </div>
       </div>
 

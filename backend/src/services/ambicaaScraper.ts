@@ -20,7 +20,10 @@ type Browser = any;
 type Page = any;
 
 const TARGET_URL = 'http://ambicaaspot.com/';
-const POLL_MS = 5_000;
+// Ambicaa pushes new rates roughly every 1-2s via SignalR; we re-read the
+// rendered DOM at the same cadence so frontend per-second polling sees fresh
+// numbers. Override with AMBICAA_POLL_MS env if needed.
+const POLL_MS = Math.max(500, Number(process.env.AMBICAA_POLL_MS) || 1_000);
 const STALE_MS = 30_000; // consider data unhealthy if older than this
 
 export interface AmbicaaRateRow {

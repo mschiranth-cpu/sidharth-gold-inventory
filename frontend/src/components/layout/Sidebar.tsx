@@ -212,9 +212,9 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             )}
           >
             <span className="text-onyx-900 font-bold text-base tracking-tight block">
-              Gold Factory
+              Ativa Jewels
             </span>
-            <p className="text-xs text-champagne-700 font-medium">Inventory System</p>
+            <p className="text-xs text-champagne-700 font-medium">Workspace</p>
           </div>
         </div>
       </div>
@@ -532,8 +532,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             <BrandMark className="w-8 h-8 drop-shadow-sm" />
           </div>
           <div>
-            <span className="text-onyx-900 font-bold text-lg tracking-tight">Gold Factory</span>
-            <p className="text-xs text-champagne-700 font-medium">Inventory System</p>
+            <span className="text-onyx-900 font-bold text-lg tracking-tight">Ativa Jewels</span>
+            <p className="text-xs text-champagne-700 font-medium">Workspace</p>
           </div>
         </div>
       </div>

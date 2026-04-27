@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import ClientPortalLayout from './components/layout/ClientPortalLayout';
 import { AuthProvider } from './contexts/AuthContext';
+import { RefreshIntervalProvider } from './contexts/RefreshIntervalContext';
 import {
   ProtectedRoute,
   AdminRoute,
@@ -120,6 +121,7 @@ const RateManagementPage = lazy(() => import('./pages/inventory/RateManagementPa
 
 // Phase 3 Inventory Pages
 const DiamondListPage = lazy(() => import('./pages/inventory/DiamondListPage'));
+const AddDiamondPage = lazy(() => import('./pages/inventory/AddDiamondPage'));
 const RealStoneListPage = lazy(() => import('./pages/inventory/RealStoneListPage'));
 const StonePacketListPage = lazy(() => import('./pages/inventory/StonePacketListPage'));
 
@@ -148,8 +150,10 @@ function LazyRoute({ children, fallback }: LazyRouteProps) {
 function App() {
   return (
     <AuthProvider>
-      <NavigationLoader />
-      <WorkerNotification />
+      <RefreshIntervalProvider>
+        <NavigationLoader />
+        <WorkerNotification />
+        <WorkerNotification />
       <NotificationPermissionPrompt />
       <Routes>
         {/* Public Routes */}
@@ -605,6 +609,18 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="inventory/diamonds/new"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <AddDiamondPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Real Stone Inventory - Admin/Office Staff/Factory Manager */}
           <Route
@@ -757,6 +773,7 @@ function App() {
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
       </Routes>
+      </RefreshIntervalProvider>
     </AuthProvider>
   );
 }

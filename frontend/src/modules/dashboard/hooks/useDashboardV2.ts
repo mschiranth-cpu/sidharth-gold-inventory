@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchOverview, fetchWorkerOverview } from '../../../services/dashboard.service';
 import type { DashboardRange } from '../../../types/dashboard.types';
+import { useRefreshInterval } from '../../../contexts/RefreshIntervalContext';
 
-const REFETCH_MS = 30_000;
+const FALLBACK_MS = 30_000;
 
 export interface UseOverviewParams {
   range: DashboardRange;
@@ -19,21 +20,27 @@ export const overviewKeys = {
   worker: ['dashboard-worker-overview'] as const,
 };
 
-export const useOverview = ({ range, from, to, enabled = true, paused = false }: UseOverviewParams) =>
-  useQuery({
+export const useOverview = ({ range, from, to, enabled = true, paused = false }: UseOverviewParams) => {
+  const intervalMs = useRefreshInterval();
+  const effective = intervalMs === false ? false : intervalMs;
+  return useQuery({
     queryKey: overviewKeys.byRange(range, from, to),
     queryFn: () => fetchOverview({ range, from, to }),
-    staleTime: 25_000,
-    refetchInterval: paused ? false : REFETCH_MS,
+    staleTime: Math.min(25_000, effective === false ? FALLBACK_MS : Math.max(1_000, effective - 1_000)),
+    refetchInterval: paused ? false : effective,
     refetchIntervalInBackground: false,
     enabled,
   });
+};
 
-export const useWorkerOverview = (paused = false) =>
-  useQuery({
+export const useWorkerOverview = (paused = false) => {
+  const intervalMs = useRefreshInterval();
+  const effective = intervalMs === false ? false : intervalMs;
+  return useQuery({
     queryKey: overviewKeys.worker,
     queryFn: fetchWorkerOverview,
-    staleTime: 25_000,
-    refetchInterval: paused ? false : REFETCH_MS,
+    staleTime: Math.min(25_000, effective === false ? FALLBACK_MS : Math.max(1_000, effective - 1_000)),
+    refetchInterval: paused ? false : effective,
     refetchIntervalInBackground: false,
   });
+};

@@ -1,5 +1,6 @@
 import { Calendar, RefreshCw, Pencil, Check, RotateCcw } from 'lucide-react';
 import type { DashboardRange, MarketRatesPayload } from '../../../../types/dashboard.types';
+import RefreshIntervalPicker from '../../../../components/RefreshIntervalPicker';
 
 interface HeroBarProps {
   userName: string;
@@ -132,6 +133,7 @@ export const HeroBar = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          <RefreshIntervalPicker variant="dark" />
           <button
             type="button"
             onClick={onRefresh}
