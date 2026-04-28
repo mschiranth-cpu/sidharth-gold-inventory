@@ -4,7 +4,7 @@
  * dashboards (Metal / Diamond / Real Stone / Stone Packets) without going
  * back to the sidebar. Highlights the active route automatically.
  */
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   CubeTransparentIcon,
   SparklesIcon,
@@ -45,6 +45,7 @@ const TABS = [
 
 export default function InventoryTabs({ variant = 'dark', className = '' }: Props) {
   const isDark = variant === 'dark';
+  const { pathname } = useLocation();
 
   const baseTab =
     'group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition focus:outline-none focus:ring-2';
@@ -60,28 +61,27 @@ export default function InventoryTabs({ variant = 'dark', className = '' }: Prop
       aria-label="Inventory sections"
       className={`flex flex-wrap gap-2 ${className}`}
     >
-      {TABS.map(({ to, label, Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end
-          className={({ isActive }) =>
-            `${baseTab} ${isActive ? active : inactive}`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <Icon
-                className={`w-4 h-4 ${
-                  isActive ? '' : 'opacity-80 group-hover:opacity-100'
-                }`}
-                aria-hidden
-              />
-              <span>{label}</span>
-            </>
-          )}
-        </NavLink>
-      ))}
+      {TABS.map(({ to, label, Icon }) => {
+        // Prefix-match so sub-routes (e.g. /inventory/metal/stock,
+        // /inventory/real-stones/dashboard) still highlight the parent tab.
+        const isActive = pathname === to || pathname.startsWith(`${to}/`);
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            aria-current={isActive ? 'page' : undefined}
+            className={`${baseTab} ${isActive ? active : inactive}`}
+          >
+            <Icon
+              className={`w-4 h-4 ${
+                isActive ? '' : 'opacity-80 group-hover:opacity-100'
+              }`}
+              aria-hidden
+            />
+            <span>{label}</span>
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }
