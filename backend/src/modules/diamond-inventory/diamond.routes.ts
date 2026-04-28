@@ -15,9 +15,92 @@ import {
   issueDiamondController,
   getAllDiamondLotsController,
   createDiamondLotController,
+  // Parity-with-metal controllers
+  getDiamondStockSummaryController,
+  createDiamondTransactionController,
+  getAllDiamondTransactionsController,
+  updateDiamondTransactionController,
+  deleteDiamondTransactionController,
+  settleDiamondPaymentController,
+  getDiamondPaymentsController,
+  exportDiamondTransactionsController,
+  getCurrentDiamondRatesController,
+  createDiamondRateController,
 } from './diamond.controller';
 
 const router = Router();
+
+// ============================================================================
+// PARITY-WITH-METAL ROUTES (registered BEFORE legacy `/:diamondId` so Express
+// doesn't treat the literal segments below as a diamondId param).
+// ============================================================================
+
+// Stock summary (groupBy aggregation — no separate stock table)
+router.get(
+  '/stock/summary',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER),
+  getDiamondStockSummaryController
+);
+
+// Transactions — list / export / create / edit / delete
+router.get(
+  '/transactions',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER),
+  getAllDiamondTransactionsController
+);
+router.get(
+  '/transactions/export',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  exportDiamondTransactionsController
+);
+router.post(
+  '/transactions',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  createDiamondTransactionController
+);
+router.patch(
+  '/transactions/:id',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  updateDiamondTransactionController
+);
+router.delete(
+  '/transactions/:id',
+  authenticate,
+  requireRoles(UserRole.ADMIN),
+  deleteDiamondTransactionController
+);
+
+// Settlement ledger
+router.patch(
+  '/transactions/:id/payment',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  settleDiamondPaymentController
+);
+router.get(
+  '/transactions/:id/payments',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER),
+  getDiamondPaymentsController
+);
+
+// Rates
+router.get('/rates', authenticate, getCurrentDiamondRatesController);
+router.post(
+  '/rates',
+  authenticate,
+  requireRoles(UserRole.ADMIN),
+  createDiamondRateController
+);
+
+// ============================================================================
+// LEGACY DIAMOND ROUTES (preserved for back-compat)
+// ============================================================================
 
 router.get(
   '/',

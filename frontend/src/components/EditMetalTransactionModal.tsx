@@ -90,6 +90,18 @@ export default function EditMetalTransactionModal({
   // edit modal must reflect that same truth (otherwise the form opens as
   // Billable + Cash + Complete and silently flips the row on save).
   const wasBillable = txn.isBillable === true;
+  // Legacy rows (typically non-billable created before payment fields existed)
+  // have no cached paymentStatus / amountPaid. Pre-refactor those were treated
+  // as fully settled by the user (vendor outstanding ignored them entirely).
+  // Hydrate them as COMPLETE / fully-paid so opening + saving the modal does
+  // not silently introduce an "outstanding" balance against the vendor.
+  const txnTotal =
+    txn.totalValue ??
+    (txn.rate ? ((txn.grossWeight ?? 0) * (txn.purity ?? 24)) / 24 * txn.rate : 0);
+  const isLegacyRow = !txn.paymentStatus;
+  const hydratedAmountPaid = isLegacyRow ? txnTotal : (txn.amountPaid ?? 0);
+  const hydratedStatus = isLegacyRow ? 'COMPLETE' : (txn.paymentStatus ?? 'COMPLETE');
+  const hydratedMode = txn.paymentMode ?? 'CASH';
   const [formData, setFormData] = useState({
     metalType: txn.metalType ?? 'GOLD',
     purity: txn.purity ?? 24,
@@ -101,11 +113,9 @@ export default function EditMetalTransactionModal({
     // Pre-fill with the row's existing transaction date.
     transactionDate: isoToDateInput(txn.createdAt),
     isBillable: wasBillable,
-    // Payment-mode/status only meaningful when billable; for non-billable rows
-    // we keep the defaults but they're ignored on save.
-    paymentMode: txn.paymentMode ?? (wasBillable ? 'CASH' : 'CASH'),
-    paymentStatus: txn.paymentStatus ?? (wasBillable ? 'COMPLETE' : 'PENDING'),
-    amountPaid: txn.amountPaid ?? 0,
+    paymentMode: hydratedMode,
+    paymentStatus: hydratedStatus,
+    amountPaid: hydratedAmountPaid,
     cashAmount: txn.cashAmount ?? 0,
     neftAmount: txn.neftAmount ?? 0,
     neftUtr: txn.neftUtr ?? '',
@@ -135,7 +145,7 @@ export default function EditMetalTransactionModal({
       e.grossWeight = 'Gross Weight must be greater than 0';
     if (isPurchase && (!formData.rate || formData.rate <= 0))
       e.rate = 'Rate per Gram is required';
-    if (isPurchase && formData.isBillable && totalPrice > 0) {
+    if (isPurchase && totalPrice > 0) {
       if (!formData.paymentMode) e.paymentMode = 'Payment Mode is required';
       if (!formData.paymentStatus) e.paymentStatus = 'Payment Status is required';
       if (formData.paymentStatus === 'HALF' && formData.paymentMode !== 'BOTH') {
@@ -165,13 +175,15 @@ export default function EditMetalTransactionModal({
         vendorId: selectedVendor?.id ?? null,
         notes: composedNotes,
         referenceNumber: formData.referenceNumber,
+        // `isBillable` is preserved as a tax-classification tag only; payment
+        // fields apply to every PURCHASE row.
         isBillable: isPurchase ? formData.isBillable : false,
         transactionDate: formData.transactionDate
           ? new Date(formData.transactionDate).toISOString()
           : undefined,
       };
 
-      if (isPurchase && formData.isBillable) {
+      if (isPurchase) {
         payload.paymentMode = formData.paymentMode;
         payload.paymentStatus = formData.paymentStatus;
         payload.amountPaid = formData.amountPaid;

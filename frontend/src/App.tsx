@@ -120,8 +120,20 @@ const MeltingBatchPage = lazy(() => import('./pages/inventory/MeltingBatchPage')
 const RateManagementPage = lazy(() => import('./pages/inventory/RateManagementPage'));
 
 // Phase 3 Inventory Pages
-const DiamondListPage = lazy(() => import('./pages/inventory/DiamondListPage'));
 const AddDiamondPage = lazy(() => import('./pages/inventory/AddDiamondPage'));
+const DiamondInventoryDashboard = lazy(
+  () => import('./pages/inventory/DiamondInventoryDashboard')
+);
+const ReceiveDiamondPage = lazy(() => import('./pages/inventory/ReceiveDiamondPage'));
+const IssueDiamondPage = lazy(() => import('./pages/inventory/IssueDiamondPage'));
+const TransferDiamondPage = lazy(() => import('./pages/inventory/TransferDiamondPage'));
+const DiamondTransactionsPage = lazy(
+  () => import('./pages/inventory/DiamondTransactionsPage')
+);
+const DiamondRateManagementPage = lazy(
+  () => import('./pages/inventory/DiamondRateManagementPage')
+);
+const DiamondLotsPage = lazy(() => import('./pages/inventory/DiamondLotsPage'));
 const RealStoneListPage = lazy(() => import('./pages/inventory/RealStoneListPage'));
 const StonePacketListPage = lazy(() => import('./pages/inventory/StonePacketListPage'));
 
@@ -604,7 +616,7 @@ function App() {
                 allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
               >
                 <LazyRoute>
-                  <DiamondListPage />
+                  <DiamondInventoryDashboard />
                 </LazyRoute>
               </ProtectedRoute>
             }
@@ -617,6 +629,78 @@ function App() {
               >
                 <LazyRoute>
                   <AddDiamondPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/receive"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}
+              >
+                <LazyRoute>
+                  <ReceiveDiamondPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/issue"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}
+              >
+                <LazyRoute>
+                  <IssueDiamondPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/transfer"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}
+              >
+                <LazyRoute>
+                  <TransferDiamondPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/transactions"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondTransactionsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/rates"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondRateManagementPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/diamonds/lots"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondLotsPage />
                 </LazyRoute>
               </ProtectedRoute>
             }

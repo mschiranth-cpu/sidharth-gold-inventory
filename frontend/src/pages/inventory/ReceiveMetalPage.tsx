@@ -68,8 +68,9 @@ export default function ReceiveMetalPage() {
   // HALF leaves amountPaid alone (user-controlled).
   // BOTH mode is driven by its own effect below — skip here so we don't clobber
   // an over-payment split (e.g. cash 60 + neft 60 on a ₹100 total).
+  // Note: `isBillable` is now a pure tax-classification tag; payment behavior
+  // runs identically for both billable and non-billable purchases.
   useEffect(() => {
-    if (!formData.isBillable) return;
     if (formData.paymentMode === 'BOTH') return;
     if (formData.paymentStatus === 'COMPLETE') {
       setFormData((prev) =>
@@ -78,12 +79,12 @@ export default function ReceiveMetalPage() {
     } else if (formData.paymentStatus === 'PENDING') {
       setFormData((prev) => (prev.amountPaid === 0 ? prev : { ...prev, amountPaid: 0 }));
     }
-  }, [totalPrice, formData.paymentStatus, formData.isBillable, formData.paymentMode]);
+  }, [totalPrice, formData.paymentStatus, formData.paymentMode]);
 
   // BOTH mode: cash + neft inputs ARE the payment, so derive status + amountPaid
   // from their sum. (CASH/NEFT modes are driven by the status segmented buttons.)
   useEffect(() => {
-    if (!formData.isBillable || formData.paymentMode !== 'BOTH' || totalPrice <= 0) return;
+    if (formData.paymentMode !== 'BOTH' || totalPrice <= 0) return;
     const split = (formData.cashAmount || 0) + (formData.neftAmount || 0);
     let nextStatus: string;
     if (split <= 0) nextStatus = 'PENDING';
@@ -98,7 +99,6 @@ export default function ReceiveMetalPage() {
     formData.cashAmount,
     formData.neftAmount,
     formData.paymentMode,
-    formData.isBillable,
     totalPrice,
   ]);
 
@@ -122,7 +122,8 @@ export default function ReceiveMetalPage() {
     if (!formData.rate || formData.rate <= 0)
       e.rate = 'Rate per Gram is required and must be greater than 0';
 
-    if (formData.isBillable && totalPrice > 0) {
+    // Payment validation runs for every purchase — isBillable is a tax tag.
+    if (totalPrice > 0) {
       if (!formData.paymentMode) e.paymentMode = 'Payment Mode is required';
       if (!formData.paymentStatus) e.paymentStatus = 'Payment Status is required';
       // BOTH split & HALF amount are allowed to over-pay; the excess is
@@ -166,22 +167,22 @@ export default function ReceiveMetalPage() {
         ? new Date(formData.transactionDate).toISOString()
         : undefined,
     };
-    if (formData.isBillable) {
-      payload.paymentMode = formData.paymentMode;
-      payload.paymentStatus = formData.paymentStatus;
-      payload.amountPaid = formData.amountPaid;
-      if (formData.creditApplied > 0) {
-        payload.creditApplied = formData.creditApplied;
-      }
-      if (formData.paymentMode === 'BOTH') {
-        payload.cashAmount = formData.cashAmount;
-        payload.neftAmount = formData.neftAmount;
-      }
-      if (isNeft) {
-        if (formData.neftUtr) payload.neftUtr = formData.neftUtr;
-        if (formData.neftBank) payload.neftBank = formData.neftBank;
-        if (formData.neftDate) payload.neftDate = new Date(formData.neftDate).toISOString();
-      }
+    // Always send payment fields. `isBillable` is preserved on the row purely
+    // as a tax-classification tag for Excel exports.
+    payload.paymentMode = formData.paymentMode;
+    payload.paymentStatus = formData.paymentStatus;
+    payload.amountPaid = formData.amountPaid;
+    if (formData.creditApplied > 0) {
+      payload.creditApplied = formData.creditApplied;
+    }
+    if (formData.paymentMode === 'BOTH') {
+      payload.cashAmount = formData.cashAmount;
+      payload.neftAmount = formData.neftAmount;
+    }
+    if (isNeft) {
+      if (formData.neftUtr) payload.neftUtr = formData.neftUtr;
+      if (formData.neftBank) payload.neftBank = formData.neftBank;
+      if (formData.neftDate) payload.neftDate = new Date(formData.neftDate).toISOString();
     }
     createMutation.mutate(payload);
   };
@@ -861,10 +862,17 @@ export function BillingPaymentCard({
   return (
     <div className="p-5 bg-white rounded-xl border border-champagne-200 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-onyx-900">Billing &amp; Payment</h3>
+        <div>
+          <h3 className="font-semibold text-onyx-900">Billing &amp; Payment</h3>
+          <p className="text-xs text-onyx-400 mt-0.5">
+            Vendor balance, credit, and payment tracking work the same for both
+            options. The Billable / Non-Billable label is only used to filter
+            rows in the Excel export for Income Tax filing.
+          </p>
+        </div>
       </div>
 
-      {/* Billable toggle */}
+      {/* Billable / Non-Billable tax tag */}
       <div className="flex gap-2">
         <button type="button" className={segBtn(formData.isBillable)} onClick={() => set({ isBillable: true })}>
           Billable
@@ -874,17 +882,16 @@ export function BillingPaymentCard({
         </button>
       </div>
 
-      {!formData.isBillable && (
-        <p className="text-sm text-onyx-400">
-          Non-Billable: this transaction won&apos;t affect vendor outstanding balance.
-        </p>
-      )}
+      <p className="text-xs text-onyx-400 -mt-1">
+        {formData.isBillable
+          ? 'Billable: included in the Income-Tax Excel export.'
+          : "Non-Billable: still affects vendor balance, but excluded from the Income-Tax Excel export."}
+      </p>
 
-      {formData.isBillable && (
-        <>
-          {!vendorHasGstin && (
+      <>
+          {!vendorHasGstin && formData.isBillable && (
             <div className="px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
-              ⚠ This vendor has no GSTIN on file. Are you sure this should be billable?
+              ⚠ This vendor has no GSTIN on file. Are you sure this should be tagged Billable?
             </div>
           )}
 
@@ -1082,7 +1089,6 @@ export function BillingPaymentCard({
             </div>
           )}
         </>
-      )}
     </div>
   );
 }

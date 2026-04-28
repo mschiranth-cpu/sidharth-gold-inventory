@@ -4,7 +4,6 @@
  * ============================================
  */
 
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMyAttendance } from '../../services/attendance.service';

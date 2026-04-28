@@ -20,6 +20,7 @@ import {
   getMeltingBatches,
   settleMetalPayment,
   getMetalPayments,
+  exportMetalTransactions,
 } from './metal.service';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../middleware/errorHandler';
@@ -230,6 +231,35 @@ export async function getMetalPaymentsController(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       error: { message: error.message || 'Failed to fetch payments' },
+    });
+  }
+}
+
+export async function exportMetalTransactionsController(req: Request, res: Response) {
+  try {
+    const { metalType, transactionType, startDate, endDate, taxClass } = req.query;
+    const buffer = await exportMetalTransactions({
+      metalType: metalType as any,
+      transactionType: transactionType as any,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      taxClass:
+        taxClass === 'BILLABLE' || taxClass === 'NON_BILLABLE'
+          ? (taxClass as 'BILLABLE' | 'NON_BILLABLE')
+          : undefined,
+    });
+    const filename = `metal-transactions-${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error: any) {
+    logger.error('Export metal transactions error', { error });
+    res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Failed to export transactions' },
     });
   }
 }

@@ -53,7 +53,7 @@ const SALT_ROUNDS = 12;
  * JWT token expiration times
  */
 const TOKEN_EXPIRY = {
-  ACCESS: '15m', // Short-lived access token
+  ACCESS: '2h', // Short-lived access token (bumped from 15m per ops request)
   ACCESS_REMEMBER: '1d', // Extended access when "remember me" is checked
   REFRESH: '7d', // Refresh token validity
   REFRESH_REMEMBER: '30d', // Extended refresh when "remember me" is checked

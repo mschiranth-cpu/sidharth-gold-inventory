@@ -39,7 +39,9 @@ export default function CreateMeltingBatchPage() {
 
   const updateInputMetal = (index: number, field: string, value: any) => {
     const updated = [...inputMetals];
-    updated[index] = { ...updated[index], [field]: value };
+    const cur = updated[index];
+    if (!cur) return;
+    updated[index] = { ...cur, [field]: value };
     setInputMetals(updated);
   };
 

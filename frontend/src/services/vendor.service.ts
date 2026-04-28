@@ -133,3 +133,10 @@ export async function getVendorTransactions(id: string): Promise<MetalTransactio
   const r = await api.get(`/vendors/${id}/transactions`);
   return r.data.data;
 }
+
+export async function getVendorDiamondTransactions(
+  id: string
+): Promise<import('./diamond.service').DiamondTransaction[]> {
+  const r = await api.get(`/vendors/${id}/diamond-transactions`);
+  return r.data.data;
+}

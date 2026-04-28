@@ -246,41 +246,6 @@ test.describe('Module Testing Suite', () => {
   });
 
   // ============================================
-  // MODULE 4: PARTY METAL
-  // ============================================
-  test('Module 4: Party Metal - Party management', async ({ page }) => {
-    console.log('🧪 Testing Module 4: Party Metal');
-
-    await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
-
-    // Navigate to parties page
-    await page.goto('http://localhost:5173/inventory/parties');
-    await page.waitForLoadState('networkidle');
-
-    // Verify page loaded
-    await expect(page.locator('h1')).toContainText('Part');
-
-    // Check if parties are displayed
-    const parties = await page
-      .locator('[data-testid="party"], .party-card, table tbody tr')
-      .count();
-    console.log(`✅ Found ${parties} parties`);
-
-    // Check for add party button
-    const addButton = page.locator('button:has-text("Add Party"), button:has-text("Create")');
-    if (await addButton.isVisible()) {
-      console.log('✅ Add party button found');
-    }
-
-    // Check filters
-    const filters = await page.locator('select, input[type="search"]').count();
-    console.log(`✅ Found ${filters} filter controls`);
-
-    await logout(page);
-    console.log('✅ Module 4: Party Metal - PASSED');
-  });
-
-  // ============================================
   // MODULE 5: DIAMOND INVENTORY
   // ============================================
   test('Module 5: Diamond Inventory - Diamond management', async ({ page }) => {

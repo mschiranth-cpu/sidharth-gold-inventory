@@ -5,13 +5,11 @@
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { applyLeave, getLeaves } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
 
 export default function LeaveApplicationPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     leaveType: 'CASUAL',

@@ -16,23 +16,39 @@ import {
   getMetalPayments,
   settleMetalPayment,
   type MetalTransaction,
+  type MetalPayment,
 } from '../services/metal.service';
+import {
+  getDiamondPayments,
+  settleDiamondPayment,
+  type DiamondTransaction,
+  type DiamondPayment,
+} from '../services/diamond.service';
 import Button from './common/Button';
 
+type Domain = 'metal' | 'diamond';
+
 interface Props {
-  transaction: MetalTransaction;
+  transaction: MetalTransaction | DiamondTransaction;
   onClose: () => void;
   onSettled?: () => void;
+  /** Selects which API + cache keys to use. Defaults to 'metal' for back-compat. */
+  domain?: Domain;
 }
 
-export default function SettlePaymentModal({ transaction, onClose, onSettled }: Props) {
+export default function SettlePaymentModal({ transaction, onClose, onSettled, domain = 'metal' }: Props) {
   const queryClient = useQueryClient();
   const txnId = transaction.id;
   const totalValue = transaction.totalValue ?? 0;
+  const isDiamond = domain === 'diamond';
+  const paymentsQueryKey = isDiamond ? ['diamond-payments', txnId] : ['metal-payments', txnId];
+  const txnsQueryKey = isDiamond ? ['diamond-transactions'] : ['metal-transactions'];
+  const fetchPayments = (): Promise<MetalPayment[] | DiamondPayment[]> =>
+    isDiamond ? getDiamondPayments(txnId) : getMetalPayments(txnId);
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['metal-payments', txnId],
-    queryFn: () => getMetalPayments(txnId),
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery<MetalPayment[] | DiamondPayment[]>({
+    queryKey: paymentsQueryKey,
+    queryFn: fetchPayments,
   });
 
   const ledgerSum = useMemo(() => payments.reduce((s, p) => s + p.amount, 0), [payments]);
@@ -64,9 +80,9 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [balanceDue, amountTouched]);
 
-  const settle = useMutation({
-    mutationFn: () =>
-      settleMetalPayment(txnId, {
+  const settle = useMutation<MetalTransaction | DiamondTransaction, unknown, void>({
+    mutationFn: () => {
+      const payload = {
         amount,
         paymentMode,
         cashAmount: paymentMode === 'BOTH' ? cashAmount : undefined,
@@ -76,10 +92,14 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled }: 
         neftDate: neftDate ? new Date(neftDate).toISOString() : undefined,
         notes: notes || undefined,
         creditApplied: creditApplied > 0 ? creditApplied : undefined,
-      }),
+      };
+      return isDiamond
+        ? settleDiamondPayment(txnId, payload)
+        : settleMetalPayment(txnId, payload);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['metal-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['metal-payments', txnId] });
+      queryClient.invalidateQueries({ queryKey: txnsQueryKey });
+      queryClient.invalidateQueries({ queryKey: paymentsQueryKey });
       queryClient.invalidateQueries({ queryKey: ['vendors-outstanding'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       if (transaction.vendorId) {

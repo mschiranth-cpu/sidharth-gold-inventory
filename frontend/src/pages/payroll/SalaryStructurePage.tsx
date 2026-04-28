@@ -32,7 +32,7 @@ export default function SalaryStructurePage() {
     bankName: existingStructure?.bankName || '',
     accountNumber: existingStructure?.accountNumber || '',
     ifscCode: existingStructure?.ifscCode || '',
-    effectiveFrom: new Date().toISOString().split('T')[0],
+    effectiveFrom: new Date().toISOString().split('T')[0] || '',
   });
 
   const createMutation = useMutation({

@@ -5,6 +5,7 @@
  */
 
 import { PrismaClient, MetalType, MetalForm, MetalTransactionType } from '@prisma/client';
+import * as XLSX from 'xlsx';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../middleware/errorHandler';
 import {
@@ -132,18 +133,22 @@ export async function createMetalTransaction(
 
   const neftDate = data.neftDate ? new Date(data.neftDate) : undefined;
   const txnDate = data.transactionDate ? new Date(data.transactionDate) : undefined;
-  const isBillablePurchase = data.transactionType === 'PURCHASE' && data.isBillable === true;
+  // Payment & vendor-credit logic runs for every PURCHASE — `isBillable` is a
+  // pure tax-classification tag (used in Excel exports). Both billable and
+  // non-billable purchases affect the vendor's outstanding balance the same
+  // way, because the vendor is owed the money either way.
+  const isPurchase = data.transactionType === 'PURCHASE';
 
   const result = await prisma.$transaction(async (tx) => {
-    // Vendor credit handling. Only relevant for billable PURCHASE rows that
-    // have a vendor and a totalValue.
+    // Vendor credit handling. Relevant for any PURCHASE row that has a
+    // vendor and a totalValue.
     let creditApplied = 0;
     let creditGenerated = 0;
     let effectivePaid = data.amountPaid ?? 0;
     let cachedAmountPaid = data.amountPaid ?? 0;
     let cachedStatus = data.paymentStatus;
 
-    if (isBillablePurchase && data.vendorId && totalValue !== undefined) {
+    if (isPurchase && data.vendorId && totalValue !== undefined) {
       // Lock the vendor row for the rest of this transaction so concurrent
       // receipts can't double-spend the same credit balance.
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${data.vendorId} FOR UPDATE`;
@@ -204,20 +209,21 @@ export async function createMetalTransaction(
         createdById: createdById,
         // Override createdAt only if the user picked a transaction date.
         ...(txnDate ? { createdAt: txnDate } : {}),
-        // Payment fields. Only set when the caller explicitly sends isBillable.
-        // ISSUE / RETURN / etc. (and any non-PURCHASE) leave these as NULL.
+        // Payment fields apply to every PURCHASE (billable or not). Non-PURCHASE
+        // rows (ISSUE / RETURN / etc.) leave these as NULL.
+        // `isBillable` is preserved as a tax-classification tag.
         isBillable: data.isBillable,
-        paymentMode: isBillablePurchase ? data.paymentMode : undefined,
-        paymentStatus: isBillablePurchase ? cachedStatus : undefined,
-        amountPaid: isBillablePurchase ? cachedAmountPaid : undefined,
-        cashAmount: isBillablePurchase ? data.cashAmount : undefined,
-        neftAmount: isBillablePurchase ? data.neftAmount : undefined,
-        neftUtr: isBillablePurchase ? data.neftUtr || undefined : undefined,
-        neftBank: isBillablePurchase ? data.neftBank || undefined : undefined,
-        neftDate: isBillablePurchase ? neftDate : undefined,
-        creditApplied: isBillablePurchase && creditApplied > 0 ? creditApplied : undefined,
+        paymentMode: isPurchase ? data.paymentMode : undefined,
+        paymentStatus: isPurchase ? cachedStatus : undefined,
+        amountPaid: isPurchase ? cachedAmountPaid : undefined,
+        cashAmount: isPurchase ? data.cashAmount : undefined,
+        neftAmount: isPurchase ? data.neftAmount : undefined,
+        neftUtr: isPurchase ? data.neftUtr || undefined : undefined,
+        neftBank: isPurchase ? data.neftBank || undefined : undefined,
+        neftDate: isPurchase ? neftDate : undefined,
+        creditApplied: isPurchase && creditApplied > 0 ? creditApplied : undefined,
         creditGenerated:
-          isBillablePurchase && creditGenerated > 0 ? creditGenerated : undefined,
+          isPurchase && creditGenerated > 0 ? creditGenerated : undefined,
       },
       include: {
         stock: true,
@@ -332,18 +338,20 @@ export async function updateMetalTransaction(
       data.vendorId !== undefined ? data.vendorId : old.vendorId;
     const newIsBillable =
       data.isBillable !== undefined ? data.isBillable : old.isBillable;
-    const isBillablePurchase =
-      newTxnType === 'PURCHASE' && newIsBillable === true;
+    // Payment & vendor-credit logic now runs for every PURCHASE row
+    // (billable or not). `isBillable` is just a tax-classification tag.
+    const isPurchase = newTxnType === 'PURCHASE';
+    // Suppress unused-variable warning while still documenting the intent.
+    void newIsBillable;
 
     // ===== 1. Reverse OLD vendor-credit effect =====
     // Original logic at create time:
     //   vendor.creditBalance += creditGenerated - creditApplied  (balanceDelta)
-    // To reverse: subtract that same delta from the OLD vendor.
-    if (
-      old.transactionType === 'PURCHASE' &&
-      old.isBillable === true &&
-      old.vendorId
-    ) {
+    // To reverse: subtract that same delta from the OLD vendor. We use the
+    // stored creditApplied/creditGenerated columns rather than re-checking
+    // isBillable, so legacy non-billable rows (which had no credit deltas)
+    // naturally produce a zero-delta no-op.
+    if (old.transactionType === 'PURCHASE' && old.vendorId) {
       const oldDelta =
         (old.creditGenerated ?? 0) - (old.creditApplied ?? 0);
       if (oldDelta !== 0) {
@@ -382,7 +390,7 @@ export async function updateMetalTransaction(
     let cachedStatus: string | null | undefined =
       data.paymentStatus ?? old.paymentStatus;
 
-    if (isBillablePurchase && newVendorId && newTotalValue !== null) {
+    if (isPurchase && newVendorId && newTotalValue !== null) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${newVendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: newVendorId },
@@ -463,39 +471,39 @@ export async function updateMetalTransaction(
         // Allow editing the transaction date.
         ...(txnDate ? { createdAt: txnDate } : {}),
         isBillable: data.isBillable !== undefined ? data.isBillable : old.isBillable,
-        paymentMode: isBillablePurchase
+        paymentMode: isPurchase
           ? data.paymentMode ?? old.paymentMode
           : null,
-        paymentStatus: isBillablePurchase ? cachedStatus : null,
-        amountPaid: isBillablePurchase ? cachedAmountPaid : null,
-        cashAmount: isBillablePurchase
+        paymentStatus: isPurchase ? cachedStatus : null,
+        amountPaid: isPurchase ? cachedAmountPaid : null,
+        cashAmount: isPurchase
           ? data.cashAmount !== undefined
             ? data.cashAmount
             : old.cashAmount
           : null,
-        neftAmount: isBillablePurchase
+        neftAmount: isPurchase
           ? data.neftAmount !== undefined
             ? data.neftAmount
             : old.neftAmount
           : null,
-        neftUtr: isBillablePurchase
+        neftUtr: isPurchase
           ? data.neftUtr !== undefined
             ? data.neftUtr || null
             : old.neftUtr
           : null,
-        neftBank: isBillablePurchase
+        neftBank: isPurchase
           ? data.neftBank !== undefined
             ? data.neftBank || null
             : old.neftBank
           : null,
-        neftDate: isBillablePurchase
+        neftDate: isPurchase
           ? data.neftDate !== undefined
             ? neftDate ?? null
             : old.neftDate
           : null,
-        creditApplied: isBillablePurchase && creditApplied > 0 ? creditApplied : null,
+        creditApplied: isPurchase && creditApplied > 0 ? creditApplied : null,
         creditGenerated:
-          isBillablePurchase && creditGenerated > 0 ? creditGenerated : null,
+          isPurchase && creditGenerated > 0 ? creditGenerated : null,
       },
       include: {
         stock: true,
@@ -533,11 +541,10 @@ export async function deleteMetalTransaction(id: string) {
     }
 
     // Reverse vendor-credit delta (same logic as updateMetalTransaction).
-    if (
-      old.transactionType === 'PURCHASE' &&
-      old.isBillable === true &&
-      old.vendorId
-    ) {
+    // Use the stored creditApplied/creditGenerated columns rather than
+    // re-checking isBillable, so legacy non-billable rows (no credit deltas)
+    // produce a zero-delta no-op while new non-billable rows reverse cleanly.
+    if (old.transactionType === 'PURCHASE' && old.vendorId) {
       const oldDelta =
         (old.creditGenerated ?? 0) - (old.creditApplied ?? 0);
       if (oldDelta !== 0) {
@@ -733,8 +740,8 @@ export async function settleMetalPayment(
     if (!txn) {
       throw new ApiError(404, 'Metal transaction not found', true, 'NOT_FOUND');
     }
-    if (txn.transactionType !== 'PURCHASE' || txn.isBillable !== true) {
-      throw new ApiError(400, 'Only billable purchases can be settled');
+    if (txn.transactionType !== 'PURCHASE') {
+      throw new ApiError(400, 'Only purchases can be settled');
     }
 
     const totalValue = txn.totalValue ?? 0;
@@ -857,4 +864,97 @@ export async function getMetalPayments(transactionId: string) {
     },
     orderBy: { recordedAt: 'desc' },
   });
+}
+
+/**
+ * Export metal transactions to an Excel workbook.
+ *
+ * Three sheets:
+ *   - "All Transactions"  — every row in the filtered range
+ *   - "Billable"          — only isBillable === true (for IT filing)
+ *   - "Non-Billable"      — only isBillable !== true
+ *
+ * Filters mirror the list endpoint (metalType, transactionType, date range)
+ * plus an optional `taxClass` ('BILLABLE' | 'NON_BILLABLE') for export-only use.
+ */
+export async function exportMetalTransactions(filters: {
+  metalType?: MetalType;
+  transactionType?: MetalTransactionType;
+  startDate?: Date;
+  endDate?: Date;
+  taxClass?: 'BILLABLE' | 'NON_BILLABLE';
+}): Promise<Buffer> {
+  const where: any = {};
+  if (filters.metalType) where.metalType = filters.metalType;
+  if (filters.transactionType) where.transactionType = filters.transactionType;
+  if (filters.startDate || filters.endDate) {
+    where.createdAt = {};
+    if (filters.startDate) where.createdAt.gte = filters.startDate;
+    if (filters.endDate) where.createdAt.lte = filters.endDate;
+  }
+  if (filters.taxClass === 'BILLABLE') where.isBillable = true;
+  if (filters.taxClass === 'NON_BILLABLE') where.isBillable = { not: true };
+
+  const transactions = await prisma.metalTransaction.findMany({
+    where,
+    include: {
+      vendor: { select: { name: true, uniqueCode: true, gstNumber: true } },
+      createdBy: { select: { name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const fmt = (n: number | null | undefined) =>
+    n == null ? '' : Number(n.toFixed(2));
+
+  const rows = transactions.map((t) => ({
+    Date: t.createdAt.toISOString().split('T')[0],
+    Type: t.transactionType,
+    'Tax Class': t.isBillable === true ? 'Billable' : 'Non-Billable',
+    Metal: t.metalType,
+    Purity: t.purity,
+    Form: t.form,
+    'Gross Wt (g)': fmt(t.grossWeight),
+    'Pure Wt (g)': fmt(t.pureWeight),
+    'Rate (₹/g)': fmt(t.rate),
+    'Total Value (₹)': fmt(t.totalValue),
+    'Amount Paid (₹)': fmt(t.amountPaid),
+    'Balance (₹)':
+      t.totalValue != null && t.amountPaid != null
+        ? fmt(Math.max(0, t.totalValue - t.amountPaid))
+        : '',
+    'Payment Mode': t.paymentMode ?? '',
+    'Payment Status': t.paymentStatus ?? '',
+    'Cash (₹)': fmt(t.cashAmount),
+    'NEFT (₹)': fmt(t.neftAmount),
+    'NEFT UTR': t.neftUtr ?? '',
+    'NEFT Bank': t.neftBank ?? '',
+    'Credit Applied (₹)': fmt(t.creditApplied),
+    'Credit Generated (₹)': fmt(t.creditGenerated),
+    Vendor: t.vendor?.name ?? '',
+    'Vendor Code': t.vendor?.uniqueCode ?? '',
+    GSTIN: t.vendor?.gstNumber ?? '',
+    Reference: t.referenceNumber ?? '',
+    Notes: t.notes ?? '',
+    'Recorded By': t.createdBy?.name ?? '',
+  }));
+
+  const billable = rows.filter((r) => r['Tax Class'] === 'Billable');
+  const nonBillable = rows.filter((r) => r['Tax Class'] === 'Non-Billable');
+
+  const workbook = XLSX.utils.book_new();
+  const allSheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, allSheet, 'All Transactions');
+  if (billable.length > 0) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(billable), 'Billable');
+  }
+  if (nonBillable.length > 0) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(nonBillable),
+      'Non-Billable'
+    );
+  }
+
+  return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 }

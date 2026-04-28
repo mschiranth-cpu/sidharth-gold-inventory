@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAllFeatures, updateFeaturePermission } from '../../services/features.service';
 import { UserRole } from '../../types/auth.types';
-import Button from '../../components/common/Button';
 
 export default function FeatureTogglePage() {
   const queryClient = useQueryClient();

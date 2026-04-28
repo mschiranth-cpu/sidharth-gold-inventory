@@ -60,10 +60,12 @@ export default function PayslipDetailPage() {
             Back to Payslips
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mt-2">Payslip Details</h1>
-          <p className="text-gray-600">
-            {new Date(0, payslip.period.month - 1).toLocaleString('en-IN', { month: 'long' })}{' '}
-            {payslip.period.year}
-          </p>
+          {payslip.period && (
+            <p className="text-gray-600">
+              {new Date(0, payslip.period.month - 1).toLocaleString('en-IN', { month: 'long' })}{' '}
+              {payslip.period.year}
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">

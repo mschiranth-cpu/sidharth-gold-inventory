@@ -49,6 +49,11 @@ export interface Payslip {
   holidays: number;
   overtimeHours: number;
   basicEarned: number;
+  hraEarned?: number | null;
+  daEarned?: number | null;
+  overtimePay?: number | null;
+  advanceDeduction?: number | null;
+  loanDeduction?: number | null;
   grossEarnings: number;
   totalDeductions: number;
   netSalary: number;

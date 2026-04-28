@@ -13,8 +13,10 @@ import {
   getVendor,
   getVendorOutstanding,
   getVendorTransactions,
+  getVendorDiamondTransactions,
 } from '../../services/vendor.service';
 import type { MetalTransaction } from '../../services/metal.service';
+import type { DiamondTransaction } from '../../services/diamond.service';
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import GstInfoCard from '../../components/GstInfoCard';
@@ -75,6 +77,7 @@ export default function VendorDetailPage() {
   const { user } = useAuth();
   const canSettle = SETTLE_ROLES.has(String(user?.role ?? ''));
   const [settleTxn, setSettleTxn] = useState<MetalTransaction | null>(null);
+  const [settleDiamondTxn, setSettleDiamondTxn] = useState<DiamondTransaction | null>(null);
 
   const { data: vendor, isLoading: vendorLoading, isError: vendorError } = useQuery({
     queryKey: ['vendor', id],
@@ -91,6 +94,64 @@ export default function VendorDetailPage() {
     queryFn: () => getVendorTransactions(id),
     enabled: Boolean(id),
   });
+  const { data: diamondTransactions = [] } = useQuery({
+    queryKey: ['vendor-diamond-transactions', id],
+    queryFn: () => getVendorDiamondTransactions(id),
+    enabled: Boolean(id),
+  });
+
+  // Merge metal + diamond into a single chronological list. Each row carries
+  // a `domain` discriminator + a normalised `description` so one table can
+  // render both. Settle action dispatches to the right modal via the domain.
+  type UnifiedRow = {
+    id: string;
+    domain: 'metal' | 'diamond';
+    createdAt: string;
+    description: string;
+    measure: string;
+    rate: number | null;
+    totalValue: number | null;
+    amountPaid: number | null;
+    creditApplied: number | null;
+    creditGenerated: number | null;
+    paymentStatus: string | null;
+    isBillable: boolean | null;
+    raw: MetalTransaction | DiamondTransaction;
+  };
+  const unified: UnifiedRow[] = [
+    ...transactions.map((t) => ({
+      id: `m-${t.id}`,
+      domain: 'metal' as const,
+      createdAt: t.createdAt,
+      description: `${t.metalType} ${t.purity}K`,
+      measure: `${t.grossWeight.toFixed(2)} g`,
+      rate: t.rate ?? null,
+      totalValue: t.totalValue ?? null,
+      amountPaid: t.amountPaid ?? null,
+      creditApplied: t.creditApplied ?? null,
+      creditGenerated: t.creditGenerated ?? null,
+      paymentStatus: t.paymentStatus ?? null,
+      isBillable: t.isBillable ?? null,
+      raw: t,
+    })),
+    ...diamondTransactions.map((t) => ({
+      id: `d-${t.id}`,
+      domain: 'diamond' as const,
+      createdAt: t.createdAt,
+      description: [t.diamond?.shape, t.diamond?.color, t.diamond?.clarity]
+        .filter(Boolean)
+        .join(' · ') || (t.diamond?.stockNumber ?? 'Diamond'),
+      measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
+      rate: t.pricePerCarat ?? null,
+      totalValue: t.totalValue ?? null,
+      amountPaid: t.amountPaid ?? null,
+      creditApplied: t.creditApplied ?? null,
+      creditGenerated: t.creditGenerated ?? null,
+      paymentStatus: t.paymentStatus ?? null,
+      isBillable: t.isBillable ?? null,
+      raw: t,
+    })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   if (vendorLoading) {
     return (
@@ -150,7 +211,7 @@ export default function VendorDetailPage() {
 
         {/* Outstanding summary */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <StatCard label="Total Billable" value={`₹${fmt(outstanding?.totalBillable ?? 0)}`} />
+          <StatCard label="Total Purchases" value={`₹${fmt(outstanding?.totalBillable ?? 0)}`} />
           <StatCard label="Total Paid" value={`₹${fmt(outstanding?.totalPaid ?? 0)}`} tone="emerald" />
           <StatCard
             label="Outstanding"
@@ -165,12 +226,15 @@ export default function VendorDetailPage() {
           <StatCard label="Open Receipts" value={String(outstanding?.openCount ?? 0)} tone="amber" />
         </div>
 
-        {/* Transactions */}
+        {/* Unified Purchase Transactions (metal + diamond, chronological) */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Purchase Transactions</h2>
+            <span className="text-xs text-gray-500">
+              {transactions.length} metal · {diamondTransactions.length} diamond
+            </span>
           </div>
-          {transactions.length === 0 ? (
+          {unified.length === 0 ? (
             <p className="px-6 py-12 text-center text-gray-500">No purchases yet.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -178,9 +242,9 @@ export default function VendorDetailPage() {
                 <thead className="bg-gray-50 text-xs text-gray-600 uppercase">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Date</th>
-                    <th className="px-4 py-3 text-left font-medium">Metal</th>
-                    <th className="px-4 py-3 text-left font-medium">Purity</th>
-                    <th className="px-4 py-3 text-right font-medium">Weight (g)</th>
+                    <th className="px-4 py-3 text-left font-medium">Type</th>
+                    <th className="px-4 py-3 text-left font-medium">Item</th>
+                    <th className="px-4 py-3 text-right font-medium">Qty</th>
                     <th className="px-4 py-3 text-right font-medium">Rate</th>
                     <th className="px-4 py-3 text-right font-medium">Total Value</th>
                     <th className="px-4 py-3 text-right font-medium">Paid</th>
@@ -189,33 +253,45 @@ export default function VendorDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {transactions.map((txn) => (
-                    <tr key={txn.id} className="hover:bg-gray-50">
+                  {unified.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-700">
-                        {new Date(txn.createdAt).toLocaleDateString('en-IN')}
+                        {new Date(row.createdAt).toLocaleDateString('en-IN')}
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{txn.metalType}</td>
-                      <td className="px-4 py-3 text-gray-700">{txn.purity}K</td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {txn.grossWeight.toFixed(2)}
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+                            row.domain === 'metal'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-sky-50 text-sky-800 border border-sky-200'
+                          }`}
+                        >
+                          {row.domain}
+                        </span>
                       </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{row.description}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{row.measure}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {txn.rate ? `₹${fmt(txn.rate)}` : '—'}
+                        {row.rate ? `₹${fmt(row.rate)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-medium">
-                        {txn.totalValue != null ? `₹${fmt(txn.totalValue)}` : '—'}
+                        {row.totalValue != null ? `₹${fmt(row.totalValue)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {txn.amountPaid != null ? `₹${fmt(txn.amountPaid)}` : '—'}
+                        {row.amountPaid != null ? `₹${fmt(row.amountPaid)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-xs">
-                        {txn.creditApplied || txn.creditGenerated ? (
+                        {row.creditApplied || row.creditGenerated ? (
                           <div className="space-y-0.5">
-                            {txn.creditApplied ? (
-                              <span className="block text-champagne-800">Applied: ₹{fmt(txn.creditApplied)}</span>
+                            {row.creditApplied ? (
+                              <span className="block text-champagne-800">
+                                Applied: ₹{fmt(row.creditApplied)}
+                              </span>
                             ) : null}
-                            {txn.creditGenerated ? (
-                              <span className="block text-emerald-700">Generated: ₹{fmt(txn.creditGenerated)}</span>
+                            {row.creditGenerated ? (
+                              <span className="block text-emerald-700">
+                                Generated: ₹{fmt(row.creditGenerated)}
+                              </span>
                             ) : null}
                           </div>
                         ) : (
@@ -223,16 +299,26 @@ export default function VendorDetailPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {txn.isBillable !== true || !txn.paymentStatus ? (
+                        {!row.paymentStatus ? (
                           <span className="text-gray-400">—</span>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <PaymentBadge status={txn.paymentStatus} />
+                            <PaymentBadge status={row.paymentStatus} />
+                            {row.isBillable !== true && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
+                                Non-billable
+                              </span>
+                            )}
                             {canSettle &&
-                              (txn.paymentStatus === 'HALF' || txn.paymentStatus === 'PENDING') && (
+                              (row.paymentStatus === 'HALF' ||
+                                row.paymentStatus === 'PENDING') && (
                                 <button
                                   type="button"
-                                  onClick={() => setSettleTxn(txn)}
+                                  onClick={() =>
+                                    row.domain === 'metal'
+                                      ? setSettleTxn(row.raw as MetalTransaction)
+                                      : setSettleDiamondTxn(row.raw as DiamondTransaction)
+                                  }
                                   className="text-xs font-medium text-champagne-700 hover:text-onyx-800 hover:underline"
                                 >
                                   Settle
@@ -252,6 +338,14 @@ export default function VendorDetailPage() {
 
       {settleTxn && (
         <SettlePaymentModal transaction={settleTxn} onClose={() => setSettleTxn(null)} />
+      )}
+
+      {settleDiamondTxn && (
+        <SettlePaymentModal
+          domain="diamond"
+          transaction={settleDiamondTxn as any}
+          onClose={() => setSettleDiamondTxn(null)}
+        />
       )}
     </div>
   );

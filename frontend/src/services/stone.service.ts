@@ -16,6 +16,7 @@ export interface RealStone {
   clarity?: string;
   origin?: string;
   treatment?: string;
+  treatmentNotes?: string | null;
   pricePerCarat?: number;
   totalPrice?: number;
   status: string;
@@ -34,6 +35,7 @@ export interface StonePacket {
   currentWeight: number;
   unit: string;
   pricePerUnit?: number;
+  reorderLevel?: number | null;
   createdAt: string;
 }
 

@@ -119,7 +119,7 @@ export default function IssueMetalPage() {
     if (errorList.length > 0) {
       setShowAllErrors(true);
       // Auto-focus first invalid field
-      const firstKey = errorList[0][0];
+      const firstKey = errorList[0]![0];
       const map: Record<string, string> = {
         metalType: 'metalType',
         purity: 'purity',
@@ -150,7 +150,7 @@ export default function IssueMetalPage() {
 
   const blur = (k: string) => () => setTouched((t) => ({ ...t, [k]: true }));
 
-  const selectedMetal = METAL_OPTIONS.find((m) => m.value === form.metalType) ?? METAL_OPTIONS[0];
+  const selectedMetal = METAL_OPTIONS.find((m) => m.value === form.metalType) ?? METAL_OPTIONS[0]!;
 
   /* ── render ──────────────────────────────────────────────────── */
 

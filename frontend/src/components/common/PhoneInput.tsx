@@ -182,17 +182,17 @@ export default function PhoneInput({ value, onChange, onBlur, hasError, placehol
     return () => window.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const country = COUNTRIES.find((c) => c.iso === iso) || COUNTRIES[0];
+  const country = COUNTRIES.find((c) => c.iso === iso) || COUNTRIES[0]!;
 
   const emit = (newIso: string, newNational: string) => {
-    const c = COUNTRIES.find((x) => x.iso === newIso) || COUNTRIES[0];
+    const c = COUNTRIES.find((x) => x.iso === newIso) || COUNTRIES[0]!;
     onChange(newNational ? `${c.dial} ${newNational}` : '');
   };
 
   const onNationalChange = (raw: string) => {
     // Strip everything except digits.
     const digits = raw.replace(/\D/g, '');
-    const c = COUNTRIES.find((x) => x.iso === iso) || COUNTRIES[0];
+    const c = COUNTRIES.find((x) => x.iso === iso) || COUNTRIES[0]!;
     const trimmed = digits.slice(0, c.max);
     setNational(trimmed);
     emit(iso, trimmed);
@@ -203,7 +203,7 @@ export default function PhoneInput({ value, onChange, onBlur, hasError, placehol
     setOpen(false);
     setSearch('');
     // Re-clamp national to new max
-    const c = COUNTRIES.find((x) => x.iso === newIso) || COUNTRIES[0];
+    const c = COUNTRIES.find((x) => x.iso === newIso) || COUNTRIES[0]!;
     const clamped = national.slice(0, c.max);
     if (clamped !== national) setNational(clamped);
     emit(newIso, clamped);

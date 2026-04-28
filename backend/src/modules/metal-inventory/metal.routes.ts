@@ -22,6 +22,7 @@ import {
   getMeltingBatchesController,
   settleMetalPaymentController,
   getMetalPaymentsController,
+  exportMetalTransactionsController,
 } from './metal.controller';
 
 const router = Router();
@@ -52,6 +53,12 @@ router.get(
   authenticate,
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER),
   getAllMetalTransactionsController
+);
+router.get(
+  '/transactions/export',
+  authenticate,
+  requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
+  exportMetalTransactionsController
 );
 router.post(
   '/transactions',

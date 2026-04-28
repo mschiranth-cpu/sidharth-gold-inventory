@@ -10,7 +10,7 @@ import { getAllAttendance } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
 
 export default function AdminAttendancePage() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0] || '');
 
   const { data: attendance = [], isLoading } = useQuery({
     queryKey: ['all-attendance', selectedDate],

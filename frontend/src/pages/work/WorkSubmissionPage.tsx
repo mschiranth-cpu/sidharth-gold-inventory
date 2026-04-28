@@ -822,7 +822,7 @@ function WorkSubmissionPage() {
   // Check if advanced features are enabled (for future use)
   const configId =
     departmentNameToConfigId[workDetails.departmentName] || workDetails.departmentName;
-  const isFeatureEnabled = isDepartmentEnabled(configId);
+  void isDepartmentEnabled(configId); // reserved for future feature flag gating
 
   const isWorkComplete = workDetails.workData?.isComplete || false;
   const orderDetails = workDetails.order.orderDetails;

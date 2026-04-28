@@ -388,15 +388,26 @@ interface VendorOutstandingRow {
 
 // GET /api/vendors/outstanding  — aggregate across all vendors.
 router.get('/outstanding', async (_req: Request, res: Response) => {
+  // `is_billable` is now a pure tax-classification tag (used in Excel exports);
+  // both billable and non-billable PURCHASE rows count toward what the vendor
+  // is owed. Sums BOTH metal AND diamond purchases — vendors are cross-domain.
   const rows = await prisma.$queryRaw<VendorOutstandingRow[]>`
+    WITH unified AS (
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM metal_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM diamond_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+    )
     SELECT v.id AS "vendorId", v.name, v.unique_code AS "uniqueCode",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN mt.total_value ELSE 0 END), 0)::float AS "totalBillable",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "totalPaid",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.total_value,0) - COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "outstanding",
-      COUNT(CASE WHEN mt.is_billable=true AND mt.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
+      COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
+      COALESCE(SUM(COALESCE(u.amount_paid,0)), 0)::float AS "totalPaid",
+      COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0)::float AS "outstanding",
+      COUNT(CASE WHEN u.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
     FROM vendors v
-    LEFT JOIN metal_transactions mt
-      ON mt.vendor_id = v.id AND mt.transaction_type = 'PURCHASE'
+    LEFT JOIN unified u ON u.vendor_id = v.id
     GROUP BY v.id, v.name, v.unique_code
     ORDER BY "outstanding" DESC, v.name ASC
   `;
@@ -406,14 +417,22 @@ router.get('/outstanding', async (_req: Request, res: Response) => {
 // GET /api/vendors/:id/outstanding  — single vendor totals.
 router.get('/:id/outstanding', async (req: Request, res: Response) => {
   const rows = await prisma.$queryRaw<VendorOutstandingRow[]>`
+    WITH unified AS (
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM metal_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id = ${req.params.id}
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM diamond_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id = ${req.params.id}
+    )
     SELECT v.id AS "vendorId", v.name, v.unique_code AS "uniqueCode",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN mt.total_value ELSE 0 END), 0)::float AS "totalBillable",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "totalPaid",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.total_value,0) - COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "outstanding",
-      COUNT(CASE WHEN mt.is_billable=true AND mt.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
+      COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
+      COALESCE(SUM(COALESCE(u.amount_paid,0)), 0)::float AS "totalPaid",
+      COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0)::float AS "outstanding",
+      COUNT(CASE WHEN u.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
     FROM vendors v
-    LEFT JOIN metal_transactions mt
-      ON mt.vendor_id = v.id AND mt.transaction_type = 'PURCHASE'
+    LEFT JOIN unified u ON u.vendor_id = v.id
     WHERE v.id = ${req.params.id}
     GROUP BY v.id, v.name, v.unique_code
   `;
@@ -423,12 +442,39 @@ router.get('/:id/outstanding', async (req: Request, res: Response) => {
   res.json({ success: true, data: rows[0] });
 });
 
-// GET /api/vendors/:id/transactions  — vendor's billable purchase history.
+// GET /api/vendors/:id/transactions  — vendor's full purchase history
+// (billable + non-billable; isBillable is a tax-classification tag).
 router.get('/:id/transactions', async (req: Request, res: Response) => {
   const transactions = await prisma.metalTransaction.findMany({
     where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
     include: {
       vendor: { select: { id: true, name: true, uniqueCode: true } },
+      payments: {
+        include: { recordedBy: { select: { id: true, name: true } } },
+        orderBy: { recordedAt: 'desc' },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ success: true, data: transactions });
+});
+
+// GET /api/vendors/:id/diamond-transactions  — vendor's diamond purchase history.
+router.get('/:id/diamond-transactions', async (req: Request, res: Response) => {
+  const transactions = await prisma.diamondTransaction.findMany({
+    where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
+    include: {
+      vendor: { select: { id: true, name: true, uniqueCode: true } },
+      diamond: {
+        select: {
+          id: true,
+          stockNumber: true,
+          category: true,
+          shape: true,
+          color: true,
+          clarity: true,
+        },
+      },
       payments: {
         include: { recordedBy: { select: { id: true, name: true } } },
         orderBy: { recordedAt: 'desc' },

@@ -93,18 +93,6 @@ test.describe('All Modules E2E Testing', () => {
     console.log(`   ✅ Rates page loaded`);
 
     // ============================================
-    // MODULE 4: PARTY METAL
-    // ============================================
-    console.log('\n🧪 Testing Module 4: Party Metal');
-    await page.goto('http://localhost:5173/inventory/parties');
-    await page.waitForTimeout(2000);
-
-    const parties = await page
-      .locator('table tbody tr, [data-testid="party"], .party-card')
-      .count();
-    console.log(`   ✅ Found ${parties} parties`);
-
-    // ============================================
     // MODULE 5: DIAMOND INVENTORY
     // ============================================
     console.log('\n🧪 Testing Module 5: Diamond Inventory');

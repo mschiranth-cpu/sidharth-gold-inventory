@@ -82,7 +82,7 @@ export function RefreshIntervalProvider({ children }: { children: ReactNode }) {
 
   const option = useMemo<RefreshOption>(() => {
     const found = REFRESH_OPTIONS.find((o) => o.ms === intervalMs);
-    return found ?? REFRESH_OPTIONS[3]; // default 30s
+    return found ?? REFRESH_OPTIONS[3]!; // default 30s
   }, [intervalMs]);
 
   const value = useMemo(
@@ -113,7 +113,7 @@ export function useRefreshIntervalControls(): ContextValue {
     // Allow standalone usage – returns a no-op setter.
     return {
       intervalMs: readStored(),
-      option: REFRESH_OPTIONS[3],
+      option: REFRESH_OPTIONS[3]!,
       setIntervalMs: () => {},
     };
   }

@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteMetalTransaction,
+  exportMetalTransactionsXlsx,
   getAllMetalTransactions,
   type MetalTransaction,
 } from '../../services/metal.service';
@@ -66,9 +67,10 @@ function formatINR(n: number): string {
 /**
  * Payment cell.
  *  - Non-PURCHASE rows have no payment concept → "—"
- *  - Non-billable PURCHASE → muted "Non-billable" tag
- *  - Billable PURCHASE → meaningful status (Paid in Full / Partially Paid / Pending)
- *    plus payment mode and amount paid / balance due where useful.
+ *  - PURCHASE rows (billable OR non-billable) → meaningful status
+ *    (Paid in Full / Partially Paid / Pending) plus payment mode and
+ *    amount paid / balance due. Non-billable rows additionally get a
+ *    small "Non-billable" tag for tax-classification visibility.
  */
 function PaymentCell({
   txn,
@@ -83,27 +85,24 @@ function PaymentCell({
     return <span className="text-onyx-300">—</span>;
   }
 
-  if (txn.isBillable !== true) {
-    return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
-        Non-billable
-      </span>
-    );
-  }
-
-  // isBillable === true but no cached paymentStatus — older rows from before
-  // the payment fields existed. Show the badge as Pending so the user can
-  // still settle / edit.
+  // Older rows (pre-payment-fields) may have no cached paymentStatus —
+  // show the badge as Pending so the user can still settle / edit.
   const status = txn.paymentStatus || 'PENDING';
   const totalValue = txn.totalValue ?? 0;
   const amountPaid = txn.amountPaid ?? 0;
   const balanceDue = Math.max(0, totalValue - amountPaid);
   const mode = modeLabel(txn.paymentMode);
+  const isNonBillable = txn.isBillable !== true;
 
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <PaymentBadge status={status} />
+        {isNonBillable && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
+            Non-billable
+          </span>
+        )}
         {canSettle && (status === 'HALF' || status === 'PENDING') && (
           <button
             type="button"
@@ -209,8 +208,10 @@ export default function MetalTransactionsPage() {
       if (paymentFilter) {
         if (paymentFilter === 'NON_BILLABLE') {
           if (!(t.transactionType === 'PURCHASE' && t.isBillable !== true)) return false;
+        } else if (paymentFilter === 'BILLABLE') {
+          if (!(t.transactionType === 'PURCHASE' && t.isBillable === true)) return false;
         } else {
-          if (t.transactionType !== 'PURCHASE' || t.isBillable !== true) return false;
+          if (t.transactionType !== 'PURCHASE') return false;
           const status = t.paymentStatus || 'PENDING';
           if (status !== paymentFilter) return false;
         }
@@ -299,10 +300,9 @@ export default function MetalTransactionsPage() {
     for (const t of filteredTransactions) {
       if (t.transactionType === 'PURCHASE' && t.totalValue) {
         purchaseValue += t.totalValue;
-        if (t.isBillable === true) {
-          const due = Math.max(0, (t.totalValue ?? 0) - (t.amountPaid ?? 0));
-          pendingDue += due;
-        }
+        // All purchases (billable or not) contribute to vendor outstanding.
+        const due = Math.max(0, (t.totalValue ?? 0) - (t.amountPaid ?? 0));
+        pendingDue += due;
       }
       const bucket = byMetal[t.metalType];
       if (bucket) {
@@ -359,9 +359,12 @@ export default function MetalTransactionsPage() {
               {hasActiveFilters && ' (filtered)'}
             </p>
           </div>
-          <Link to="/app/inventory/metal">
-            <Button variant="secondary">Back to Dashboard</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ExportMenu filters={filters} dateFrom={dateFrom} dateTo={dateTo} />
+            <Link to="/app/inventory/metal">
+              <Button variant="secondary">Back to Dashboard</Button>
+            </Link>
+          </div>
         </div>
 
         {/* KPI cards */}
@@ -490,7 +493,8 @@ export default function MetalTransactionsPage() {
                 { value: 'COMPLETE', label: 'Paid in Full' },
                 { value: 'HALF', label: 'Partially Paid' },
                 { value: 'PENDING', label: 'Payment Pending' },
-                { value: 'NON_BILLABLE', label: 'Non-billable' },
+                { value: 'BILLABLE', label: 'Billable (tax)' },
+                { value: 'NON_BILLABLE', label: 'Non-billable (tax)' },
               ]}
             />
             <div>
@@ -710,6 +714,18 @@ export default function MetalTransactionsPage() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                       <div className="flex items-center justify-end gap-2">
+                        {canSettle &&
+                          txn.transactionType === 'PURCHASE' &&
+                          (txn.paymentStatus === 'HALF' || txn.paymentStatus === 'PENDING' || !txn.paymentStatus) && (
+                            <button
+                              type="button"
+                              onClick={() => setSettleTxn(txn)}
+                              className="px-2.5 py-1 rounded-lg text-emerald-800 bg-emerald-50 hover:bg-emerald-100 text-xs font-medium transition-colors inline-flex items-center gap-1"
+                              title="Settle payment"
+                            >
+                              ₹ Settle
+                            </button>
+                          )}
                         {canEdit && (
                           <button
                             type="button"
@@ -731,7 +747,7 @@ export default function MetalTransactionsPage() {
                             Delete
                           </button>
                         )}
-                        {!canEdit && !canDelete && <span className="text-onyx-200">—</span>}
+                        {!canEdit && !canDelete && !canSettle && <span className="text-onyx-200">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -976,6 +992,97 @@ function DeleteConfirmModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Export-to-Excel dropdown. Sends the current list filters to the
+ * `/metal/transactions/export` endpoint and triggers a download. The
+ * "Billable only" / "Non-billable only" variants narrow the export to
+ * the matching tax class for Income-Tax filing.
+ */
+function ExportMenu({
+  filters,
+  dateFrom,
+  dateTo,
+}: {
+  filters: { metalType: string; transactionType: string };
+  dateFrom: string;
+  dateTo: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const download = async (taxClass?: 'BILLABLE' | 'NON_BILLABLE') => {
+    setOpen(false);
+    setDownloading(true);
+    try {
+      const blob = await exportMetalTransactionsXlsx({
+        metalType: filters.metalType || undefined,
+        transactionType: filters.transactionType || undefined,
+        startDate: dateFrom || undefined,
+        endDate: dateTo || undefined,
+        taxClass,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const suffix = taxClass
+        ? taxClass === 'BILLABLE'
+          ? '-billable'
+          : '-non-billable'
+        : '';
+      a.download = `metal-transactions${suffix}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert('Export failed. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <Button
+        variant="secondary"
+        onClick={() => setOpen((o) => !o)}
+        disabled={downloading}
+      >
+        {downloading ? 'Exporting…' : 'Export Excel ▾'}
+      </Button>
+      {open && (
+        <div
+          className="absolute right-0 mt-1 w-56 rounded-xl border border-champagne-200 bg-white shadow-lg z-20"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm hover:bg-champagne-50 rounded-t-xl"
+            onClick={() => download()}
+          >
+            All Transactions
+          </button>
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm hover:bg-champagne-50"
+            onClick={() => download('BILLABLE')}
+          >
+            Billable only (IT filing)
+          </button>
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm hover:bg-champagne-50 rounded-b-xl"
+            onClick={() => download('NON_BILLABLE')}
+          >
+            Non-Billable only
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -184,3 +184,22 @@ export async function getMetalPayments(transactionId: string): Promise<MetalPaym
   const response = await api.get(`/metal/transactions/${transactionId}/payments`);
   return response.data.data;
 }
+
+/**
+ * Download a metal-transaction Excel export. Forwards the same filters
+ * as the list endpoint, plus an optional `taxClass` to scope to billable
+ * or non-billable rows for Income-Tax filing.
+ */
+export async function exportMetalTransactionsXlsx(filters?: {
+  metalType?: string;
+  transactionType?: string;
+  startDate?: string;
+  endDate?: string;
+  taxClass?: 'BILLABLE' | 'NON_BILLABLE';
+}): Promise<Blob> {
+  const response = await api.get('/metal/transactions/export', {
+    params: filters,
+    responseType: 'blob',
+  });
+  return response.data as Blob;
+}

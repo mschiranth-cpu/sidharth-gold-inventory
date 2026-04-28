@@ -248,7 +248,10 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
               setShowAllErrors(true);
               // Focus the first invalid field for accessibility.
               const first = errorList[0]?.[0];
-              const el = first && (document.querySelector(`[data-field="${first}"]`) as HTMLElement | null);
+              const el =
+                first
+                  ? (document.querySelector(`[data-field="${first}"]`) as HTMLElement | null)
+                  : null;
               el?.focus();
               return;
             }

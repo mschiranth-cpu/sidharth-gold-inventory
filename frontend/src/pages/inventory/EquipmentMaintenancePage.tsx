@@ -21,7 +21,7 @@ export default function EquipmentMaintenancePage() {
     description: '',
     cost: 0,
     performedBy: '',
-    performedAt: new Date().toISOString().split('T')[0],
+    performedAt: new Date().toISOString().split('T')[0] || '',
     nextDueDate: '',
   });
 
@@ -41,7 +41,7 @@ export default function EquipmentMaintenancePage() {
         description: '',
         cost: 0,
         performedBy: '',
-        performedAt: new Date().toISOString().split('T')[0],
+        performedAt: new Date().toISOString().split('T')[0] || '',
         nextDueDate: '',
       });
     },

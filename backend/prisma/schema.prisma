@@ -109,6 +109,8 @@ model User {
 
   // Phase 3 relations
   diamondTransactions     DiamondTransaction[]     @relation("DiamondTransactionsCreated")
+  diamondPaymentsRecorded DiamondPayment[]         @relation("DiamondPaymentsRecorded")
+  diamondRatesCreated     DiamondRate[]            @relation("DiamondRatesCreated")
   realStoneTransactions   RealStoneTransaction[]   @relation("RealStoneTransactionsCreated")
   stonePacketTransactions StonePacketTransaction[] @relation("StonePacketTransactionsCreated")
 
@@ -982,7 +984,8 @@ model Vendor {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  metalTransactions MetalTransaction[] @relation("VendorMetalTransactions")
+  metalTransactions   MetalTransaction[]   @relation("VendorMetalTransactions")
+  diamondTransactions DiamondTransaction[] @relation("VendorDiamondTransactions")
 
   @@index([name])
   @@index([gstNumber])
@@ -1065,8 +1068,10 @@ model DiamondLot {
 model Diamond {
   id               String         @id @default(uuid())
   stockNumber      String         @unique @map("stock_number")
+  category         String         @default("SOLITAIRE") // 'LOOSE' | 'SOLITAIRE'
   caratWeight      Float          @map("carat_weight")
   color            DiamondColor
+  colorBand        String?        @map("color_band") // e.g. 'D/E','E/F','F/G','G/H','H/I','I/J','J/K' for LOOSE
   clarity          DiamondClarity
   cut              DiamondCut?
   shape            DiamondShape
@@ -1082,6 +1087,9 @@ model Diamond {
   certUrl          String?        @map("cert_url")
   pricePerCarat    Float?         @map("price_per_carat")
   totalPrice       Float?         @map("total_price")
+  // For LOOSE parcels: number of pieces in the parcel. Decremented on partial issue.
+  // For SOLITAIRE: null (treated as 1).
+  totalPieces      Int?           @map("total_pieces")
   lotId            String?        @map("lot_id")
   lot              DiamondLot?    @relation(fields: [lotId], references: [id])
   status           String         @default("IN_STOCK")
@@ -1095,6 +1103,7 @@ model Diamond {
   transactions DiamondTransaction[]
 
   @@index([status])
+  @@index([category])
   @@index([shape, color, clarity])
   @@index([stockNumber])
   @@map("diamonds")
@@ -1104,20 +1113,95 @@ model DiamondTransaction {
   id              String   @id @default(uuid())
   diamondId       String   @map("diamond_id")
   diamond         Diamond  @relation(fields: [diamondId], references: [id], onDelete: Cascade)
+  // 'PURCHASE' | 'ISSUE_TO_DEPARTMENT' | 'RETURN_FROM_DEPARTMENT' | 'TRANSFER' | 'ADJUSTMENT'
   transactionType String   @map("transaction_type")
   fromLocation    String?  @map("from_location")
   toLocation      String?  @map("to_location")
   orderId         String?  @map("order_id")
   order           Order?   @relation("DiamondTransactions", fields: [orderId], references: [id])
+  departmentId    String?  @map("department_id")
   workerId        String?  @map("worker_id")
+  vendorId        String?  @map("vendor_id")
+  vendor          Vendor?  @relation("VendorDiamondTransactions", fields: [vendorId], references: [id])
   notes           String?
+  referenceNumber String?  @map("reference_number")
   createdById     String   @map("created_by_id")
   createdBy       User     @relation("DiamondTransactionsCreated", fields: [createdById], references: [id])
   createdAt       DateTime @default(now()) @map("created_at")
 
+  // Snapshot fields (linked Diamond row's pricing can change later)
+  caratWeight    Float? @map("carat_weight")
+  pricePerCarat  Float? @map("price_per_carat")
+  totalValue     Float? @map("total_value")
+  // Pieces issued/transferred (loose parcels only). Solitaires implicitly 1.
+  quantityPieces Int?   @map("quantity_pieces")
+
+  // Payment tracking (mirrors MetalTransaction). NULL for non-PURCHASE rows.
+  isBillable      Boolean?  @map("is_billable")
+  paymentMode     String?   @map("payment_mode") // 'CASH' | 'NEFT' | 'BOTH'
+  paymentStatus   String?   @map("payment_status") // 'COMPLETE' | 'HALF' | 'PENDING'
+  amountPaid      Float?    @map("amount_paid")
+  cashAmount      Float?    @map("cash_amount")
+  neftAmount      Float?    @map("neft_amount")
+  neftUtr         String?   @map("neft_utr")
+  neftBank        String?   @map("neft_bank")
+  neftDate        DateTime? @map("neft_date")
+  // Vendor credit applied to this purchase (deducted from Vendor.creditBalance).
+  creditApplied   Float?    @map("credit_applied")
+  // Excess paid on this purchase that was parked into Vendor.creditBalance.
+  creditGenerated Float?    @map("credit_generated")
+
+  payments DiamondPayment[] @relation("DiamondTransactionPayments")
+
   @@index([diamondId])
   @@index([createdAt])
+  @@index([transactionType])
+  @@index([vendorId])
+  @@index([isBillable])
+  @@index([paymentStatus])
   @@map("diamond_transactions")
+}
+
+model DiamondPayment {
+  id              String             @id @default(uuid())
+  transactionId   String             @map("transaction_id")
+  transaction     DiamondTransaction @relation("DiamondTransactionPayments", fields: [transactionId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentMode     String             @map("payment_mode") // 'CASH' | 'NEFT' | 'BOTH'
+  cashAmount      Float?             @map("cash_amount")
+  neftAmount      Float?             @map("neft_amount")
+  neftUtr         String?            @map("neft_utr")
+  neftBank        String?            @map("neft_bank")
+  neftDate        DateTime?          @map("neft_date")
+  creditApplied   Float?             @map("credit_applied")
+  creditGenerated Float?             @map("credit_generated")
+  notes           String?
+  recordedById    String             @map("recorded_by_id")
+  recordedBy      User               @relation("DiamondPaymentsRecorded", fields: [recordedById], references: [id])
+  recordedAt      DateTime           @default(now()) @map("recorded_at")
+
+  @@index([transactionId])
+  @@index([recordedAt])
+  @@map("diamond_payments")
+}
+
+model DiamondRate {
+  id            String         @id @default(uuid())
+  shape         DiamondShape
+  color         DiamondColor
+  clarity       DiamondClarity
+  caratFrom     Float          @map("carat_from")
+  caratTo       Float          @map("carat_to")
+  pricePerCarat Float          @map("price_per_carat")
+  effectiveDate DateTime       @map("effective_date")
+  source        String?
+  createdById   String         @map("created_by_id")
+  createdBy     User           @relation("DiamondRatesCreated", fields: [createdById], references: [id])
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([shape, color, clarity, effectiveDate])
+  @@index([effectiveDate])
+  @@map("diamond_rates")
 }
 
 // ============================================

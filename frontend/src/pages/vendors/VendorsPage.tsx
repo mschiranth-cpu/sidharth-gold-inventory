@@ -252,7 +252,7 @@ export default function VendorsPage() {
         (o?.outstanding ?? 0).toFixed(2),
         (o?.totalPaid ?? 0).toFixed(2),
         (v.creditBalance ?? 0).toFixed(2),
-        o?.openCount ?? 0,
+        String(o?.openCount ?? 0),
       ]);
     });
     const stamp = new Date().toISOString().slice(0, 10);
@@ -705,7 +705,7 @@ function KpiCard({
   sub?: string;
   tint: keyof typeof TINTS;
 }) {
-  const t = TINTS[tint];
+  const t = TINTS[tint]!;
   return (
     <div
       className={`rounded-2xl p-4 ${t.bg} ring-1 ${t.ring} shadow-sm hover:shadow-md transition`}

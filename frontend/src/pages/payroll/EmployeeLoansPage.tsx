@@ -18,6 +18,7 @@ export default function EmployeeLoansPage() {
     interestRate: 0,
     tenure: 12,
     emiAmount: 0,
+    reason: '',
   });
 
   const createMutation = useMutation({
@@ -25,7 +26,7 @@ export default function EmployeeLoansPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-loans'] });
       setShowForm(false);
-      setFormData({ userId: '', loanAmount: 0, interestRate: 0, tenure: 12, emiAmount: 0 });
+      setFormData({ userId: '', loanAmount: 0, interestRate: 0, tenure: 12, emiAmount: 0, reason: '' });
     },
   });
 

@@ -378,17 +378,28 @@ async function loadInventorySnapshot() {
 }
 
 async function loadVendorOutstanding(): Promise<VendorOutstandingRow[]> {
+  // `is_billable` is now a tax-classification tag only; non-billable purchases
+  // still create vendor outstanding balance. Includes BOTH metal AND diamond
+  // PURCHASE rows — vendors are cross-domain (shared `creditBalance`).
   return prisma.$queryRaw<VendorOutstandingRow[]>`
+    WITH unified AS (
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM metal_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM diamond_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+    )
     SELECT v.id AS "vendorId", v.name, v.unique_code AS "uniqueCode",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN mt.total_value ELSE 0 END), 0)::float AS "totalBillable",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "totalPaid",
-      COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.total_value,0) - COALESCE(mt.amount_paid,0) ELSE 0 END), 0)::float AS "outstanding",
-      COUNT(CASE WHEN mt.is_billable=true AND mt.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
+      COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
+      COALESCE(SUM(COALESCE(u.amount_paid,0)), 0)::float AS "totalPaid",
+      COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0)::float AS "outstanding",
+      COUNT(CASE WHEN u.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
     FROM vendors v
-    LEFT JOIN metal_transactions mt
-      ON mt.vendor_id = v.id AND mt.transaction_type = 'PURCHASE'
+    LEFT JOIN unified u ON u.vendor_id = v.id
     GROUP BY v.id, v.name, v.unique_code
-    HAVING COALESCE(SUM(CASE WHEN mt.is_billable=true THEN COALESCE(mt.total_value,0) - COALESCE(mt.amount_paid,0) ELSE 0 END), 0) > 0
+    HAVING COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0) > 0
     ORDER BY "outstanding" DESC, v.name ASC
     LIMIT 5
   `;
