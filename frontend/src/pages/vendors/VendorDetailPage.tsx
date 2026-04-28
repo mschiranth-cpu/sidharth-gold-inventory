@@ -4,11 +4,34 @@
  * ============================================
  * Single-vendor view: identity card, outstanding stat cards, full PURCHASE
  * transaction list with inline Settle action.
+ *
+ * UX: gradient onyx hero (matches inventory dashboards), tinted KPI cards
+ * with icons, search + chip filters + CSV export over the transaction
+ * table, sticky thead, zebra rows, payment progress bars.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  ArrowDownTrayIcon,
+  PencilSquareIcon,
+  IdentificationIcon,
+  PhoneIcon,
+  MapPinIcon,
+  ShieldCheckIcon,
+  BanknotesIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  GiftIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  SparklesIcon,
+  CubeTransparentIcon,
+} from '@heroicons/react/24/outline';
 import {
   getVendor,
   getVendorOutstanding,
@@ -24,50 +47,138 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
 
+type DomainFilter = 'all' | 'metal' | 'diamond';
+type StatusFilter = 'all' | 'PENDING' | 'HALF' | 'COMPLETE';
+
 function fmt(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtCompactInr(v: number) {
+  if (Math.abs(v) >= 1e7) return `₹${(v / 1e7).toFixed(2)} Cr`;
+  if (Math.abs(v) >= 1e5) return `₹${(v / 1e5).toFixed(2)} L`;
+  if (Math.abs(v) >= 1e3) return `₹${(v / 1e3).toFixed(1)} K`;
+  return `₹${v.toFixed(0)}`;
+}
+
+function downloadCsv(rows: (string | number)[][], filename: string) {
+  const escape = (s: any) => {
+    const v = s == null ? '' : String(s);
+    return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const csv = rows.map((r) => r.map(escape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function PaymentBadge({ status }: { status: string }) {
   const cls =
     status === 'COMPLETE'
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
       : status === 'HALF'
-      ? 'bg-amber-100 text-amber-800'
-      : 'bg-rose-100 text-rose-700';
+      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+      : 'bg-rose-50 text-rose-700 border border-rose-200';
+  const label = status === 'HALF' ? 'PARTIAL' : status;
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status}</span>
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${cls}`}>
+      {label}
+    </span>
   );
 }
 
-function StatCard({
+const KPI_TINTS = {
+  indigo: 'from-indigo-500/15 to-indigo-500/5 text-indigo-700 ring-indigo-200/60',
+  emerald: 'from-emerald-500/15 to-emerald-500/5 text-emerald-700 ring-emerald-200/60',
+  rose: 'from-rose-500/15 to-rose-500/5 text-rose-700 ring-rose-200/60',
+  amber: 'from-amber-500/15 to-amber-500/5 text-amber-700 ring-amber-200/60',
+  champagne: 'from-champagne-500/15 to-champagne-500/5 text-champagne-800 ring-champagne-200/60',
+} as const;
+
+function KpiCard({
+  icon,
   label,
   value,
-  tone = 'gray',
+  sub,
+  tint,
+  loading,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: string;
-  tone?: 'gray' | 'emerald' | 'rose' | 'amber';
+  sub?: string;
+  tint: keyof typeof KPI_TINTS;
+  loading?: boolean;
 }) {
-  const tones = {
-    gray: 'bg-gray-50 border-gray-200 text-gray-900',
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-    rose: 'bg-rose-50 border-rose-200 text-rose-900',
-    amber: 'bg-amber-50 border-amber-200 text-amber-900',
-  };
   return (
-    <div className={`p-4 rounded-xl border ${tones[tone]}`}>
-      <p className="text-xs text-gray-600 mb-1">{label}</p>
-      <p className="text-2xl font-bold">{value}</p>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-onyx-500">
+          {label}
+        </span>
+        <span
+          className={`w-9 h-9 rounded-xl bg-gradient-to-br ${KPI_TINTS[tint]} ring-1 inline-flex items-center justify-center`}
+        >
+          {icon}
+        </span>
+      </div>
+      {loading ? (
+        <div className="h-7 rounded-md bg-gray-100 animate-pulse" />
+      ) : (
+        <p className="text-2xl font-bold text-onyx-900 tabular-nums">{value}</p>
+      )}
+      {sub ? <p className="text-[11px] text-onyx-500">{sub}</p> : null}
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+  mono,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+}) {
   return (
-    <div>
-      <span className="text-gray-500 text-sm">{label}: </span>
-      <span className="text-gray-900 text-sm">{value || '—'}</span>
+    <div className="flex items-start gap-3">
+      <span className="w-8 h-8 rounded-lg bg-champagne-50 text-champagne-700 inline-flex items-center justify-center shrink-0">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] uppercase tracking-wider text-onyx-500 font-semibold">{label}</p>
+        <p className={`text-sm text-onyx-900 break-words ${mono ? 'font-mono' : ''}`}>
+          {value || <span className="text-onyx-400">—</span>}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PayProgress({
+  paid,
+  total,
+}: {
+  paid: number;
+  total: number;
+}) {
+  if (!total) return null;
+  const pct = Math.max(0, Math.min(100, Math.round((paid / total) * 100)));
+  const color =
+    pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
+        <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] tabular-nums text-onyx-500 w-9 text-right">{pct}%</span>
     </div>
   );
 }
@@ -75,30 +186,53 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 export default function VendorDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const qc = useQueryClient();
   const canSettle = SETTLE_ROLES.has(String(user?.role ?? ''));
   const [settleTxn, setSettleTxn] = useState<MetalTransaction | null>(null);
   const [settleDiamondTxn, setSettleDiamondTxn] = useState<DiamondTransaction | null>(null);
 
-  const { data: vendor, isLoading: vendorLoading, isError: vendorError } = useQuery({
+  const [search, setSearch] = useState('');
+  const [domainFilter, setDomainFilter] = useState<DomainFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const vendorQ = useQuery({
     queryKey: ['vendor', id],
     queryFn: () => getVendor(id),
     enabled: Boolean(id),
   });
-  const { data: outstanding } = useQuery({
+  const outstandingQ = useQuery({
     queryKey: ['vendor-outstanding', id],
     queryFn: () => getVendorOutstanding(id),
     enabled: Boolean(id),
   });
-  const { data: transactions = [] } = useQuery({
+  const transactionsQ = useQuery({
     queryKey: ['vendor-transactions', id],
     queryFn: () => getVendorTransactions(id),
     enabled: Boolean(id),
   });
-  const { data: diamondTransactions = [] } = useQuery({
+  const diamondTransactionsQ = useQuery({
     queryKey: ['vendor-diamond-transactions', id],
     queryFn: () => getVendorDiamondTransactions(id),
     enabled: Boolean(id),
   });
+
+  const vendor = vendorQ.data;
+  const outstanding = outstandingQ.data;
+  const transactions = transactionsQ.data ?? [];
+  const diamondTransactions = diamondTransactionsQ.data ?? [];
+
+  const isFetching =
+    vendorQ.isFetching ||
+    outstandingQ.isFetching ||
+    transactionsQ.isFetching ||
+    diamondTransactionsQ.isFetching;
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['vendor', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-outstanding', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-transactions', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-diamond-transactions', id] });
+  };
 
   // Merge metal + diamond into a single chronological list. Each row carries
   // a `domain` discriminator + a normalised `description` so one table can
@@ -118,54 +252,115 @@ export default function VendorDetailPage() {
     isBillable: boolean | null;
     raw: MetalTransaction | DiamondTransaction;
   };
-  const unified: UnifiedRow[] = [
-    ...transactions.map((t) => ({
-      id: `m-${t.id}`,
-      domain: 'metal' as const,
-      createdAt: t.createdAt,
-      description: `${t.metalType} ${t.purity}K`,
-      measure: `${t.grossWeight.toFixed(2)} g`,
-      rate: t.rate ?? null,
-      totalValue: t.totalValue ?? null,
-      amountPaid: t.amountPaid ?? null,
-      creditApplied: t.creditApplied ?? null,
-      creditGenerated: t.creditGenerated ?? null,
-      paymentStatus: t.paymentStatus ?? null,
-      isBillable: t.isBillable ?? null,
-      raw: t,
-    })),
-    ...diamondTransactions.map((t) => ({
-      id: `d-${t.id}`,
-      domain: 'diamond' as const,
-      createdAt: t.createdAt,
-      description: [t.diamond?.shape, t.diamond?.color, t.diamond?.clarity]
-        .filter(Boolean)
-        .join(' · ') || (t.diamond?.stockNumber ?? 'Diamond'),
-      measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
-      rate: t.pricePerCarat ?? null,
-      totalValue: t.totalValue ?? null,
-      amountPaid: t.amountPaid ?? null,
-      creditApplied: t.creditApplied ?? null,
-      creditGenerated: t.creditGenerated ?? null,
-      paymentStatus: t.paymentStatus ?? null,
-      isBillable: t.isBillable ?? null,
-      raw: t,
-    })),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  if (vendorLoading) {
+  const unified = useMemo<UnifiedRow[]>(
+    () =>
+      [
+        ...transactions.map((t) => ({
+          id: `m-${t.id}`,
+          domain: 'metal' as const,
+          createdAt: t.createdAt,
+          description: `${t.metalType} ${t.purity}K`,
+          measure: `${t.grossWeight.toFixed(2)} g`,
+          rate: t.rate ?? null,
+          totalValue: t.totalValue ?? null,
+          amountPaid: t.amountPaid ?? null,
+          creditApplied: t.creditApplied ?? null,
+          creditGenerated: t.creditGenerated ?? null,
+          paymentStatus: t.paymentStatus ?? null,
+          isBillable: t.isBillable ?? null,
+          raw: t,
+        })),
+        ...diamondTransactions.map((t) => ({
+          id: `d-${t.id}`,
+          domain: 'diamond' as const,
+          createdAt: t.createdAt,
+          description:
+            [t.diamond?.shape, t.diamond?.color, t.diamond?.clarity]
+              .filter(Boolean)
+              .join(' · ') || (t.diamond?.stockNumber ?? 'Diamond'),
+          measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
+          rate: t.pricePerCarat ?? null,
+          totalValue: t.totalValue ?? null,
+          amountPaid: t.amountPaid ?? null,
+          creditApplied: t.creditApplied ?? null,
+          creditGenerated: t.creditGenerated ?? null,
+          paymentStatus: t.paymentStatus ?? null,
+          isBillable: t.isBillable ?? null,
+          raw: t,
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [transactions, diamondTransactions],
+  );
+
+  const counts = useMemo(() => {
+    const c = { all: unified.length, metal: 0, diamond: 0, PENDING: 0, HALF: 0, COMPLETE: 0 };
+    for (const r of unified) {
+      if (r.domain === 'metal') c.metal++;
+      else c.diamond++;
+      if (r.paymentStatus === 'PENDING') c.PENDING++;
+      else if (r.paymentStatus === 'HALF') c.HALF++;
+      else if (r.paymentStatus === 'COMPLETE') c.COMPLETE++;
+    }
+    return c;
+  }, [unified]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return unified.filter((r) => {
+      if (domainFilter !== 'all' && r.domain !== domainFilter) return false;
+      if (statusFilter !== 'all' && r.paymentStatus !== statusFilter) return false;
+      if (q && !r.description.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [unified, search, domainFilter, statusFilter]);
+
+  const exportCsv = () => {
+    const rows: (string | number)[][] = [
+      ['Date', 'Type', 'Item', 'Qty', 'Rate', 'Total Value', 'Paid', 'Credit Applied', 'Credit Generated', 'Payment', 'Billable'],
+    ];
+    for (const r of filtered) {
+      rows.push([
+        new Date(r.createdAt).toLocaleDateString('en-IN'),
+        r.domain.toUpperCase(),
+        r.description,
+        r.measure,
+        r.rate ?? '',
+        r.totalValue ?? '',
+        r.amountPaid ?? '',
+        r.creditApplied ?? '',
+        r.creditGenerated ?? '',
+        r.paymentStatus ?? '',
+        r.isBillable === false ? 'No' : 'Yes',
+      ]);
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const code = vendor?.uniqueCode ?? id;
+    downloadCsv(rows, `vendor-${code}-purchases-${stamp}.csv`);
+  };
+
+  if (vendorQ.isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-champagne-700" />
+      <div className="p-6 bg-gradient-to-br from-pearl via-white to-champagne-50/30 min-h-screen">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="h-44 rounded-3xl bg-onyx-900/80 animate-pulse" />
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-2xl bg-white border border-gray-100 animate-pulse" />
+            ))}
+          </div>
+          <div className="h-72 rounded-2xl bg-white border border-gray-100 animate-pulse" />
+        </div>
       </div>
     );
   }
 
-  if (vendorError || !vendor) {
+  if (vendorQ.isError || !vendor) {
     return (
-      <div className="p-6">
+      <div className="p-6 bg-gradient-to-br from-pearl via-white to-champagne-50/30 min-h-screen">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-12 text-center">
-          <p className="text-gray-700 mb-4">Vendor not found.</p>
+          <ExclamationTriangleIcon className="w-12 h-12 mx-auto text-rose-500 mb-3" />
+          <p className="text-onyx-700 mb-4 font-semibold">Vendor not found.</p>
           <Link to="/app/vendors">
             <Button variant="secondary">← Back to vendors</Button>
           </Link>
@@ -174,144 +369,355 @@ export default function VendorDetailPage() {
     );
   }
 
+  const verifiedSource = vendor.gstDetails?.source;
+  const isVerified = ['rapidapi', 'rapidapi-tool', 'gstincheck', 'mastergst'].includes(
+    String(verifiedSource ?? ''),
+  );
+
+  const filterChip = (active: boolean) =>
+    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition border focus:outline-none focus:ring-2 focus:ring-champagne-400 ${
+      active
+        ? 'bg-gradient-to-r from-champagne-500 to-champagne-700 text-onyx-900 border-champagne-300 shadow-sm'
+        : 'bg-white text-onyx-700 border-gray-200 hover:bg-champagne-50'
+    }`;
+
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gradient-to-br from-pearl via-white to-champagne-50/30 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Link to="/app/vendors" className="text-sm text-champagne-700 hover:underline">
-              ← Back to vendors
+        {/* Hero header */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-onyx-900 via-onyx-800 to-onyx-700 text-pearl shadow-onyx p-6 md:p-8">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-champagne-500/20 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gold-leaf-gradient opacity-10 pointer-events-none" />
+
+          <div className="relative flex flex-col gap-6">
+            <Link
+              to="/app/vendors"
+              className="inline-flex items-center gap-1.5 text-xs text-champagne-200/80 hover:text-pearl transition w-fit"
+            >
+              <ArrowLeftIcon className="w-3.5 h-3.5" /> Back to vendors
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 mt-1">{vendor.name}</h1>
-            <p className="text-gray-600 font-mono text-xs">{vendor.uniqueCode}</p>
+
+            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-2 flex items-center gap-2">
+                  <SparklesIcon className="w-3.5 h-3.5" /> Vendor · Purchase Ledger
+                </p>
+                <h1 className="font-display text-3xl md:text-4xl font-semibold text-pearl mb-2 break-words">
+                  {vendor.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 font-mono tracking-wide text-champagne-100">
+                    {vendor.uniqueCode}
+                  </span>
+                  {vendor.phone && (
+                    <span className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 inline-flex items-center gap-1.5 text-champagne-100">
+                      <PhoneIcon className="w-3 h-3" /> {vendor.phone}
+                    </span>
+                  )}
+                  {vendor.gstNumber && (
+                    <span
+                      className={`px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 font-mono ${
+                        isVerified
+                          ? 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30'
+                          : 'bg-white/10 text-champagne-100 border border-white/15'
+                      }`}
+                    >
+                      <ShieldCheckIcon className="w-3 h-3" /> {vendor.gstNumber}
+                      {isVerified && <span className="text-[10px] font-sans font-semibold">VERIFIED</span>}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 xl:justify-end">
+                <button
+                  onClick={refresh}
+                  disabled={isFetching}
+                  aria-label="Refresh vendor data"
+                  title="Refresh"
+                  className="p-2.5 rounded-xl border border-white/15 bg-white/10 hover:bg-white/15 text-pearl disabled:opacity-50 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                >
+                  <ArrowPathIcon className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
+                </button>
+                <Link
+                  to={`/app/vendors?edit=${vendor.id}`}
+                  className="px-4 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-pearl text-sm font-semibold flex items-center gap-2 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                >
+                  <PencilSquareIcon className="w-4 h-4" /> Edit Vendor
+                </Link>
+                <button
+                  onClick={exportCsv}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-700 hover:from-champagne-600 hover:to-champagne-800 text-onyx-900 text-sm font-semibold flex items-center gap-2 shadow-md shadow-champagne-500/20 focus:outline-none focus:ring-2 focus:ring-champagne-300"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" /> Export CSV
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Vendor info card */}
+        {/* KPI strip */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <KpiCard
+            icon={<BanknotesIcon className="w-5 h-5" />}
+            label="Total Purchases"
+            value={`₹${fmt(outstanding?.totalBillable ?? 0)}`}
+            sub={fmtCompactInr(outstanding?.totalBillable ?? 0)}
+            tint="indigo"
+            loading={outstandingQ.isLoading}
+          />
+          <KpiCard
+            icon={<CheckCircleIcon className="w-5 h-5" />}
+            label="Total Paid"
+            value={`₹${fmt(outstanding?.totalPaid ?? 0)}`}
+            sub={fmtCompactInr(outstanding?.totalPaid ?? 0)}
+            tint="emerald"
+            loading={outstandingQ.isLoading}
+          />
+          <KpiCard
+            icon={<ExclamationTriangleIcon className="w-5 h-5" />}
+            label="Outstanding"
+            value={`₹${fmt(outstanding?.outstanding ?? 0)}`}
+            sub={
+              outstanding && outstanding.outstanding > 0
+                ? 'Settle pending bills'
+                : 'All clear'
+            }
+            tint={outstanding && outstanding.outstanding > 0 ? 'rose' : 'emerald'}
+            loading={outstandingQ.isLoading}
+          />
+          <KpiCard
+            icon={<GiftIcon className="w-5 h-5" />}
+            label="Vendor Credit"
+            value={`₹${fmt(vendor?.creditBalance ?? 0)}`}
+            sub={vendor && vendor.creditBalance > 0 ? 'Available to apply' : 'No credit on file'}
+            tint={vendor && vendor.creditBalance > 0 ? 'champagne' : 'indigo'}
+            loading={vendorQ.isLoading}
+          />
+          <KpiCard
+            icon={<ClockIcon className="w-5 h-5" />}
+            label="Open Receipts"
+            value={String(outstanding?.openCount ?? 0)}
+            sub={`${counts.PENDING} pending · ${counts.HALF} partial`}
+            tint="amber"
+            loading={outstandingQ.isLoading}
+          />
+        </div>
+
+        {/* Vendor info + GST */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 lg:col-span-1">
-            <h2 className="font-semibold text-gray-900 mb-3">Vendor Information</h2>
-            <div className="space-y-2">
-              <InfoRow label="Phone" value={vendor.phone} />
-              <InfoRow label="GSTIN" value={vendor.gstNumber} />
-              <InfoRow label="Vendor Code" value={vendor.uniqueCode} />
-              <InfoRow label="Address" value={vendor.address} />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-1">
+            <h2 className="font-semibold text-onyx-900 mb-4 flex items-center gap-2">
+              <IdentificationIcon className="w-5 h-5 text-champagne-700" />
+              Vendor Information
+            </h2>
+            <div className="space-y-4">
+              <InfoRow icon={<PhoneIcon className="w-4 h-4" />} label="Phone" value={vendor.phone} />
+              <InfoRow
+                icon={<ShieldCheckIcon className="w-4 h-4" />}
+                label="GSTIN"
+                value={vendor.gstNumber}
+                mono
+              />
+              <InfoRow
+                icon={<IdentificationIcon className="w-4 h-4" />}
+                label="Vendor Code"
+                value={vendor.uniqueCode}
+                mono
+              />
+              <InfoRow icon={<MapPinIcon className="w-4 h-4" />} label="Address" value={vendor.address} />
             </div>
           </div>
           <div className="lg:col-span-2">
             {vendor.gstDetails ? (
               <GstInfoCard gstDetails={vendor.gstDetails} variant="detail" />
             ) : (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center text-sm text-gray-500">
-                No GST details on file. Edit the vendor and add a GSTIN to fetch details.
+              <div className="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-8 h-full flex flex-col items-center justify-center text-center gap-3">
+                <span className="w-12 h-12 rounded-2xl bg-champagne-50 text-champagne-700 inline-flex items-center justify-center">
+                  <ShieldCheckIcon className="w-6 h-6" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-onyx-800">No GST details on file</p>
+                  <p className="text-xs text-onyx-500 mt-1">
+                    Edit the vendor and add a GSTIN to fetch government-verified business details.
+                  </p>
+                </div>
+                <Link
+                  to={`/app/vendors?edit=${vendor.id}`}
+                  className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-champagne-700 hover:text-onyx-900"
+                >
+                  <PencilSquareIcon className="w-3.5 h-3.5" /> Add GSTIN
+                </Link>
               </div>
             )}
           </div>
         </div>
 
-        {/* Outstanding summary */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <StatCard label="Total Purchases" value={`₹${fmt(outstanding?.totalBillable ?? 0)}`} />
-          <StatCard label="Total Paid" value={`₹${fmt(outstanding?.totalPaid ?? 0)}`} tone="emerald" />
-          <StatCard
-            label="Outstanding"
-            value={`₹${fmt(outstanding?.outstanding ?? 0)}`}
-            tone={outstanding && outstanding.outstanding > 0 ? 'rose' : 'gray'}
-          />
-          <StatCard
-            label="Vendor Credit"
-            value={`₹${fmt(vendor?.creditBalance ?? 0)}`}
-            tone={vendor && vendor.creditBalance > 0 ? 'emerald' : 'gray'}
-          />
-          <StatCard label="Open Receipts" value={String(outstanding?.openCount ?? 0)} tone="amber" />
-        </div>
+        {/* Purchase Transactions */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-semibold text-onyx-900 flex items-center gap-2">
+                  <CubeTransparentIcon className="w-5 h-5 text-champagne-700" />
+                  Purchase Transactions
+                </h2>
+                <p className="text-[11px] text-onyx-500 mt-0.5">
+                  {transactions.length} metal · {diamondTransactions.length} diamond ·{' '}
+                  {filtered.length} shown
+                </p>
+              </div>
+              <div className="relative w-full sm:w-72">
+                <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-onyx-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search item…"
+                  className="w-full pl-9 pr-9 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-champagne-400 focus:border-transparent"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-onyx-400 hover:text-onyx-700 hover:bg-gray-100"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-        {/* Unified Purchase Transactions (metal + diamond, chronological) */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Purchase Transactions</h2>
-            <span className="text-xs text-gray-500">
-              {transactions.length} metal · {diamondTransactions.length} diamond
-            </span>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setDomainFilter('all')} className={filterChip(domainFilter === 'all')}>
+                All <span className="opacity-70">· {counts.all}</span>
+              </button>
+              <button onClick={() => setDomainFilter('metal')} className={filterChip(domainFilter === 'metal')}>
+                Metal <span className="opacity-70">· {counts.metal}</span>
+              </button>
+              <button onClick={() => setDomainFilter('diamond')} className={filterChip(domainFilter === 'diamond')}>
+                Diamond <span className="opacity-70">· {counts.diamond}</span>
+              </button>
+              <span className="w-px h-6 bg-gray-200 mx-1 self-center" />
+              <button onClick={() => setStatusFilter('all')} className={filterChip(statusFilter === 'all')}>
+                Any status
+              </button>
+              <button onClick={() => setStatusFilter('PENDING')} className={filterChip(statusFilter === 'PENDING')}>
+                Pending <span className="opacity-70">· {counts.PENDING}</span>
+              </button>
+              <button onClick={() => setStatusFilter('HALF')} className={filterChip(statusFilter === 'HALF')}>
+                Partial <span className="opacity-70">· {counts.HALF}</span>
+              </button>
+              <button onClick={() => setStatusFilter('COMPLETE')} className={filterChip(statusFilter === 'COMPLETE')}>
+                Complete <span className="opacity-70">· {counts.COMPLETE}</span>
+              </button>
+            </div>
           </div>
-          {unified.length === 0 ? (
-            <p className="px-6 py-12 text-center text-gray-500">No purchases yet.</p>
+
+          {filtered.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <CubeTransparentIcon className="w-10 h-10 mx-auto text-onyx-300 mb-3" />
+              <p className="text-sm font-semibold text-onyx-700">
+                {unified.length === 0 ? 'No purchases yet' : 'No matching transactions'}
+              </p>
+              <p className="text-xs text-onyx-500 mt-1">
+                {unified.length === 0
+                  ? 'New receipts from this vendor will appear here.'
+                  : 'Try a different filter or clear the search.'}
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-600 uppercase">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-[11px] text-onyx-500 uppercase tracking-wider sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Date</th>
-                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                    <th className="px-4 py-3 text-left font-medium">Item</th>
-                    <th className="px-4 py-3 text-right font-medium">Qty</th>
-                    <th className="px-4 py-3 text-right font-medium">Rate</th>
-                    <th className="px-4 py-3 text-right font-medium">Total Value</th>
-                    <th className="px-4 py-3 text-right font-medium">Paid</th>
-                    <th className="px-4 py-3 text-left font-medium">Credit</th>
-                    <th className="px-4 py-3 text-left font-medium">Payment</th>
+                    <th className="px-4 py-3 text-left font-semibold">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold">Type</th>
+                    <th className="px-4 py-3 text-left font-semibold">Item</th>
+                    <th className="px-4 py-3 text-right font-semibold">Qty</th>
+                    <th className="px-4 py-3 text-right font-semibold">Rate</th>
+                    <th className="px-4 py-3 text-right font-semibold">Total Value</th>
+                    <th className="px-4 py-3 text-right font-semibold">Paid</th>
+                    <th className="px-4 py-3 text-left font-semibold">Credit</th>
+                    <th className="px-4 py-3 text-left font-semibold">Payment</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {unified.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-700">
-                        {new Date(row.createdAt).toLocaleDateString('en-IN')}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
-                            row.domain === 'metal'
-                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                              : 'bg-sky-50 text-sky-800 border border-sky-200'
-                          }`}
-                        >
-                          {row.domain}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{row.description}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{row.measure}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.rate ? `₹${fmt(row.rate)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">
-                        {row.totalValue != null ? `₹${fmt(row.totalValue)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {row.amountPaid != null ? `₹${fmt(row.amountPaid)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {row.creditApplied || row.creditGenerated ? (
-                          <div className="space-y-0.5">
-                            {row.creditApplied ? (
-                              <span className="block text-champagne-800">
-                                Applied: ₹{fmt(row.creditApplied)}
-                              </span>
-                            ) : null}
-                            {row.creditGenerated ? (
-                              <span className="block text-emerald-700">
-                                Generated: ₹{fmt(row.creditGenerated)}
-                              </span>
-                            ) : null}
+                <tbody>
+                  {filtered.map((row, i) => {
+                    const total = row.totalValue ?? 0;
+                    const paid = row.amountPaid ?? 0;
+                    const showSettle =
+                      canSettle &&
+                      (row.paymentStatus === 'HALF' || row.paymentStatus === 'PENDING') &&
+                      row.isBillable !== false;
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`border-t border-gray-100 transition-colors ${
+                          i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                        } hover:bg-champagne-50/40`}
+                      >
+                        <td className="px-4 py-3 text-onyx-700 whitespace-nowrap">
+                          {new Date(row.createdAt).toLocaleDateString('en-IN')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                              row.domain === 'metal'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-sky-50 text-sky-800 border-sky-200'
+                            }`}
+                          >
+                            {row.domain}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-onyx-900">{row.description}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-onyx-700">{row.measure}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-onyx-700">
+                          {row.rate ? `₹${fmt(row.rate)}` : <span className="text-onyx-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-onyx-900">
+                          {row.totalValue != null ? `₹${fmt(row.totalValue)}` : <span className="text-onyx-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <div className="text-onyx-700">
+                            {row.amountPaid != null ? `₹${fmt(row.amountPaid)}` : <span className="text-onyx-400">—</span>}
                           </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {!row.paymentStatus ? (
-                          <span className="text-gray-400">—</span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <PaymentBadge status={row.paymentStatus} />
-                            {row.isBillable !== true && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
-                                Non-billable
-                              </span>
-                            )}
-                            {canSettle &&
-                              (row.paymentStatus === 'HALF' ||
-                                row.paymentStatus === 'PENDING') && (
+                          {row.paymentStatus && total > 0 && (
+                            <PayProgress paid={paid} total={total} />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {row.creditApplied || row.creditGenerated ? (
+                            <div className="space-y-0.5">
+                              {row.creditApplied ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-champagne-50 text-champagne-800 border border-champagne-200">
+                                  Applied ₹{fmt(row.creditApplied)}
+                                </span>
+                              ) : null}
+                              {row.creditGenerated ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Generated ₹{fmt(row.creditGenerated)}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-onyx-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {!row.paymentStatus ? (
+                            <span className="text-onyx-400">—</span>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <PaymentBadge status={row.paymentStatus} />
+                              {row.isBillable === false && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
+                                  Non-billable
+                                </span>
+                              )}
+                              {showSettle && (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -319,16 +725,17 @@ export default function VendorDetailPage() {
                                       ? setSettleTxn(row.raw as MetalTransaction)
                                       : setSettleDiamondTxn(row.raw as DiamondTransaction)
                                   }
-                                  className="text-xs font-medium text-champagne-700 hover:text-onyx-800 hover:underline"
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-champagne-500 to-champagne-700 text-onyx-900 hover:from-champagne-600 hover:to-champagne-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-champagne-400"
                                 >
                                   Settle
                                 </button>
                               )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
