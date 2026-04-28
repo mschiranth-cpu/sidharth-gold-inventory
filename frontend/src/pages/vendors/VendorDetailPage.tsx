@@ -10,7 +10,7 @@
  * table, sticky thead, zebra rows, payment progress bars.
  */
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,7 +31,11 @@ import {
   XMarkIcon,
   SparklesIcon,
   CubeTransparentIcon,
+  ChevronDownIcon,
+  BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
+import type { MetalPayment } from '../../services/metal.service';
+import type { DiamondPayment } from '../../services/diamond.service';
 import {
   getVendor,
   getVendorOutstanding,
@@ -237,6 +241,7 @@ export default function VendorDetailPage() {
   // Merge metal + diamond into a single chronological list. Each row carries
   // a `domain` discriminator + a normalised `description` so one table can
   // render both. Settle action dispatches to the right modal via the domain.
+  type AnyPayment = MetalPayment | DiamondPayment;
   type UnifiedRow = {
     id: string;
     domain: 'metal' | 'diamond';
@@ -250,48 +255,126 @@ export default function VendorDetailPage() {
     creditGenerated: number | null;
     paymentStatus: string | null;
     isBillable: boolean | null;
+    payments: AnyPayment[];
+    cashTotal: number;
+    neftTotal: number;
+    lastNeftBank: string | null;
+    lastNeftUtr: string | null;
     raw: MetalTransaction | DiamondTransaction;
   };
+
+  function summarisePayments(
+    payments: AnyPayment[] | undefined,
+    fallback: {
+      paymentMode?: string | null;
+      cashAmount?: number | null;
+      neftAmount?: number | null;
+      amountPaid?: number | null;
+      neftBank?: string | null;
+      neftUtr?: string | null;
+    },
+  ) {
+    if (payments && payments.length > 0) {
+      let cash = 0;
+      let neft = 0;
+      let lastNeftBank: string | null = null;
+      let lastNeftUtr: string | null = null;
+      // payments are ordered desc by recordedAt — first NEFT entry is the most recent.
+      for (const p of payments) {
+        const mode = String(p.paymentMode || '').toUpperCase();
+        if (mode === 'CASH') {
+          cash += p.amount || 0;
+        } else if (mode === 'NEFT') {
+          neft += p.amount || 0;
+          if (!lastNeftBank) lastNeftBank = p.neftBank ?? null;
+          if (!lastNeftUtr) lastNeftUtr = p.neftUtr ?? null;
+        } else if (mode === 'BOTH') {
+          cash += p.cashAmount ?? 0;
+          neft += p.neftAmount ?? 0;
+          if (!lastNeftBank) lastNeftBank = p.neftBank ?? null;
+          if (!lastNeftUtr) lastNeftUtr = p.neftUtr ?? null;
+        } else {
+          cash += p.amount || 0;
+        }
+      }
+      return { cashTotal: cash, neftTotal: neft, lastNeftBank, lastNeftUtr };
+    }
+    // No ledger rows yet — fall back to the cached fields on the transaction.
+    const mode = String(fallback.paymentMode || '').toUpperCase();
+    const paid = fallback.amountPaid ?? 0;
+    if (mode === 'CASH') {
+      return { cashTotal: paid, neftTotal: 0, lastNeftBank: null, lastNeftUtr: null };
+    }
+    if (mode === 'NEFT') {
+      return {
+        cashTotal: 0,
+        neftTotal: paid,
+        lastNeftBank: fallback.neftBank ?? null,
+        lastNeftUtr: fallback.neftUtr ?? null,
+      };
+    }
+    if (mode === 'BOTH') {
+      return {
+        cashTotal: fallback.cashAmount ?? 0,
+        neftTotal: fallback.neftAmount ?? 0,
+        lastNeftBank: fallback.neftBank ?? null,
+        lastNeftUtr: fallback.neftUtr ?? null,
+      };
+    }
+    return { cashTotal: 0, neftTotal: 0, lastNeftBank: null, lastNeftUtr: null };
+  }
 
   const unified = useMemo<UnifiedRow[]>(
     () =>
       [
-        ...transactions.map((t) => ({
-          id: `m-${t.id}`,
-          domain: 'metal' as const,
-          createdAt: t.createdAt,
-          description: `${t.metalType} ${t.purity}K`,
-          measure: `${t.grossWeight.toFixed(2)} g`,
-          rate: t.rate ?? null,
-          totalValue: t.totalValue ?? null,
-          amountPaid: t.amountPaid ?? null,
-          creditApplied: t.creditApplied ?? null,
-          creditGenerated: t.creditGenerated ?? null,
-          paymentStatus: t.paymentStatus ?? null,
-          isBillable: t.isBillable ?? null,
-          raw: t,
-        })),
-        ...diamondTransactions.map((t) => ({
-          id: `d-${t.id}`,
-          domain: 'diamond' as const,
-          createdAt: t.createdAt,
-          description:
-            [t.diamond?.shape, t.diamond?.color, t.diamond?.clarity]
-              .filter(Boolean)
-              .join(' · ') || (t.diamond?.stockNumber ?? 'Diamond'),
-          measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
-          rate: t.pricePerCarat ?? null,
-          totalValue: t.totalValue ?? null,
-          amountPaid: t.amountPaid ?? null,
-          creditApplied: t.creditApplied ?? null,
-          creditGenerated: t.creditGenerated ?? null,
-          paymentStatus: t.paymentStatus ?? null,
-          isBillable: t.isBillable ?? null,
-          raw: t,
-        })),
+        ...transactions.map((t) => {
+          const summary = summarisePayments(t.payments, t);
+          return {
+            id: `m-${t.id}`,
+            domain: 'metal' as const,
+            createdAt: t.createdAt,
+            description: `${t.metalType} ${t.purity}K`,
+            measure: `${t.grossWeight.toFixed(2)} g`,
+            rate: t.rate ?? null,
+            totalValue: t.totalValue ?? null,
+            amountPaid: t.amountPaid ?? null,
+            creditApplied: t.creditApplied ?? null,
+            creditGenerated: t.creditGenerated ?? null,
+            paymentStatus: t.paymentStatus ?? null,
+            isBillable: t.isBillable ?? null,
+            payments: t.payments ?? [],
+            ...summary,
+            raw: t,
+          };
+        }),
+        ...diamondTransactions.map((t) => {
+          const summary = summarisePayments(t.payments, t);
+          return {
+            id: `d-${t.id}`,
+            domain: 'diamond' as const,
+            createdAt: t.createdAt,
+            description:
+              [t.diamond?.shape, t.diamond?.color, t.diamond?.clarity]
+                .filter(Boolean)
+                .join(' · ') || (t.diamond?.stockNumber ?? 'Diamond'),
+            measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
+            rate: t.pricePerCarat ?? null,
+            totalValue: t.totalValue ?? null,
+            amountPaid: t.amountPaid ?? null,
+            creditApplied: t.creditApplied ?? null,
+            creditGenerated: t.creditGenerated ?? null,
+            paymentStatus: t.paymentStatus ?? null,
+            isBillable: t.isBillable ?? null,
+            payments: t.payments ?? [],
+            ...summary,
+            raw: t,
+          };
+        }),
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [transactions, diamondTransactions],
   );
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
     const c = { all: unified.length, metal: 0, diamond: 0, PENDING: 0, HALF: 0, COMPLETE: 0 };
@@ -317,7 +400,23 @@ export default function VendorDetailPage() {
 
   const exportCsv = () => {
     const rows: (string | number)[][] = [
-      ['Date', 'Type', 'Item', 'Qty', 'Rate', 'Total Value', 'Paid', 'Credit Applied', 'Credit Generated', 'Payment', 'Billable'],
+      [
+        'Date',
+        'Type',
+        'Item',
+        'Qty',
+        'Rate',
+        'Total Value',
+        'Paid',
+        'Cash Paid',
+        'NEFT Paid',
+        'NEFT Bank',
+        'NEFT UTR',
+        'Credit Applied',
+        'Credit Generated',
+        'Payment',
+        'Billable',
+      ],
     ];
     for (const r of filtered) {
       rows.push([
@@ -328,6 +427,10 @@ export default function VendorDetailPage() {
         r.rate ?? '',
         r.totalValue ?? '',
         r.amountPaid ?? '',
+        r.cashTotal || '',
+        r.neftTotal || '',
+        r.lastNeftBank ?? '',
+        r.lastNeftUtr ?? '',
         r.creditApplied ?? '',
         r.creditGenerated ?? '',
         r.paymentStatus ?? '',
@@ -632,6 +735,7 @@ export default function VendorDetailPage() {
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-[11px] text-onyx-500 uppercase tracking-wider sticky top-0 z-10">
                   <tr>
+                    <th className="px-2 py-3 w-8" aria-label="Expand row" />
                     <th className="px-4 py-3 text-left font-semibold">Date</th>
                     <th className="px-4 py-3 text-left font-semibold">Type</th>
                     <th className="px-4 py-3 text-left font-semibold">Item</th>
@@ -639,8 +743,9 @@ export default function VendorDetailPage() {
                     <th className="px-4 py-3 text-right font-semibold">Rate</th>
                     <th className="px-4 py-3 text-right font-semibold">Total Value</th>
                     <th className="px-4 py-3 text-right font-semibold">Paid</th>
+                    <th className="px-4 py-3 text-left font-semibold">Payment Mix</th>
                     <th className="px-4 py-3 text-left font-semibold">Credit</th>
-                    <th className="px-4 py-3 text-left font-semibold">Payment</th>
+                    <th className="px-4 py-3 text-left font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -651,89 +756,265 @@ export default function VendorDetailPage() {
                       canSettle &&
                       (row.paymentStatus === 'HALF' || row.paymentStatus === 'PENDING') &&
                       row.isBillable !== false;
+                    const isExpanded = expandedId === row.id;
+                    const hasBreakdown =
+                      row.cashTotal > 0 || row.neftTotal > 0 || row.payments.length > 0;
                     return (
-                      <tr
-                        key={row.id}
-                        className={`border-t border-gray-100 transition-colors ${
-                          i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
-                        } hover:bg-champagne-50/40`}
-                      >
-                        <td className="px-4 py-3 text-onyx-700 whitespace-nowrap">
-                          {new Date(row.createdAt).toLocaleDateString('en-IN')}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                              row.domain === 'metal'
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-sky-50 text-sky-800 border-sky-200'
-                            }`}
-                          >
-                            {row.domain}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-onyx-900">{row.description}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-onyx-700">{row.measure}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-onyx-700">
-                          {row.rate ? `₹${fmt(row.rate)}` : <span className="text-onyx-400">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-onyx-900">
-                          {row.totalValue != null ? `₹${fmt(row.totalValue)}` : <span className="text-onyx-400">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          <div className="text-onyx-700">
-                            {row.amountPaid != null ? `₹${fmt(row.amountPaid)}` : <span className="text-onyx-400">—</span>}
-                          </div>
-                          {row.paymentStatus && total > 0 && (
-                            <PayProgress paid={paid} total={total} />
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {row.creditApplied || row.creditGenerated ? (
-                            <div className="space-y-0.5">
-                              {row.creditApplied ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-champagne-50 text-champagne-800 border border-champagne-200">
-                                  Applied ₹{fmt(row.creditApplied)}
-                                </span>
-                              ) : null}
-                              {row.creditGenerated ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Generated ₹{fmt(row.creditGenerated)}
-                                </span>
-                              ) : null}
+                      <Fragment key={row.id}>
+                        <tr
+                          className={`border-t border-gray-100 transition-colors ${
+                            i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                          } ${isExpanded ? 'bg-champagne-50/40' : 'hover:bg-champagne-50/40'}`}
+                        >
+                          <td className="px-2 py-3 align-top">
+                            {hasBreakdown ? (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId(isExpanded ? null : row.id)}
+                                aria-label={isExpanded ? 'Collapse payment details' : 'Expand payment details'}
+                                aria-expanded={isExpanded}
+                                className="p-1 rounded-md text-onyx-400 hover:text-onyx-800 hover:bg-champagne-100/60 focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                              >
+                                <ChevronDownIcon
+                                  className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                />
+                              </button>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3 text-onyx-700 whitespace-nowrap align-top">
+                            {new Date(row.createdAt).toLocaleDateString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                                row.domain === 'metal'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-sky-50 text-sky-800 border-sky-200'
+                              }`}
+                            >
+                              {row.domain}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-onyx-900 align-top">{row.description}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-onyx-700 align-top">{row.measure}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-onyx-700 align-top">
+                            {row.rate ? `₹${fmt(row.rate)}` : <span className="text-onyx-400">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-onyx-900 align-top">
+                            {row.totalValue != null ? `₹${fmt(row.totalValue)}` : <span className="text-onyx-400">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums align-top">
+                            <div className="text-onyx-700">
+                              {row.amountPaid != null ? `₹${fmt(row.amountPaid)}` : <span className="text-onyx-400">—</span>}
                             </div>
-                          ) : (
-                            <span className="text-onyx-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {!row.paymentStatus ? (
-                            <span className="text-onyx-400">—</span>
-                          ) : (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <PaymentBadge status={row.paymentStatus} />
-                              {row.isBillable === false && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
-                                  Non-billable
-                                </span>
-                              )}
-                              {showSettle && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    row.domain === 'metal'
-                                      ? setSettleTxn(row.raw as MetalTransaction)
-                                      : setSettleDiamondTxn(row.raw as DiamondTransaction)
-                                  }
-                                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-champagne-500 to-champagne-700 text-onyx-900 hover:from-champagne-600 hover:to-champagne-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-champagne-400"
-                                >
-                                  Settle
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                            {row.paymentStatus && total > 0 && (
+                              <PayProgress paid={paid} total={total} />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            {hasBreakdown ? (
+                              <div className="flex flex-wrap gap-1">
+                                {row.cashTotal > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <BanknotesIcon className="w-3 h-3" /> Cash ₹{fmt(row.cashTotal)}
+                                  </span>
+                                )}
+                                {row.neftTotal > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200"
+                                    title={
+                                      [row.lastNeftBank, row.lastNeftUtr]
+                                        .filter(Boolean)
+                                        .join(' · ') || 'Bank transfer'
+                                    }
+                                  >
+                                    <BuildingLibraryIcon className="w-3 h-3" /> NEFT ₹{fmt(row.neftTotal)}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-onyx-400 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs align-top">
+                            {row.creditApplied || row.creditGenerated ? (
+                              <div className="space-y-0.5">
+                                {row.creditApplied ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-champagne-50 text-champagne-800 border border-champagne-200">
+                                    Applied ₹{fmt(row.creditApplied)}
+                                  </span>
+                                ) : null}
+                                {row.creditGenerated ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Generated ₹{fmt(row.creditGenerated)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-onyx-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            {!row.paymentStatus ? (
+                              <span className="text-onyx-400">—</span>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <PaymentBadge status={row.paymentStatus} />
+                                {row.isBillable === false && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
+                                    Non-billable
+                                  </span>
+                                )}
+                                {showSettle && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      row.domain === 'metal'
+                                        ? setSettleTxn(row.raw as MetalTransaction)
+                                        : setSettleDiamondTxn(row.raw as DiamondTransaction)
+                                    }
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-champagne-500 to-champagne-700 text-onyx-900 hover:from-champagne-600 hover:to-champagne-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                                  >
+                                    Settle
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-champagne-50/30 border-t border-champagne-100">
+                            <td className="px-2 py-3" />
+                            <td colSpan={10} className="px-4 py-4">
+                              <div className="rounded-xl border border-champagne-100 bg-white p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-onyx-600">
+                                    Payment Ledger
+                                  </h4>
+                                  <div className="flex flex-wrap gap-2 text-[11px]">
+                                    {row.cashTotal > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                                        <BanknotesIcon className="w-3.5 h-3.5" />
+                                        Total Cash: ₹{fmt(row.cashTotal)}
+                                      </span>
+                                    )}
+                                    {row.neftTotal > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-sky-700 font-semibold">
+                                        <BuildingLibraryIcon className="w-3.5 h-3.5" />
+                                        Total NEFT: ₹{fmt(row.neftTotal)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {row.payments.length === 0 ? (
+                                  <p className="text-xs text-onyx-500">
+                                    Single payment recorded against this transaction (no ledger entries yet).
+                                  </p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full text-xs">
+                                      <thead className="text-[10px] text-onyx-500 uppercase tracking-wider">
+                                        <tr className="border-b border-gray-100">
+                                          <th className="px-2 py-2 text-left font-semibold">When</th>
+                                          <th className="px-2 py-2 text-left font-semibold">Mode</th>
+                                          <th className="px-2 py-2 text-right font-semibold">Cash</th>
+                                          <th className="px-2 py-2 text-right font-semibold">NEFT</th>
+                                          <th className="px-2 py-2 text-left font-semibold">Bank · UTR</th>
+                                          <th className="px-2 py-2 text-right font-semibold">Total</th>
+                                          <th className="px-2 py-2 text-left font-semibold">Recorded By</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {row.payments.map((p) => {
+                                          const mode = String(p.paymentMode || '').toUpperCase();
+                                          const cash =
+                                            mode === 'CASH'
+                                              ? p.amount
+                                              : mode === 'BOTH'
+                                              ? p.cashAmount ?? 0
+                                              : 0;
+                                          const neft =
+                                            mode === 'NEFT'
+                                              ? p.amount
+                                              : mode === 'BOTH'
+                                              ? p.neftAmount ?? 0
+                                              : 0;
+                                          return (
+                                            <tr key={p.id} className="border-b border-gray-50 last:border-0">
+                                              <td className="px-2 py-2 text-onyx-700 whitespace-nowrap">
+                                                {new Date(p.recordedAt).toLocaleString('en-IN', {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                })}
+                                              </td>
+                                              <td className="px-2 py-2">
+                                                <span
+                                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                                    mode === 'CASH'
+                                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                      : mode === 'NEFT'
+                                                      ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                                      : 'bg-violet-50 text-violet-800 border-violet-200'
+                                                  }`}
+                                                >
+                                                  {mode || '—'}
+                                                </span>
+                                              </td>
+                                              <td className="px-2 py-2 text-right tabular-nums text-onyx-700">
+                                                {cash > 0 ? `₹${fmt(cash)}` : <span className="text-onyx-300">—</span>}
+                                              </td>
+                                              <td className="px-2 py-2 text-right tabular-nums text-onyx-700">
+                                                {neft > 0 ? `₹${fmt(neft)}` : <span className="text-onyx-300">—</span>}
+                                              </td>
+                                              <td className="px-2 py-2 text-onyx-600">
+                                                {p.neftBank || p.neftUtr ? (
+                                                  <div className="flex flex-col leading-tight">
+                                                    {p.neftBank && (
+                                                      <span className="font-medium text-onyx-800">{p.neftBank}</span>
+                                                    )}
+                                                    {p.neftUtr && (
+                                                      <span className="font-mono text-[10px] text-onyx-500">
+                                                        UTR {p.neftUtr}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-onyx-300">—</span>
+                                                )}
+                                              </td>
+                                              <td className="px-2 py-2 text-right tabular-nums font-semibold text-onyx-900">
+                                                ₹{fmt(p.amount)}
+                                              </td>
+                                              <td className="px-2 py-2 text-onyx-600">
+                                                {p.recordedBy?.name ?? <span className="text-onyx-300">—</span>}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                {(row.lastNeftBank || row.lastNeftUtr) && row.payments.length === 0 && (
+                                  <p className="text-xs text-onyx-600 mt-2">
+                                    Last NEFT:{' '}
+                                    <span className="font-semibold">{row.lastNeftBank ?? '—'}</span>
+                                    {row.lastNeftUtr ? (
+                                      <>
+                                        {' · UTR '}
+                                        <span className="font-mono">{row.lastNeftUtr}</span>
+                                      </>
+                                    ) : null}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
