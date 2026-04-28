@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAllStonePackets } from '../../services/stone.service';
 import Button from '../../components/common/Button';
@@ -33,7 +34,14 @@ export default function StonePacketListPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Stone Inventory</h1>
             <p className="text-gray-600">Manage CZ, Kundan, Polki stones</p>
           </div>
-          <Button variant="primary">Add Packet</Button>
+          <div className="flex items-center gap-2">
+            <Link to="/app/inventory/stone-packets">
+              <Button variant="secondary">Back to Dashboard</Button>
+            </Link>
+            <Link to="/app/inventory/stone-packets/receive">
+              <Button variant="primary">Add Packet</Button>
+            </Link>
+          </div>
         </div>
 
         {/* Filters */}

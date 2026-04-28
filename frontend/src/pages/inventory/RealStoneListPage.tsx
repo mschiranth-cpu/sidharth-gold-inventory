@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAllRealStones } from '../../services/stone.service';
 import Button from '../../components/common/Button';
@@ -33,7 +34,14 @@ export default function RealStoneListPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Real Stone Inventory</h1>
             <p className="text-gray-600">Manage precious stones (Ruby, Emerald, Sapphire)</p>
           </div>
-          <Button variant="primary">Add Stone</Button>
+          <div className="flex items-center gap-2">
+            <Link to="/app/inventory/real-stones">
+              <Button variant="secondary">Back to Dashboard</Button>
+            </Link>
+            <Link to="/app/inventory/real-stones/receive">
+              <Button variant="primary">Add Stone</Button>
+            </Link>
+          </div>
         </div>
 
         {/* Filters */}

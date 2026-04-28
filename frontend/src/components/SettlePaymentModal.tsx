@@ -24,29 +24,78 @@ import {
   type DiamondTransaction,
   type DiamondPayment,
 } from '../services/diamond.service';
+import {
+  getRealStonePayments,
+  settleRealStonePayment,
+  getStonePacketPayments,
+  settleStonePacketPayment,
+  type RealStoneTransaction,
+  type RealStonePayment,
+  type StonePacketTransaction,
+  type StonePacketPayment,
+} from '../services/stone.service';
 import Button from './common/Button';
 
-type Domain = 'metal' | 'diamond';
+type Domain = 'metal' | 'diamond' | 'realStone' | 'stonePacket';
+
+type AnyTxn =
+  | MetalTransaction
+  | DiamondTransaction
+  | RealStoneTransaction
+  | StonePacketTransaction;
+
+type AnyPayment =
+  | MetalPayment
+  | DiamondPayment
+  | RealStonePayment
+  | StonePacketPayment;
+
+const DOMAIN_CONFIG = {
+  metal: {
+    paymentsKey: (id: string) => ['metal-payments', id],
+    txnsKey: ['metal-transactions'],
+    fetch: getMetalPayments,
+    settle: settleMetalPayment,
+  },
+  diamond: {
+    paymentsKey: (id: string) => ['diamond-payments', id],
+    txnsKey: ['diamond-transactions'],
+    fetch: getDiamondPayments,
+    settle: settleDiamondPayment,
+  },
+  realStone: {
+    paymentsKey: (id: string) => ['real-stone-payments', id],
+    txnsKey: ['real-stone-transactions'],
+    fetch: getRealStonePayments,
+    settle: settleRealStonePayment,
+  },
+  stonePacket: {
+    paymentsKey: (id: string) => ['stone-packet-payments', id],
+    txnsKey: ['stone-packet-transactions'],
+    fetch: getStonePacketPayments,
+    settle: settleStonePacketPayment,
+  },
+} as const;
 
 interface Props {
-  transaction: MetalTransaction | DiamondTransaction;
+  transaction: AnyTxn;
   onClose: () => void;
   onSettled?: () => void;
-  /** Selects which API + cache keys to use. Defaults to 'metal' for back-compat. */
-  domain?: Domain;
+  /** REQUIRED: selects API + cache keys. No default — prevents silent mis-routing. */
+  domain: Domain;
 }
 
-export default function SettlePaymentModal({ transaction, onClose, onSettled, domain = 'metal' }: Props) {
+export default function SettlePaymentModal({ transaction, onClose, onSettled, domain }: Props) {
   const queryClient = useQueryClient();
   const txnId = transaction.id;
   const totalValue = transaction.totalValue ?? 0;
-  const isDiamond = domain === 'diamond';
-  const paymentsQueryKey = isDiamond ? ['diamond-payments', txnId] : ['metal-payments', txnId];
-  const txnsQueryKey = isDiamond ? ['diamond-transactions'] : ['metal-transactions'];
-  const fetchPayments = (): Promise<MetalPayment[] | DiamondPayment[]> =>
-    isDiamond ? getDiamondPayments(txnId) : getMetalPayments(txnId);
+  const cfg = DOMAIN_CONFIG[domain];
+  const paymentsQueryKey = cfg.paymentsKey(txnId);
+  const txnsQueryKey = cfg.txnsKey;
+  const fetchPayments = (): Promise<AnyPayment[]> =>
+    cfg.fetch(txnId) as Promise<AnyPayment[]>;
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery<MetalPayment[] | DiamondPayment[]>({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery<AnyPayment[]>({
     queryKey: paymentsQueryKey,
     queryFn: fetchPayments,
   });
@@ -80,7 +129,7 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled, do
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [balanceDue, amountTouched]);
 
-  const settle = useMutation<MetalTransaction | DiamondTransaction, unknown, void>({
+  const settle = useMutation<AnyTxn, unknown, void>({
     mutationFn: () => {
       const payload = {
         amount,
@@ -93,9 +142,7 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled, do
         notes: notes || undefined,
         creditApplied: creditApplied > 0 ? creditApplied : undefined,
       };
-      return isDiamond
-        ? settleDiamondPayment(txnId, payload)
-        : settleMetalPayment(txnId, payload);
+      return cfg.settle(txnId, payload as any) as Promise<AnyTxn>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: txnsQueryKey });

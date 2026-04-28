@@ -333,12 +333,22 @@ async function loadInventorySnapshot() {
         orderBy: { totalPieces: 'asc' },
         take: 5,
       }),
-      prisma.stonePacket.findMany({
-        where: { currentPieces: { gt: 0, lte: LOW_STOCK_STONE_PACKET_THRESHOLD } },
-        select: { id: true, packetNumber: true, currentPieces: true },
-        orderBy: { currentPieces: 'asc' },
-        take: 5,
-      }),
+      // Per-packet `reorderLevel` (Stone Inventory Parity, Phase 3 step 4).
+      // Falls back to the legacy constant when reorderLevel is NULL so existing
+      // packets without an explicit reorder level still surface alerts.
+      prisma.$queryRaw<Array<{ id: string; packetNumber: string; currentPieces: number | null; currentWeight: number; reorderLevel: number | null }>>`
+        SELECT id, packet_number AS "packetNumber",
+               current_pieces AS "currentPieces",
+               current_weight AS "currentWeight",
+               reorder_level  AS "reorderLevel"
+          FROM stone_packets
+         WHERE current_weight > 0
+           AND ((reorder_level IS NOT NULL AND current_weight <= reorder_level)
+                OR (reorder_level IS NULL AND current_pieces IS NOT NULL
+                    AND current_pieces <= ${LOW_STOCK_STONE_PACKET_THRESHOLD}))
+         ORDER BY (current_weight / NULLIF(reorder_level, current_weight)) ASC
+         LIMIT 5
+      `,
     ]);
 
   const metalStockGrams =
@@ -364,7 +374,7 @@ async function loadInventorySnapshot() {
       id: s.id,
       label: s.packetNumber,
       quantity: s.currentPieces ?? 0,
-      threshold: LOW_STOCK_STONE_PACKET_THRESHOLD,
+      threshold: s.reorderLevel ?? LOW_STOCK_STONE_PACKET_THRESHOLD,
     })),
   ];
 

@@ -4,6 +4,7 @@
  * ============================================
  */
 
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAllStonePackets } from '../../services/stone.service';
 import Button from '../../components/common/Button';
@@ -29,9 +30,14 @@ export default function StoneReorderAlertsPage() {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reorder Alerts</h1>
-          <p className="text-gray-600">Stone packets below reorder level</p>
+        <div className="mb-8 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Reorder Alerts</h1>
+            <p className="text-gray-600">Stone packets below reorder level</p>
+          </div>
+          <Link to="/app/inventory/stone-packets">
+            <Button variant="secondary">Back to Dashboard</Button>
+          </Link>
         </div>
 
         {lowStockPackets.length === 0 ? (
@@ -91,9 +97,11 @@ export default function StoneReorderAlertsPage() {
                   </div>
                 </div>
 
-                <Button variant="primary" size="sm" className="w-full">
-                  Create Purchase Order
-                </Button>
+                <Link to="/app/inventory/stone-packets/receive" className="block">
+                  <Button variant="primary" size="sm" className="w-full">
+                    Create Purchase Order
+                  </Button>
+                </Link>
               </div>
             ))}
           </div>

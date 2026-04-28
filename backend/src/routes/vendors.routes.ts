@@ -400,6 +400,14 @@ router.get('/outstanding', async (_req: Request, res: Response) => {
       SELECT vendor_id, total_value, amount_paid, payment_status
         FROM diamond_transactions
         WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM real_stone_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM stone_packet_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
     )
     SELECT v.id AS "vendorId", v.name, v.unique_code AS "uniqueCode",
       COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
@@ -424,6 +432,14 @@ router.get('/:id/outstanding', async (req: Request, res: Response) => {
       UNION ALL
       SELECT vendor_id, total_value, amount_paid, payment_status
         FROM diamond_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id = ${req.params.id}
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM real_stone_transactions
+        WHERE transaction_type = 'PURCHASE' AND vendor_id = ${req.params.id}
+      UNION ALL
+      SELECT vendor_id, total_value, amount_paid, payment_status
+        FROM stone_packet_transactions
         WHERE transaction_type = 'PURCHASE' AND vendor_id = ${req.params.id}
     )
     SELECT v.id AS "vendorId", v.name, v.unique_code AS "uniqueCode",
@@ -473,6 +489,59 @@ router.get('/:id/diamond-transactions', async (req: Request, res: Response) => {
           shape: true,
           color: true,
           clarity: true,
+        },
+      },
+      payments: {
+        include: { recordedBy: { select: { id: true, name: true } } },
+        orderBy: { recordedAt: 'desc' },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ success: true, data: transactions });
+});
+
+// GET /api/vendors/:id/real-stone-transactions  — vendor's real-stone purchase history.
+router.get('/:id/real-stone-transactions', async (req: Request, res: Response) => {
+  const transactions = await prisma.realStoneTransaction.findMany({
+    where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
+    include: {
+      vendor: { select: { id: true, name: true, uniqueCode: true } },
+      stone: {
+        select: {
+          id: true,
+          stockNumber: true,
+          stoneType: true,
+          shape: true,
+          color: true,
+          clarity: true,
+        },
+      },
+      payments: {
+        include: { recordedBy: { select: { id: true, name: true } } },
+        orderBy: { recordedAt: 'desc' },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ success: true, data: transactions });
+});
+
+// GET /api/vendors/:id/stone-packet-transactions  — vendor's stone-packet purchase history.
+router.get('/:id/stone-packet-transactions', async (req: Request, res: Response) => {
+  const transactions = await prisma.stonePacketTransaction.findMany({
+    where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
+    include: {
+      vendor: { select: { id: true, name: true, uniqueCode: true } },
+      packet: {
+        select: {
+          id: true,
+          packetNumber: true,
+          stoneType: true,
+          size: true,
+          color: true,
+          quality: true,
+          unit: true,
         },
       },
       payments: {

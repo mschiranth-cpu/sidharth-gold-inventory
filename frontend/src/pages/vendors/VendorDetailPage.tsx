@@ -337,7 +337,7 @@ export default function VendorDetailPage() {
       </div>
 
       {settleTxn && (
-        <SettlePaymentModal transaction={settleTxn} onClose={() => setSettleTxn(null)} />
+        <SettlePaymentModal domain="metal" transaction={settleTxn} onClose={() => setSettleTxn(null)} />
       )}
 
       {settleDiamondTxn && (

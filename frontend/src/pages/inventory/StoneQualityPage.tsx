@@ -4,8 +4,10 @@
  * ============================================
  */
 
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAllStonePackets } from '../../services/stone.service';
+import Button from '../../components/common/Button';
 
 export default function StoneQualityPage() {
   const { data: packets = [], isLoading } = useQuery({
@@ -31,9 +33,14 @@ export default function StoneQualityPage() {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Stones by Quality</h1>
-          <p className="text-gray-600">View stone packets grouped by quality grade</p>
+        <div className="mb-8 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Stones by Quality</h1>
+            <p className="text-gray-600">View stone packets grouped by quality grade</p>
+          </div>
+          <Link to="/app/inventory/stone-packets">
+            <Button variant="secondary">Back to Dashboard</Button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

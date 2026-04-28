@@ -759,6 +759,7 @@ export default function MetalTransactionsPage() {
       </div>
       {settleTxn && (
         <SettlePaymentModal
+          domain="metal"
           transaction={settleTxn}
           onClose={() => setSettleTxn(null)}
         />

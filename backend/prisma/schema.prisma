@@ -114,6 +114,11 @@ model User {
   realStoneTransactions   RealStoneTransaction[]   @relation("RealStoneTransactionsCreated")
   stonePacketTransactions StonePacketTransaction[] @relation("StonePacketTransactionsCreated")
 
+  // Phase 3.1 — stone parity (rates + payment audit trail)
+  realStoneRatesCreated       RealStoneRate[]      @relation("RealStoneRatesCreated")
+  realStonePaymentsRecorded   RealStonePayment[]   @relation("RealStonePaymentsRecorded")
+  stonePacketPaymentsRecorded StonePacketPayment[] @relation("StonePacketPaymentsRecorded")
+
   // Phase 4 relations
   factoryItemTransactions FactoryItemTransaction[] @relation("FactoryItemTransactionsCreated")
   equipmentMaintenance    EquipmentMaintenance[]   @relation("EquipmentMaintenanceCreated")
@@ -984,8 +989,10 @@ model Vendor {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  metalTransactions   MetalTransaction[]   @relation("VendorMetalTransactions")
-  diamondTransactions DiamondTransaction[] @relation("VendorDiamondTransactions")
+  metalTransactions       MetalTransaction[]       @relation("VendorMetalTransactions")
+  diamondTransactions     DiamondTransaction[]     @relation("VendorDiamondTransactions")
+  realStoneTransactions   RealStoneTransaction[]   @relation("VendorRealStoneTransactions")
+  stonePacketTransactions StonePacketTransaction[] @relation("VendorStonePacketTransactions")
 
   @@index([name])
   @@index([gstNumber])
@@ -1263,13 +1270,84 @@ model RealStoneTransaction {
   transactionType String    @map("transaction_type")
   orderId         String?   @map("order_id")
   order           Order?    @relation("RealStoneTransactions", fields: [orderId], references: [id])
+  departmentId    String?   @map("department_id")
+  workerId        String?   @map("worker_id")
   notes           String?
   createdById     String    @map("created_by_id")
   createdBy       User      @relation("RealStoneTransactionsCreated", fields: [createdById], references: [id])
   createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Vendor + invoice fields (Phase 3.1 — diamond parity)
+  vendorId        String? @map("vendor_id")
+  vendor          Vendor? @relation("VendorRealStoneTransactions", fields: [vendorId], references: [id])
+  referenceNumber String? @map("reference_number")
+  caratWeight     Float?  @map("carat_weight")
+  pricePerCarat   Float?  @map("price_per_carat")
+  totalValue      Float?  @map("total_value")
+  fromLocation    String? @map("from_location")
+  toLocation      String? @map("to_location")
+
+  // Payment tracking — NULL on non-PURCHASE rows
+  isBillable      Boolean?  @map("is_billable")
+  paymentMode     String?   @map("payment_mode") // 'CASH' | 'NEFT' | 'BOTH'
+  paymentStatus   String?   @map("payment_status") // 'COMPLETE' | 'HALF' | 'PENDING'
+  amountPaid      Float?    @map("amount_paid")
+  cashAmount      Float?    @map("cash_amount")
+  neftAmount      Float?    @map("neft_amount")
+  neftUtr         String?   @map("neft_utr")
+  neftBank        String?   @map("neft_bank")
+  neftDate        DateTime? @map("neft_date")
+  creditApplied   Float?    @map("credit_applied")
+  creditGenerated Float?    @map("credit_generated")
+
+  payments RealStonePayment[] @relation("RealStoneTransactionPayments")
 
   @@index([stoneId])
+  @@index([vendorId])
+  @@index([isBillable])
+  @@index([paymentStatus])
   @@map("real_stone_transactions")
+}
+
+model RealStonePayment {
+  id              String               @id @default(uuid())
+  transactionId   String               @map("transaction_id")
+  transaction     RealStoneTransaction @relation("RealStoneTransactionPayments", fields: [transactionId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentMode     String               @map("payment_mode")
+  cashAmount      Float?               @map("cash_amount")
+  neftAmount      Float?               @map("neft_amount")
+  neftUtr         String?              @map("neft_utr")
+  neftBank        String?              @map("neft_bank")
+  neftDate        DateTime?            @map("neft_date")
+  creditApplied   Float?               @map("credit_applied")
+  creditGenerated Float?               @map("credit_generated")
+  notes           String?
+  recordedById    String               @map("recorded_by_id")
+  recordedBy      User                 @relation("RealStonePaymentsRecorded", fields: [recordedById], references: [id])
+  recordedAt      DateTime             @default(now()) @map("recorded_at")
+
+  @@index([transactionId])
+  @@index([recordedAt])
+  @@map("real_stone_payments")
+}
+
+model RealStoneRate {
+  id            String        @id @default(uuid())
+  stoneType     RealStoneType @map("stone_type")
+  quality       String?
+  caratFrom     Float         @map("carat_from")
+  caratTo       Float         @map("carat_to")
+  pricePerCarat Float         @map("price_per_carat")
+  effectiveDate DateTime      @map("effective_date")
+  source        String?
+  createdById   String        @map("created_by_id")
+  createdBy     User          @relation("RealStoneRatesCreated", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@index([stoneType, quality, effectiveDate])
+  @@map("real_stone_rates")
 }
 
 // ============================================
@@ -1324,14 +1402,66 @@ model StonePacketTransaction {
   unit            String
   orderId         String?     @map("order_id")
   order           Order?      @relation("StonePacketTransactions", fields: [orderId], references: [id])
+  departmentId    String?     @map("department_id")
   workerId        String?     @map("worker_id")
   notes           String?
   createdById     String      @map("created_by_id")
   createdBy       User        @relation("StonePacketTransactionsCreated", fields: [createdById], references: [id])
   createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Vendor + invoice fields (Phase 3.1 — diamond parity)
+  vendorId        String? @map("vendor_id")
+  vendor          Vendor? @relation("VendorStonePacketTransactions", fields: [vendorId], references: [id])
+  referenceNumber String? @map("reference_number")
+  pricePerUnit    Float?  @map("price_per_unit")
+  totalValue      Float?  @map("total_value")
+  fromLocation    String? @map("from_location")
+  toLocation      String? @map("to_location")
+
+  // Payment tracking — NULL on non-PURCHASE rows
+  isBillable      Boolean?  @map("is_billable")
+  paymentMode     String?   @map("payment_mode")
+  paymentStatus   String?   @map("payment_status")
+  amountPaid      Float?    @map("amount_paid")
+  cashAmount      Float?    @map("cash_amount")
+  neftAmount      Float?    @map("neft_amount")
+  neftUtr         String?   @map("neft_utr")
+  neftBank        String?   @map("neft_bank")
+  neftDate        DateTime? @map("neft_date")
+  creditApplied   Float?    @map("credit_applied")
+  creditGenerated Float?    @map("credit_generated")
+
+  payments StonePacketPayment[] @relation("StonePacketTransactionPayments")
 
   @@index([packetId])
+  @@index([vendorId])
+  @@index([isBillable])
+  @@index([paymentStatus])
   @@map("stone_packet_transactions")
+}
+
+model StonePacketPayment {
+  id              String                 @id @default(uuid())
+  transactionId   String                 @map("transaction_id")
+  transaction     StonePacketTransaction @relation("StonePacketTransactionPayments", fields: [transactionId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentMode     String                 @map("payment_mode")
+  cashAmount      Float?                 @map("cash_amount")
+  neftAmount      Float?                 @map("neft_amount")
+  neftUtr         String?                @map("neft_utr")
+  neftBank        String?                @map("neft_bank")
+  neftDate        DateTime?              @map("neft_date")
+  creditApplied   Float?                 @map("credit_applied")
+  creditGenerated Float?                 @map("credit_generated")
+  notes           String?
+  recordedById    String                 @map("recorded_by_id")
+  recordedBy      User                   @relation("StonePacketPaymentsRecorded", fields: [recordedById], references: [id])
+  recordedAt      DateTime               @default(now()) @map("recorded_at")
+
+  @@index([transactionId])
+  @@index([recordedAt])
+  @@map("stone_packet_payments")
 }
 
 // ============================================

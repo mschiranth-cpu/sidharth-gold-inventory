@@ -134,8 +134,52 @@ const DiamondRateManagementPage = lazy(
   () => import('./pages/inventory/DiamondRateManagementPage')
 );
 const DiamondLotsPage = lazy(() => import('./pages/inventory/DiamondLotsPage'));
+
+// Real Stone module
+const RealStoneInventoryDashboard = lazy(
+  () => import('./pages/inventory/RealStoneInventoryDashboard')
+);
+const ReceiveRealStonePage = lazy(() => import('./pages/inventory/ReceiveRealStonePage'));
+const IssueRealStonePage = lazy(() => import('./pages/inventory/IssueRealStonePage'));
+const TransferRealStonePage = lazy(() => import('./pages/inventory/TransferRealStonePage'));
+const RealStoneTransactionsPage = lazy(
+  () => import('./pages/inventory/RealStoneTransactionsPage')
+);
 const RealStoneListPage = lazy(() => import('./pages/inventory/RealStoneListPage'));
+const RealStoneTreatmentPage = lazy(
+  () => import('./pages/inventory/RealStoneTreatmentPage')
+);
+const RealStoneRateManagementPage = lazy(
+  () => import('./pages/inventory/RealStoneRateManagementPage')
+);
+const RealStoneReportPage = lazy(() => import('./pages/inventory/RealStoneReportPage'));
+const RealStoneDetailPage = lazy(() => import('./pages/inventory/RealStoneDetailPage'));
+
+// Stone Packet module
+const StonePacketInventoryDashboard = lazy(
+  () => import('./pages/inventory/StonePacketInventoryDashboard')
+);
+const ReceiveStonePacketPage = lazy(
+  () => import('./pages/inventory/ReceiveStonePacketPage')
+);
+const IssueStonePacketPage = lazy(() => import('./pages/inventory/IssueStonePacketPage'));
+const TransferStonePacketPage = lazy(
+  () => import('./pages/inventory/TransferStonePacketPage')
+);
+const StonePacketTransactionsPage = lazy(
+  () => import('./pages/inventory/StonePacketTransactionsPage')
+);
 const StonePacketListPage = lazy(() => import('./pages/inventory/StonePacketListPage'));
+const StoneQualityPage = lazy(() => import('./pages/inventory/StoneQualityPage'));
+const StoneReorderAlertsPage = lazy(
+  () => import('./pages/inventory/StoneReorderAlertsPage')
+);
+const StoneInventoryReportPage = lazy(
+  () => import('./pages/inventory/StoneInventoryReportPage')
+);
+const StonePacketDetailPage = lazy(
+  () => import('./pages/inventory/StonePacketDetailPage')
+);
 
 // Phase 4 Inventory Pages
 const FactoryInventoryPage = lazy(() => import('./pages/inventory/FactoryInventoryPage'));
@@ -709,6 +753,70 @@ function App() {
           {/* Real Stone Inventory - Admin/Office Staff/Factory Manager */}
           <Route
             path="inventory/real-stones"
+            element={<Navigate to="./dashboard" replace />}
+          />
+          <Route
+            path="inventory/real-stones/dashboard"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneInventoryDashboard />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/receive"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <ReceiveRealStonePage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/issue"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <IssueRealStonePage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/transfer"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <TransferRealStonePage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/transactions"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneTransactionsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/list"
             element={
               <ProtectedRoute
                 allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
@@ -719,16 +827,176 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="inventory/real-stones/treatment"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneTreatmentPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/rates"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneRateManagementPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/report"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneReportPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/real-stones/detail/:id"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <RealStoneDetailPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Stone Inventory - Admin/Office Staff/Factory Manager */}
+          {/* Stone Packet Inventory - Admin/Office Staff/Factory Manager */}
           <Route
             path="inventory/stone-packets"
+            element={<Navigate to="./dashboard" replace />}
+          />
+          <Route
+            path="inventory/stone-packets/dashboard"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StonePacketInventoryDashboard />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/receive"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <ReceiveStonePacketPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/issue"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <IssueStonePacketPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/transfer"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <TransferStonePacketPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/transactions"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StonePacketTransactionsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/list"
             element={
               <ProtectedRoute
                 allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
               >
                 <LazyRoute>
                   <StonePacketListPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/quality"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StoneQualityPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/reorder"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StoneReorderAlertsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/report"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StoneInventoryReportPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inventory/stone-packets/detail/:id"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <StonePacketDetailPage />
                 </LazyRoute>
               </ProtectedRoute>
             }
