@@ -10,7 +10,8 @@
  *   <RefreshIntervalPicker variant="dark"/> // for dark hero bars
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ClockIcon, CheckIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import {
   REFRESH_OPTIONS,
@@ -29,11 +30,37 @@ export default function RefreshIntervalPicker({
   const { option, setIntervalMs } = useRefreshIntervalControls();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const PANEL_WIDTH = 224; // matches w-56
+
+  // Recompute panel position when opening, on scroll, and on resize.
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const place = () => {
+      const r = btnRef.current!.getBoundingClientRect();
+      const top = r.bottom + 6; // 6px gap, matches mt-1.5
+      let left = align === 'right' ? r.right - PANEL_WIDTH : r.left;
+      // Keep within viewport horizontally with an 8px safe margin.
+      left = Math.max(8, Math.min(left, window.innerWidth - PANEL_WIDTH - 8));
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -51,6 +78,7 @@ export default function RefreshIntervalPicker({
   return (
     <div ref={ref} className="relative inline-block">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
@@ -69,13 +97,13 @@ export default function RefreshIntervalPicker({
         />
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={panelRef}
           role="listbox"
           aria-label="Auto-refresh interval"
-          className={`absolute z-30 mt-1.5 w-56 rounded-xl border bg-white shadow-lg overflow-hidden ${
-            align === 'right' ? 'right-0' : 'left-0'
-          } border-gray-200`}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: PANEL_WIDTH }}
+          className="z-[1000] rounded-xl border bg-white shadow-2xl overflow-hidden border-gray-200"
         >
           <div className="px-3 py-2 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-onyx-400">
             Auto-refresh interval
@@ -110,7 +138,8 @@ export default function RefreshIntervalPicker({
             Applies site-wide. Live rates currently scrape Ambicaa Spot
             (Bangalore) every 1 second on the server.
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
