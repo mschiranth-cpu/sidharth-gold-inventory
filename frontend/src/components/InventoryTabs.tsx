@@ -59,7 +59,7 @@ export default function InventoryTabs({ variant = 'dark', className = '' }: Prop
   return (
     <nav
       aria-label="Inventory sections"
-      className={`flex flex-wrap gap-2 ${className}`}
+      className={`flex flex-wrap justify-center gap-2 ${className}`}
     >
       {TABS.map(({ to, label, Icon }) => {
         // Prefix-match so sub-routes (e.g. /inventory/metal/stock,
