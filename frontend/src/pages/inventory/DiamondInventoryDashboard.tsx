@@ -39,6 +39,7 @@ import {
 } from '../../services/diamond.service';
 import { useRefreshInterval } from '../../contexts/RefreshIntervalContext';
 import RefreshIntervalPicker from '../../components/RefreshIntervalPicker';
+import InventoryTabs from '../../components/InventoryTabs';
 
 /* ─────────────────────────────────────────────────────────────── */
 /* Visual config                                                    */
@@ -191,6 +192,8 @@ export default function DiamondInventoryDashboard() {
   return (
     <div className="p-6 bg-gradient-to-br from-pearl via-white to-champagne-50/30 min-h-screen">
       <div className="max-w-7xl mx-auto">
+        {/* Quick-nav tabs across the 4 inventory modules */}
+        <InventoryTabs variant="light" className="mb-4" />
         {/* Hero header */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-onyx-900 via-onyx-800 to-onyx-700 text-pearl shadow-onyx mb-6 p-6 md:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-champagne-500/20 via-transparent to-transparent pointer-events-none" />
