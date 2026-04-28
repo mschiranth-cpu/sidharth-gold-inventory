@@ -36,11 +36,19 @@ import {
 } from '@heroicons/react/24/outline';
 import type { MetalPayment } from '../../services/metal.service';
 import type { DiamondPayment } from '../../services/diamond.service';
+import type {
+  RealStonePayment,
+  RealStoneTransaction,
+  StonePacketPayment,
+  StonePacketTransaction,
+} from '../../services/stone.service';
 import {
   getVendor,
   getVendorOutstanding,
   getVendorTransactions,
   getVendorDiamondTransactions,
+  getVendorRealStoneTransactions,
+  getVendorStonePacketTransactions,
 } from '../../services/vendor.service';
 import type { MetalTransaction } from '../../services/metal.service';
 import type { DiamondTransaction } from '../../services/diamond.service';
@@ -51,7 +59,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
 
-type DomainFilter = 'all' | 'metal' | 'diamond';
+type DomainFilter = 'all' | 'metal' | 'diamond' | 'realStone' | 'stonePacket';
 type StatusFilter = 'all' | 'PENDING' | 'HALF' | 'COMPLETE';
 
 function fmt(n: number) {
@@ -219,32 +227,48 @@ export default function VendorDetailPage() {
     queryFn: () => getVendorDiamondTransactions(id),
     enabled: Boolean(id),
   });
+  const realStoneTransactionsQ = useQuery({
+    queryKey: ['vendor-real-stone-transactions', id],
+    queryFn: () => getVendorRealStoneTransactions(id),
+    enabled: Boolean(id),
+  });
+  const stonePacketTransactionsQ = useQuery({
+    queryKey: ['vendor-stone-packet-transactions', id],
+    queryFn: () => getVendorStonePacketTransactions(id),
+    enabled: Boolean(id),
+  });
 
   const vendor = vendorQ.data;
   const outstanding = outstandingQ.data;
   const transactions = transactionsQ.data ?? [];
   const diamondTransactions = diamondTransactionsQ.data ?? [];
+  const realStoneTransactions = realStoneTransactionsQ.data ?? [];
+  const stonePacketTransactions = stonePacketTransactionsQ.data ?? [];
 
   const isFetching =
     vendorQ.isFetching ||
     outstandingQ.isFetching ||
     transactionsQ.isFetching ||
-    diamondTransactionsQ.isFetching;
+    diamondTransactionsQ.isFetching ||
+    realStoneTransactionsQ.isFetching ||
+    stonePacketTransactionsQ.isFetching;
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['vendor', id] });
     qc.invalidateQueries({ queryKey: ['vendor-outstanding', id] });
     qc.invalidateQueries({ queryKey: ['vendor-transactions', id] });
     qc.invalidateQueries({ queryKey: ['vendor-diamond-transactions', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-real-stone-transactions', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-stone-packet-transactions', id] });
   };
 
   // Merge metal + diamond into a single chronological list. Each row carries
   // a `domain` discriminator + a normalised `description` so one table can
   // render both. Settle action dispatches to the right modal via the domain.
-  type AnyPayment = MetalPayment | DiamondPayment;
+  type AnyPayment = MetalPayment | DiamondPayment | RealStonePayment | StonePacketPayment;
   type UnifiedRow = {
     id: string;
-    domain: 'metal' | 'diamond';
+    domain: 'metal' | 'diamond' | 'realStone' | 'stonePacket';
     createdAt: string;
     description: string;
     measure: string;
@@ -260,7 +284,7 @@ export default function VendorDetailPage() {
     neftTotal: number;
     lastNeftBank: string | null;
     lastNeftUtr: string | null;
-    raw: MetalTransaction | DiamondTransaction;
+    raw: MetalTransaction | DiamondTransaction | RealStoneTransaction | StonePacketTransaction;
   };
 
   function summarisePayments(
@@ -370,17 +394,77 @@ export default function VendorDetailPage() {
             raw: t,
           };
         }),
+        ...realStoneTransactions.map((t) => {
+          const summary = summarisePayments(t.payments, t);
+          return {
+            id: `r-${t.id}`,
+            domain: 'realStone' as const,
+            createdAt: t.createdAt,
+            description:
+              [t.stone?.stoneType, t.stone?.shape, t.stone?.color, t.stone?.clarity]
+                .filter(Boolean)
+                .join(' · ') || (t.stone?.stockNumber ?? 'Real Stone'),
+            measure: t.caratWeight != null ? `${t.caratWeight} ct` : '—',
+            rate: t.pricePerCarat ?? null,
+            totalValue: t.totalValue ?? null,
+            amountPaid: t.amountPaid ?? null,
+            creditApplied: t.creditApplied ?? null,
+            creditGenerated: t.creditGenerated ?? null,
+            paymentStatus: t.paymentStatus ?? null,
+            isBillable: t.isBillable ?? null,
+            payments: t.payments ?? [],
+            ...summary,
+            raw: t,
+          };
+        }),
+        ...stonePacketTransactions.map((t) => {
+          const summary = summarisePayments(t.payments, t);
+          return {
+            id: `p-${t.id}`,
+            domain: 'stonePacket' as const,
+            createdAt: t.createdAt,
+            description:
+              [t.packet?.stoneType, t.packet?.size, t.packet?.color, t.packet?.quality]
+                .filter(Boolean)
+                .join(' · ') || (t.packet?.packetNumber ?? 'Stone Packet'),
+            measure:
+              t.quantity != null
+                ? `${t.quantity} ${t.unit || t.packet?.unit || ''}`.trim()
+                : '—',
+            rate: t.pricePerUnit ?? null,
+            totalValue: t.totalValue ?? null,
+            amountPaid: t.amountPaid ?? null,
+            creditApplied: t.creditApplied ?? null,
+            creditGenerated: t.creditGenerated ?? null,
+            paymentStatus: t.paymentStatus ?? null,
+            isBillable: t.isBillable ?? null,
+            payments: t.payments ?? [],
+            ...summary,
+            raw: t,
+          };
+        }),
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [transactions, diamondTransactions],
+    [transactions, diamondTransactions, realStoneTransactions, stonePacketTransactions],
   );
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
-    const c = { all: unified.length, metal: 0, diamond: 0, PENDING: 0, HALF: 0, COMPLETE: 0 };
+    const c = {
+      all: unified.length,
+      metal: 0,
+      diamond: 0,
+      realStone: 0,
+      stonePacket: 0,
+      PENDING: 0,
+      HALF: 0,
+      COMPLETE: 0,
+    };
     for (const r of unified) {
       if (r.domain === 'metal') c.metal++;
-      else c.diamond++;
+      else if (r.domain === 'diamond') c.diamond++;
+      else if (r.domain === 'realStone') c.realStone++;
+      else if (r.domain === 'stonePacket') c.stonePacket++;
       if (r.paymentStatus === 'PENDING') c.PENDING++;
       else if (r.paymentStatus === 'HALF') c.HALF++;
       else if (r.paymentStatus === 'COMPLETE') c.COMPLETE++;
@@ -488,38 +572,38 @@ export default function VendorDetailPage() {
     <div className="p-6 bg-gradient-to-br from-pearl via-white to-champagne-50/30 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Hero header */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-onyx-900 via-onyx-800 to-onyx-700 text-pearl shadow-onyx p-6 md:p-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-onyx-900 via-onyx-800 to-onyx-700 text-pearl shadow-onyx p-4 md:p-5">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-champagne-500/20 via-transparent to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-gold-leaf-gradient opacity-10 pointer-events-none" />
 
-          <div className="relative flex flex-col gap-6">
+          <div className="relative flex flex-col gap-3">
             <Link
               to="/app/vendors"
-              className="inline-flex items-center gap-1.5 text-xs text-champagne-200/80 hover:text-pearl transition w-fit"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-onyx-900 bg-champagne-300 hover:bg-champagne-200 transition w-fit px-2.5 py-1 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-champagne-200 focus:ring-offset-2 focus:ring-offset-onyx-900"
             >
               <ArrowLeftIcon className="w-3.5 h-3.5" /> Back to vendors
             </Link>
 
-            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-2 flex items-center gap-2">
-                  <SparklesIcon className="w-3.5 h-3.5" /> Vendor · Purchase Ledger
+                <p className="text-[10px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-1 flex items-center gap-1.5">
+                  <SparklesIcon className="w-3 h-3" /> Vendor · Purchase Ledger
                 </p>
-                <h1 className="font-display text-3xl md:text-4xl font-semibold text-pearl mb-2 break-words">
+                <h1 className="font-display text-xl md:text-2xl font-semibold text-pearl mb-2 break-words leading-tight">
                   {vendor.name}
                 </h1>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 font-mono tracking-wide text-champagne-100">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 font-mono tracking-wide text-champagne-100">
                     {vendor.uniqueCode}
                   </span>
                   {vendor.phone && (
-                    <span className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 inline-flex items-center gap-1.5 text-champagne-100">
+                    <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 inline-flex items-center gap-1 text-champagne-100">
                       <PhoneIcon className="w-3 h-3" /> {vendor.phone}
                     </span>
                   )}
                   {vendor.gstNumber && (
                     <span
-                      className={`px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 font-mono ${
+                      className={`px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono ${
                         isVerified
                           ? 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30'
                           : 'bg-white/10 text-champagne-100 border border-white/15'
@@ -538,21 +622,21 @@ export default function VendorDetailPage() {
                   disabled={isFetching}
                   aria-label="Refresh vendor data"
                   title="Refresh"
-                  className="p-2.5 rounded-xl border border-white/15 bg-white/10 hover:bg-white/15 text-pearl disabled:opacity-50 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                  className="p-2 rounded-lg border border-white/15 bg-white/10 hover:bg-white/15 text-pearl disabled:opacity-50 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
                 >
-                  <ArrowPathIcon className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
+                  <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
                 </button>
                 <Link
                   to={`/app/vendors?edit=${vendor.id}`}
-                  className="px-4 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-pearl text-sm font-semibold flex items-center gap-2 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
+                  className="px-3 py-2 rounded-lg border border-white/20 bg-white/10 hover:bg-white/15 text-pearl text-xs font-semibold flex items-center gap-1.5 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
                 >
-                  <PencilSquareIcon className="w-4 h-4" /> Edit Vendor
+                  <PencilSquareIcon className="w-3.5 h-3.5" /> Edit Vendor
                 </Link>
                 <button
                   onClick={exportCsv}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-700 hover:from-champagne-600 hover:to-champagne-800 text-onyx-900 text-sm font-semibold flex items-center gap-2 shadow-md shadow-champagne-500/20 focus:outline-none focus:ring-2 focus:ring-champagne-300"
+                  className="px-3 py-2 rounded-lg bg-gradient-to-r from-champagne-500 to-champagne-700 hover:from-champagne-600 hover:to-champagne-800 text-onyx-900 text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-champagne-500/20 focus:outline-none focus:ring-2 focus:ring-champagne-300"
                 >
-                  <ArrowDownTrayIcon className="w-4 h-4" /> Export CSV
+                  <ArrowDownTrayIcon className="w-3.5 h-3.5" /> Export CSV
                 </button>
               </div>
             </div>
@@ -667,6 +751,7 @@ export default function VendorDetailPage() {
                 </h2>
                 <p className="text-[11px] text-onyx-500 mt-0.5">
                   {transactions.length} metal · {diamondTransactions.length} diamond ·{' '}
+                  {realStoneTransactions.length} real stone · {stonePacketTransactions.length} stone packet ·{' '}
                   {filtered.length} shown
                 </p>
               </div>
@@ -701,6 +786,18 @@ export default function VendorDetailPage() {
               </button>
               <button onClick={() => setDomainFilter('diamond')} className={filterChip(domainFilter === 'diamond')}>
                 Diamond <span className="opacity-70">· {counts.diamond}</span>
+              </button>
+              <button
+                onClick={() => setDomainFilter('realStone')}
+                className={filterChip(domainFilter === 'realStone')}
+              >
+                Real Stone <span className="opacity-70">· {counts.realStone}</span>
+              </button>
+              <button
+                onClick={() => setDomainFilter('stonePacket')}
+                className={filterChip(domainFilter === 'stonePacket')}
+              >
+                Stone Packet <span className="opacity-70">· {counts.stonePacket}</span>
               </button>
               <span className="w-px h-6 bg-gray-200 mx-1 self-center" />
               <button onClick={() => setStatusFilter('all')} className={filterChip(statusFilter === 'all')}>
@@ -789,10 +886,20 @@ export default function VendorDetailPage() {
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
                                 row.domain === 'metal'
                                   ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                  : 'bg-sky-50 text-sky-800 border-sky-200'
+                                  : row.domain === 'diamond'
+                                  ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                  : row.domain === 'realStone'
+                                  ? 'bg-violet-50 text-violet-800 border-violet-200'
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
                               }`}
                             >
-                              {row.domain}
+                              {row.domain === 'metal'
+                                ? 'Metal'
+                                : row.domain === 'diamond'
+                                ? 'Diamond'
+                                : row.domain === 'realStone'
+                                ? 'Real Stone'
+                                : 'Stone Pkt'}
                             </span>
                           </td>
                           <td className="px-4 py-3 font-medium text-onyx-900 align-top">{row.description}</td>
@@ -865,7 +972,7 @@ export default function VendorDetailPage() {
                                     Non-billable
                                   </span>
                                 )}
-                                {showSettle && (
+                                {showSettle && (row.domain === 'metal' || row.domain === 'diamond') && (
                                   <button
                                     type="button"
                                     onClick={() =>

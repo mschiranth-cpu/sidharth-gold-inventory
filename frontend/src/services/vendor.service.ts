@@ -140,3 +140,17 @@ export async function getVendorDiamondTransactions(
   const r = await api.get(`/vendors/${id}/diamond-transactions`);
   return r.data.data;
 }
+
+export async function getVendorRealStoneTransactions(
+  id: string
+): Promise<import('./stone.service').RealStoneTransaction[]> {
+  const r = await api.get(`/vendors/${id}/real-stone-transactions`);
+  return r.data.data;
+}
+
+export async function getVendorStonePacketTransactions(
+  id: string
+): Promise<import('./stone.service').StonePacketTransaction[]> {
+  const r = await api.get(`/vendors/${id}/stone-packet-transactions`);
+  return r.data.data;
+}
