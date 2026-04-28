@@ -152,6 +152,9 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled, do
       if (transaction.vendorId) {
         queryClient.invalidateQueries({ queryKey: ['vendor', transaction.vendorId] });
         queryClient.invalidateQueries({ queryKey: ['vendor-transactions', transaction.vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['vendor-diamond-transactions', transaction.vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['vendor-real-stone-transactions', transaction.vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['vendor-stone-packet-transactions', transaction.vendorId] });
         queryClient.invalidateQueries({ queryKey: ['vendor-outstanding', transaction.vendorId] });
       }
       onSettled?.();
