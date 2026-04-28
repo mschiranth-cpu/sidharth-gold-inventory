@@ -170,21 +170,22 @@ export default function RealStoneInventoryDashboard() {
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-onyx-900 via-onyx-800 to-onyx-700 text-pearl shadow-onyx mb-6 p-6 md:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-rose-500/20 via-transparent to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-gold-leaf-gradient opacity-10 pointer-events-none" />
-          <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-2 flex items-center gap-2">
-                <SparklesIcon className="w-3.5 h-3.5" /> Inventory · Real Stone
-              </p>
-              <h1 className="font-display text-3xl md:text-4xl font-semibold text-pearl mb-2">
-                Real Stone Inventory
-              </h1>
-              <p className="text-champagne-100/80 text-sm max-w-xl">
-                Ruby, Emerald, Sapphire and other natural stones — with origin, treatment notes,
-                vendor receipts and live valuations in one cockpit.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 min-w-0">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs tabular-nums">
+          <div className="relative flex flex-col gap-6">
+            {/* Top: title + summary pills */}
+            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+              <div className="min-w-0 max-w-xl">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-champagne-300 font-medium mb-2 flex items-center gap-2">
+                  <SparklesIcon className="w-3.5 h-3.5" /> Inventory · Real Stone
+                </p>
+                <h1 className="font-display text-3xl md:text-4xl font-semibold text-pearl mb-2">
+                  Real Stone Inventory
+                </h1>
+                <p className="text-champagne-100/80 text-sm">
+                  Ruby, Emerald, Sapphire and other natural stones — with origin, treatment notes,
+                  vendor receipts and live valuations in one cockpit.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs tabular-nums xl:min-w-[480px]">
                 <InlineSummaryPill
                   label="Records"
                   value={summary ? fmtCount(summary.totalStones) : null}
@@ -202,7 +203,17 @@ export default function RealStoneInventoryDashboard() {
                   value={fmtCompactInr(purchasesThisMonth)}
                 />
               </div>
-              <div className="flex flex-wrap gap-2 justify-end">
+            </div>
+
+            {/* Bottom: meta toolbar + actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-white/10">
+              <div className="flex items-center flex-wrap gap-2 text-[11px] text-champagne-200/70">
+                {lastUpdated !== null && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <ClockIcon className="w-3.5 h-3.5" /> Refreshed {lastUpdated}s ago
+                  </span>
+                )}
+                <span className="opacity-30 hidden sm:inline">·</span>
                 <RefreshIntervalPicker variant="dark" />
                 <button
                   onClick={refresh}
@@ -213,6 +224,8 @@ export default function RealStoneInventoryDashboard() {
                 >
                   <ArrowPathIcon className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
                 </button>
+              </div>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
                 <Link
                   to="/app/inventory/real-stones/transfer"
                   className="px-4 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-pearl text-sm font-semibold flex items-center gap-2 backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-champagne-400"
@@ -234,11 +247,6 @@ export default function RealStoneInventoryDashboard() {
               </div>
             </div>
           </div>
-          {lastUpdated !== null && (
-            <p className="relative mt-4 text-[11px] text-champagne-200/70 flex items-center gap-1.5">
-              <ClockIcon className="w-3 h-3" /> Refreshed {lastUpdated}s ago
-            </p>
-          )}
         </div>
 
         {/* KPI strip */}
