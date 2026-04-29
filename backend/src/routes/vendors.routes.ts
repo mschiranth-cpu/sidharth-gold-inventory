@@ -390,7 +390,7 @@ const HS_CODE_REGEX = /^\d{4,10}$/;
  * `null` if every field is blank so we don't write empty noise. Throws if a
  * structurally-invalid value is provided (caught by the route handler).
  */
-function buildForeignDetails(input: any): any | null {
+export function buildForeignDetails(input: any): any | null {
   if (!input || typeof input !== 'object') return null;
   const str = (v: any) => (v === undefined || v === null ? undefined : String(v).trim() || undefined);
   const upper = (v: any) => {
@@ -794,7 +794,23 @@ router.post(
     // Stash foreign-vendor details on the same blob (foreignDetails key) so
     // international suppliers don't require a separate schema column.
     if (foreignDetails) {
-      gstDetails = { ...(gstDetails || {}), foreignDetails };
+      // Strip Indian-only stub fields that buildManualGstDetails may have
+      // left behind from any partial manualDetails payload \u2014 keeps the
+      // blob clean for international vendors.
+      const base: any = gstDetails || {};
+      const {
+        legalName: _ln,
+        tradeName: _tn,
+        pan: _pan,
+        stateCode: _sc,
+        state: _st,
+        city: _ct,
+        pincode: _pc,
+        businessType: _bt,
+        addressParts: _ap,
+        ...kept
+      } = base;
+      gstDetails = { ...kept, foreignDetails };
     }
     // Auto-generate unique code (with retry on the rare race condition)
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -922,7 +938,36 @@ router.put(
         const { foreignDetails: _drop, ...rest } = base;
         gstDetails = rest;
       } else {
-        gstDetails = { ...base, foreignDetails };
+        // Strip Indian-only fields when promoting a vendor to international —
+        // legalName / tradeName / pan / state / city / pincode / businessType
+        // are all India-specific and stale once the vendor is no longer
+        // GST-registered. Keeps the blob honest and prevents misleading
+        // values surfacing on UI fallbacks.
+        const {
+          legalName: _ln,
+          tradeName: _tn,
+          pan: _pan,
+          stateCode: _sc,
+          state: _st,
+          city: _ct,
+          pincode: _pc,
+          businessType: _bt,
+          addressParts: _ap,
+          taxType: _tt,
+          natureOfBusinessActivity: _nob,
+          eInvoiceStatus: _ei,
+          lastUpdateDate: _lu,
+          cancelledDate: _cd,
+          centerJurisdiction: _cj,
+          stateJurisdiction: _sj,
+          registrationDate: _rd,
+          status: _stat,
+          gstin: _gstin,
+          entityNumber: _en,
+          source: _src,
+          ...kept
+        } = base;
+        gstDetails = { ...kept, foreignDetails };
       }
     }
     try {

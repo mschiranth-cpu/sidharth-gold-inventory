@@ -795,12 +795,34 @@ export default function VendorDetailPage() {
             </h2>
             <div className="space-y-4">
               <InfoRow icon={<PhoneIcon className="w-4 h-4" />} label="Phone" value={vendor.phone} />
-              <InfoRow
-                icon={<ShieldCheckIcon className="w-4 h-4" />}
-                label="GSTIN"
-                value={vendor.gstNumber}
-                mono
-              />
+              {(() => {
+                // Show GSTIN for India vendors, foreign Tax ID (with the
+                // jurisdiction-specific label, e.g. "EIN" / "VAT" / "TRN")
+                // for international vendors. Same row slot \u2014 no layout shift.
+                const fd = vendor.gstDetails?.foreignDetails;
+                const isForeign =
+                  !!fd ||
+                  ((vendor.country || vendor.gstDetails?.country || '') !== 'India' &&
+                    !vendor.gstNumber);
+                if (isForeign) {
+                  return (
+                    <InfoRow
+                      icon={<ShieldCheckIcon className="w-4 h-4" />}
+                      label={fd?.taxIdLabel || 'Foreign Tax ID'}
+                      value={fd?.taxId}
+                      mono
+                    />
+                  );
+                }
+                return (
+                  <InfoRow
+                    icon={<ShieldCheckIcon className="w-4 h-4" />}
+                    label="GSTIN"
+                    value={vendor.gstNumber}
+                    mono
+                  />
+                );
+              })()}
               <InfoRow
                 icon={<IdentificationIcon className="w-4 h-4" />}
                 label="Vendor Code"

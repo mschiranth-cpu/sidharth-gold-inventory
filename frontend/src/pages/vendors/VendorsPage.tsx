@@ -41,6 +41,7 @@ type FilterKey =
   | 'all'
   | 'verified'
   | 'noGst'
+  | 'foreign'
   | 'outstanding'
   | 'credit'
   | 'archived'
@@ -200,6 +201,14 @@ export default function VendorsPage() {
           return isVerified(v);
         case 'noGst':
           return !v.gstNumber;
+        case 'foreign': {
+          // International vendor: country is set and ≠ India, OR
+          // foreignDetails blob exists. Either signal qualifies because a
+          // freshly-saved foreign vendor always has both, but legacy data
+          // may have only one of them.
+          const c = (v.country || v.gstDetails?.country || '').trim();
+          return (c.length > 0 && c !== 'India') || !!v.gstDetails?.foreignDetails;
+        }
         case 'outstanding':
           return (o?.outstanding ?? 0) > 0;
         case 'credit':
@@ -294,6 +303,20 @@ export default function VendorsPage() {
       'Pincode',
       'Business Type',
       'Deals In',
+      // Foreign / international vendor columns — blank for India vendors.
+      'Foreign Tax ID',
+      'Foreign Tax Label',
+      'Currency',
+      'Bank Name',
+      'SWIFT/BIC',
+      'IBAN',
+      'Account #',
+      'Beneficiary',
+      'Incoterms',
+      'HS Code',
+      'KPC #',
+      'Payment Terms',
+      'LC Required',
       'Outstanding',
       'Paid',
       'Credit',
@@ -302,6 +325,12 @@ export default function VendorsPage() {
     const rows = [header];
     visible.forEach((v) => {
       const o = outstandingMap.get(v.id);
+      const fd = v.gstDetails?.foreignDetails;
+      // For foreign vendors, prefer foreignDetails.city/state/postalCode over
+      // gstDetails.city/state which only carry meaning for Indian vendors.
+      const isForeign =
+        !!fd ||
+        ((v.country || v.gstDetails?.country || '') !== 'India' && !v.gstNumber);
       rows.push([
         v.name,
         v.uniqueCode,
@@ -313,12 +342,25 @@ export default function VendorsPage() {
         v.gstDetails?.status || '',
         v.gstDetails?.legalName || '',
         v.gstDetails?.tradeName || '',
-        v.gstDetails?.state || '',
-        v.gstDetails?.city || '',
-        v.gstDetails?.pincode || '',
+        isForeign ? fd?.state || '' : v.gstDetails?.state || '',
+        isForeign ? fd?.city || '' : v.gstDetails?.city || '',
+        isForeign ? fd?.postalCode || '' : v.gstDetails?.pincode || '',
         v.gstDetails?.businessType || '',
         // Semicolon-joined so it survives Excel's comma split-on-import.
         (v.dealsIn ?? []).join(';'),
+        fd?.taxId || '',
+        fd?.taxIdLabel || '',
+        fd?.currency || '',
+        fd?.bankName || '',
+        fd?.swift || '',
+        fd?.iban || '',
+        fd?.accountNumber || '',
+        fd?.beneficiaryName || '',
+        fd?.incoterms || '',
+        fd?.defaultHsCode || '',
+        fd?.kpcNumber || '',
+        fd?.paymentTerms || '',
+        fd?.letterOfCreditRequired ? 'Yes' : '',
         (o?.outstanding ?? 0).toFixed(2),
         (o?.totalPaid ?? 0).toFixed(2),
         (v.creditBalance ?? 0).toFixed(2),
@@ -342,6 +384,15 @@ export default function VendorsPage() {
       label: 'No GST',
       count: vendors.filter((v) => !v.gstNumber).length,
       cls: 'bg-amber-100 text-amber-800',
+    },
+    {
+      key: 'foreign',
+      label: '🌍 International',
+      count: vendors.filter((v) => {
+        const c = (v.country || v.gstDetails?.country || '').trim();
+        return (c.length > 0 && c !== 'India') || !!v.gstDetails?.foreignDetails;
+      }).length,
+      cls: 'bg-sky-100 text-sky-800',
     },
     {
       key: 'outstanding',

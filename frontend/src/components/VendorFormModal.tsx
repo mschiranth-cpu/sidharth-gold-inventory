@@ -334,21 +334,36 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
 
   // Auto-default currency + Tax-ID label when the user picks a country, but
   // only if they haven't already overridden them (currencyTouched / labelTouched).
+  // We additionally track the LAST auto-applied value per field so that when
+  // the user switches between two foreign countries (e.g. UAE → USA) and the
+  // current field value still matches the previous country's auto-default,
+  // we transparently update it to the new country's default. Manual edits
+  // are preserved because `currencyTouched=true` blocks the auto-update path.
+  const lastAutoCurrency = useRef<string | undefined>(undefined);
+  const lastAutoTaxLabel = useRef<string | undefined>(undefined);
+  const lastAutoOriginCountry = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!isForeign) return;
     const c = form.country || '';
     setForeign((fd) => {
       const next = { ...fd };
-      if (!currencyTouched.current) {
-        const cur = CURRENCY_BY_COUNTRY[c];
-        if (cur) next.currency = cur;
+      // Currency: auto-update if untouched OR if the live value still equals
+      // the previous auto-applied value (i.e. the user never changed it).
+      const cur = CURRENCY_BY_COUNTRY[c];
+      if (cur && (!currencyTouched.current || fd.currency === lastAutoCurrency.current)) {
+        next.currency = cur;
+        lastAutoCurrency.current = cur;
       }
-      if (!taxLabelTouched.current) {
-        const lbl = TAX_ID_LABEL_BY_COUNTRY[c];
-        if (lbl) next.taxIdLabel = lbl;
+      const lbl = TAX_ID_LABEL_BY_COUNTRY[c];
+      if (lbl && (!taxLabelTouched.current || fd.taxIdLabel === lastAutoTaxLabel.current)) {
+        next.taxIdLabel = lbl;
+        lastAutoTaxLabel.current = lbl;
       }
-      // Country-of-origin defaults to the vendor's country if blank.
-      if (!next.countryOfOrigin) next.countryOfOrigin = c;
+      // Country-of-origin: blank → fill; matches previous country → update.
+      if (!next.countryOfOrigin || next.countryOfOrigin === lastAutoOriginCountry.current) {
+        next.countryOfOrigin = c;
+        lastAutoOriginCountry.current = c;
+      }
       return next;
     });
   }, [isForeign, form.country]);
