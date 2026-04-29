@@ -54,6 +54,7 @@ const SHAPES = [
   'RADIANT',
   'ASSCHER',
   'HEART',
+  'CUSTOM',
 ];
 const COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1'];
@@ -105,27 +106,35 @@ export default function EditDiamondTransactionModal({
   const hydratedStatus = isLegacyRow ? 'COMPLETE' : (txn.paymentStatus ?? 'COMPLETE');
   const hydratedMode = txn.paymentMode ?? 'CASH';
 
-  const [formData, setFormData] = useState({
-    // Diamond attribute snapshot fields (editable on the row's snapshot).
-    shape: txn.diamond?.shape ?? '',
-    color: txn.diamond?.color ?? '',
-    clarity: txn.diamond?.clarity ?? '',
-    caratWeight: txn.caratWeight ?? 0,
-    quantityPieces: txn.quantityPieces ?? 1,
-    pricePerCarat: txn.pricePerCarat ?? 0,
-    referenceNumber: txn.referenceNumber ?? '',
-    notes: stripVendorTag(txn.notes),
-    transactionDate: isoToDateInput(txn.createdAt),
-    isBillable: wasBillable,
-    paymentMode: hydratedMode,
-    paymentStatus: hydratedStatus,
-    amountPaid: hydratedAmountPaid,
-    cashAmount: txn.cashAmount ?? 0,
-    neftAmount: txn.neftAmount ?? 0,
-    neftUtr: txn.neftUtr ?? '',
-    neftBank: txn.neftBank ?? '',
-    neftDate: isoToDateInput(txn.neftDate),
-    creditApplied: txn.creditApplied ?? 0,
+  const [formData, setFormData] = useState(() => {
+    const existingShape = txn.diamond?.shape ?? '';
+    // Round-trip: if existing shape isn't in the standard list, treat as CUSTOM.
+    const isStandard =
+      existingShape === '' ||
+      SHAPES.filter((s) => s !== 'CUSTOM').includes(existingShape);
+    return {
+      // Diamond attribute snapshot fields (editable on the row's snapshot).
+      shape: isStandard ? existingShape : 'CUSTOM',
+      customShape: isStandard ? '' : existingShape,
+      color: txn.diamond?.color ?? '',
+      clarity: txn.diamond?.clarity ?? '',
+      caratWeight: txn.caratWeight ?? 0,
+      quantityPieces: txn.quantityPieces ?? 1,
+      pricePerCarat: txn.pricePerCarat ?? 0,
+      referenceNumber: txn.referenceNumber ?? '',
+      notes: stripVendorTag(txn.notes),
+      transactionDate: isoToDateInput(txn.createdAt),
+      isBillable: wasBillable,
+      paymentMode: hydratedMode,
+      paymentStatus: hydratedStatus,
+      amountPaid: hydratedAmountPaid,
+      cashAmount: txn.cashAmount ?? 0,
+      neftAmount: txn.neftAmount ?? 0,
+      neftUtr: txn.neftUtr ?? '',
+      neftBank: txn.neftBank ?? '',
+      neftDate: isoToDateInput(txn.neftDate),
+      creditApplied: txn.creditApplied ?? 0,
+    };
   });
 
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -142,6 +151,8 @@ export default function EditDiamondTransactionModal({
     const e: FieldErrors = {};
     if (isPurchase && !selectedVendor) e.vendor = 'Vendor is required';
     if (!formData.shape) e.shape = 'Shape is required';
+    if (formData.shape === 'CUSTOM' && !formData.customShape?.trim())
+      e.shape = 'Custom shape name is required';
     if (!formData.color) e.color = 'Color is required';
     if (!formData.clarity) e.clarity = 'Clarity is required';
     if (!formData.caratWeight || formData.caratWeight <= 0)
@@ -170,7 +181,10 @@ export default function EditDiamondTransactionModal({
         formData.paymentMode === 'NEFT' || formData.paymentMode === 'BOTH';
 
       const payload: Record<string, unknown> = {
-        shape: formData.shape,
+        shape:
+          formData.shape === 'CUSTOM'
+            ? (formData.customShape ?? '').trim().toUpperCase()
+            : formData.shape,
         color: formData.color,
         clarity: formData.clarity,
         caratWeight: formData.caratWeight,
@@ -299,6 +313,18 @@ export default function EditDiamondTransactionModal({
                     </option>
                   ))}
                 </select>
+                {formData.shape === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    required
+                    value={formData.customShape ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, customShape: e.target.value })
+                    }
+                    placeholder="Enter custom shape *"
+                    className={`${inputClass(undefined)} mt-2 ${!formData.customShape?.trim() ? 'border-accent-ruby' : ''}`}
+                  />
+                )}
               </div>
 
               <div>

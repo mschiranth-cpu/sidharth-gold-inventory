@@ -32,7 +32,7 @@ const STONE_TYPES = [
 ];
 const SHAPES = [
   'ROUND', 'OVAL', 'PEAR', 'SQUARE', 'RECTANGLE', 'MARQUISE',
-  'HEART', 'BAGUETTE', 'CABOCHON', 'ASSORTED', 'OTHER',
+  'HEART', 'BAGUETTE', 'CABOCHON', 'ASSORTED', 'OTHER', 'CUSTOM',
 ];
 const QUALITIES = ['', 'AAA', 'AA', 'A', 'B', 'COMMERCIAL'];
 const UNITS = ['CARAT', 'GRAM', 'PIECE'];
@@ -41,6 +41,7 @@ interface PurchaseItem {
   packetNumber: string;
   stoneType: string;
   shape: string;
+  customShape?: string;
   size: string;
   color: string;
   quality: string;
@@ -140,6 +141,7 @@ export default function ReceiveStonePacketPage() {
           !it.packetNumber ||
           !it.stoneType ||
           !it.shape ||
+          (it.shape === 'CUSTOM' && !it.customShape?.trim()) ||
           !it.totalWeight ||
           it.totalWeight <= 0 ||
           !it.pricePerUnit ||
@@ -148,7 +150,7 @@ export default function ReceiveStonePacketPage() {
       )
     ) {
       e.items =
-        'Each item needs packet number, stone type, shape, total weight, unit, and price/unit';
+        'Each item needs packet number, stone type, shape (custom name if CUSTOM), total weight, unit, and price/unit';
     }
     if (totalPrice > 0) {
       if (!formData.paymentMode) e.paymentMode = 'Payment mode required';
@@ -170,10 +172,18 @@ export default function ReceiveStonePacketPage() {
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
         transactionDate: transactionDate ? combineDateWithCurrentIstTimeISO(transactionDate) : undefined,
-        items: items.map((it) => ({
-          ...it,
-          totalValue: it.totalWeight * it.pricePerUnit,
-        })),
+        items: items.map((it) => {
+          const { customShape, ...rest } = it;
+          const finalShape =
+            it.shape === 'CUSTOM'
+              ? (customShape ?? '').trim().toUpperCase()
+              : it.shape;
+          return {
+            ...rest,
+            shape: finalShape,
+            totalValue: it.totalWeight * it.pricePerUnit,
+          };
+        }),
         ...(totalPrice > 0
           ? {
               isBillable: formData.isBillable,
@@ -350,6 +360,18 @@ export default function ReceiveStonePacketPage() {
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
+                        {it.shape === 'CUSTOM' && (
+                          <input
+                            type="text"
+                            required
+                            value={it.customShape ?? ''}
+                            onChange={(e) =>
+                              updateItem(idx, { customShape: e.target.value })
+                            }
+                            placeholder="Enter custom shape *"
+                            className={`${inputCls} mt-1 ${!it.customShape?.trim() ? 'border-accent-ruby' : ''}`}
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-onyx-600 mb-1">Size</label>

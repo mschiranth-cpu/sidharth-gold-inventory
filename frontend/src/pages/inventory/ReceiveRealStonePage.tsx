@@ -32,7 +32,7 @@ const STONE_TYPES = [
 ];
 const SHAPES = [
   'ROUND', 'OVAL', 'PEAR', 'EMERALD', 'CUSHION', 'PRINCESS',
-  'MARQUISE', 'HEART', 'CABOCHON', 'OTHER',
+  'MARQUISE', 'HEART', 'CABOCHON', 'OTHER', 'CUSTOM',
 ];
 const QUALITIES = ['', 'AAA', 'AA', 'A', 'B', 'COMMERCIAL'];
 const TREATMENTS = ['', 'NONE', 'HEATED', 'OILED', 'IRRADIATED', 'DIFFUSION', 'GLASS_FILLED'];
@@ -40,6 +40,7 @@ const TREATMENTS = ['', 'NONE', 'HEATED', 'OILED', 'IRRADIATED', 'DIFFUSION', 'G
 interface PurchaseItem {
   stoneType: string;
   shape: string;
+  customShape?: string;
   color: string;
   clarity: string;
   caratWeight: number;
@@ -135,6 +136,7 @@ export default function ReceiveRealStonePage() {
         (it) =>
           !it.stoneType ||
           !it.shape ||
+          (it.shape === 'CUSTOM' && !it.customShape?.trim()) ||
           !it.color ||
           !it.caratWeight ||
           it.caratWeight <= 0 ||
@@ -142,7 +144,7 @@ export default function ReceiveRealStonePage() {
           it.pricePerCarat <= 0
       )
     ) {
-      e.items = 'Each item needs stone type, shape, color, carat weight, and price/ct';
+      e.items = 'Each item needs stone type, shape (custom name if CUSTOM), color, carat weight, and price/ct';
     }
     if (totalPrice > 0) {
       if (!formData.paymentMode) e.paymentMode = 'Payment mode required';
@@ -164,10 +166,18 @@ export default function ReceiveRealStonePage() {
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
         transactionDate: transactionDate ? combineDateWithCurrentIstTimeISO(transactionDate) : undefined,
-        items: items.map((it) => ({
-          ...it,
-          totalValue: it.caratWeight * it.pricePerCarat,
-        })),
+        items: items.map((it) => {
+          const { customShape, ...rest } = it;
+          const finalShape =
+            it.shape === 'CUSTOM'
+              ? (customShape ?? '').trim().toUpperCase()
+              : it.shape;
+          return {
+            ...rest,
+            shape: finalShape,
+            totalValue: it.caratWeight * it.pricePerCarat,
+          };
+        }),
         ...(totalPrice > 0
           ? {
               isBillable: formData.isBillable,
@@ -339,6 +349,18 @@ export default function ReceiveRealStonePage() {
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
+                        {it.shape === 'CUSTOM' && (
+                          <input
+                            type="text"
+                            required
+                            value={it.customShape ?? ''}
+                            onChange={(e) =>
+                              updateItem(idx, { customShape: e.target.value })
+                            }
+                            placeholder="Enter custom shape *"
+                            className={`${inputCls} mt-1 ${!it.customShape?.trim() ? 'border-accent-ruby' : ''}`}
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-onyx-600 mb-1">Color</label>

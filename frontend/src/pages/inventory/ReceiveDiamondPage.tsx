@@ -37,6 +37,7 @@ const SHAPES = [
   'RADIANT',
   'ASSCHER',
   'HEART',
+  'CUSTOM',
 ];
 const COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1'];
@@ -45,6 +46,7 @@ const CATEGORIES = ['SOLITAIRE', 'LOOSE'] as const;
 interface PurchaseItem {
   category: 'SOLITAIRE' | 'LOOSE';
   shape: string;
+  customShape?: string;
   color: string;
   clarity: string;
   caratWeight: number;
@@ -155,6 +157,7 @@ export default function ReceiveDiamondPage() {
       items.some(
         (it) =>
           !it.shape ||
+          (it.shape === 'CUSTOM' && !it.customShape?.trim()) ||
           !it.color ||
           !it.clarity ||
           !it.caratWeight ||
@@ -163,7 +166,7 @@ export default function ReceiveDiamondPage() {
           it.pricePerCarat <= 0
       )
     ) {
-      e.items = 'Each item needs shape, color, clarity, carat weight, and price/ct';
+      e.items = 'Each item needs shape (custom name if CUSTOM), color, clarity, carat weight, and price/ct';
     }
     if (totalPrice > 0) {
       if (!formData.paymentMode) e.paymentMode = 'Payment mode required';
@@ -189,13 +192,21 @@ export default function ReceiveDiamondPage() {
         transactionDate: transactionDate
           ? combineDateWithCurrentIstTimeISO(transactionDate)
           : undefined,
-        items: items.map((it) => ({
-          ...it,
-          totalValue: it.caratWeight * it.pricePerCarat,
-          // Per-item billing block — server will distribute amountPaid
-          // proportionally; we only attach billing on the FIRST item to avoid
-          // double-counting the invoice-level payment.
-        })),
+        items: items.map((it) => {
+          const { customShape, ...rest } = it;
+          const finalShape =
+            it.shape === 'CUSTOM'
+              ? (customShape ?? '').trim().toUpperCase()
+              : it.shape;
+          return {
+            ...rest,
+            shape: finalShape,
+            totalValue: it.caratWeight * it.pricePerCarat,
+            // Per-item billing block — server will distribute amountPaid
+            // proportionally; we only attach billing on the FIRST item to avoid
+            // double-counting the invoice-level payment.
+          };
+        }),
         // Invoice-level billing
         ...(totalPrice > 0
           ? {
@@ -404,6 +415,18 @@ export default function ReceiveDiamondPage() {
                             </option>
                           ))}
                         </select>
+                        {it.shape === 'CUSTOM' && (
+                          <input
+                            type="text"
+                            required
+                            value={it.customShape ?? ''}
+                            onChange={(e) =>
+                              updateItem(idx, { customShape: e.target.value })
+                            }
+                            placeholder="Enter custom shape *"
+                            className={`${inputCls} mt-1 ${!it.customShape?.trim() ? 'border-accent-ruby' : ''}`}
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-onyx-600 mb-1">

@@ -68,6 +68,7 @@ const SHAPES = [
   'HEART',
   'CABOCHON',
   'OTHER',
+  'CUSTOM',
 ];
 const QUALITIES = ['AAA', 'AA', 'A', 'B', 'COMMERCIAL'];
 
@@ -116,26 +117,33 @@ export default function EditRealStoneTransactionModal({
   const hydratedStatus = isLegacyRow ? 'COMPLETE' : (txn.paymentStatus ?? 'COMPLETE');
   const hydratedMode = txn.paymentMode ?? 'CASH';
 
-  const [formData, setFormData] = useState({
-    stoneType: txn.stone?.stoneType ?? '',
-    shape: txn.stone?.shape ?? '',
-    color: txn.stone?.color ?? '',
-    clarity: txn.stone?.clarity ?? '',
-    caratWeight: txn.caratWeight ?? 0,
-    pricePerCarat: txn.pricePerCarat ?? 0,
-    referenceNumber: txn.referenceNumber ?? '',
-    notes: stripVendorTag(txn.notes),
-    transactionDate: isoToDateInput(txn.createdAt),
-    isBillable: wasBillable,
-    paymentMode: hydratedMode,
-    paymentStatus: hydratedStatus,
-    amountPaid: hydratedAmountPaid,
-    cashAmount: txn.cashAmount ?? 0,
-    neftAmount: txn.neftAmount ?? 0,
-    neftUtr: txn.neftUtr ?? '',
-    neftBank: txn.neftBank ?? '',
-    neftDate: isoToDateInput(txn.neftDate),
-    creditApplied: txn.creditApplied ?? 0,
+  const [formData, setFormData] = useState(() => {
+    const existingShape = txn.stone?.shape ?? '';
+    const isStandard =
+      existingShape === '' ||
+      SHAPES.filter((s) => s !== 'CUSTOM').includes(existingShape);
+    return {
+      stoneType: txn.stone?.stoneType ?? '',
+      shape: isStandard ? existingShape : 'CUSTOM',
+      customShape: isStandard ? '' : existingShape,
+      color: txn.stone?.color ?? '',
+      clarity: txn.stone?.clarity ?? '',
+      caratWeight: txn.caratWeight ?? 0,
+      pricePerCarat: txn.pricePerCarat ?? 0,
+      referenceNumber: txn.referenceNumber ?? '',
+      notes: stripVendorTag(txn.notes),
+      transactionDate: isoToDateInput(txn.createdAt),
+      isBillable: wasBillable,
+      paymentMode: hydratedMode,
+      paymentStatus: hydratedStatus,
+      amountPaid: hydratedAmountPaid,
+      cashAmount: txn.cashAmount ?? 0,
+      neftAmount: txn.neftAmount ?? 0,
+      neftUtr: txn.neftUtr ?? '',
+      neftBank: txn.neftBank ?? '',
+      neftDate: isoToDateInput(txn.neftDate),
+      creditApplied: txn.creditApplied ?? 0,
+    };
   });
 
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -153,6 +161,8 @@ export default function EditRealStoneTransactionModal({
     if (isPurchase && !selectedVendor) e.vendor = 'Vendor is required';
     if (!formData.stoneType) e.stoneType = 'Stone type is required';
     if (!formData.shape) e.shape = 'Shape is required';
+    if (formData.shape === 'CUSTOM' && !formData.customShape?.trim())
+      e.shape = 'Custom shape name is required';
     if (!formData.color) e.color = 'Color is required';
     if (!formData.caratWeight || formData.caratWeight <= 0)
       e.caratWeight = 'Carat weight must be greater than 0';
@@ -178,7 +188,10 @@ export default function EditRealStoneTransactionModal({
 
       const payload: Record<string, unknown> = {
         stoneType: formData.stoneType,
-        shape: formData.shape,
+        shape:
+          formData.shape === 'CUSTOM'
+            ? (formData.customShape ?? '').trim().toUpperCase()
+            : formData.shape,
         color: formData.color,
         clarity: formData.clarity || undefined,
         caratWeight: formData.caratWeight,
@@ -319,6 +332,18 @@ export default function EditRealStoneTransactionModal({
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+                {formData.shape === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    required
+                    value={formData.customShape ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, customShape: e.target.value })
+                    }
+                    placeholder="Enter custom shape *"
+                    className={`${inputClass(undefined)} mt-2 ${!formData.customShape?.trim() ? 'border-accent-ruby' : ''}`}
+                  />
+                )}
               </div>
 
               <div>

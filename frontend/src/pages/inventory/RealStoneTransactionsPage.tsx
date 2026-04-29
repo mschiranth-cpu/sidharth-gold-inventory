@@ -24,11 +24,19 @@ import {
   deleteRealStoneTransaction,
   exportRealStoneTransactionsXlsx,
   getAllRealStoneTransactions,
+  settleRealStonePayment,
   type RealStoneTransaction,
 } from '../../services/stone.service';
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditRealStoneTransactionModal from '../../components/EditRealStoneTransactionModal';
+import {
+  BulkDeleteModal,
+  BulkSettleModal,
+  SelectionToolbar,
+  useTxnSelection,
+} from '../../components/transactions/TxnBulkActions';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 const TXN_META: Record<string, { label: string; cls: string }> = {
@@ -59,6 +67,9 @@ const fmtInt = (n: number) =>
 
 export default function RealStoneTransactionsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canSettle = ['ADMIN', 'OFFICE_STAFF'].includes(String(user?.role ?? ''));
+  const canDelete = String(user?.role ?? '') === 'ADMIN';
   const [filters, setFilters] = useState<{
     transactionType?: string;
     isBillable?: boolean;
@@ -71,6 +82,8 @@ export default function RealStoneTransactionsPage() {
   const [editTxn, setEditTxn] = useState<RealStoneTransaction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<RealStoneTransaction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
 
   const { data: txns = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['real-stone-transactions', filters],
@@ -121,6 +134,23 @@ export default function RealStoneTransactionsPage() {
       byStoneType: Object.fromEntries(byStoneType),
     };
   }, [visibleTxns]);
+
+  // Selection state — derived from current filtered view.
+  const filteredIds = useMemo(
+    () => visibleTxns.map((t) => t.id),
+    [visibleTxns]
+  );
+  const {
+    selectedIds,
+    toggleOne,
+    selectedInView,
+    allFilteredSelected,
+    someFilteredSelected,
+    selectAllFiltered,
+    deselectAllFiltered,
+    toggleHeaderCheckbox,
+    keepFailed,
+  } = useTxnSelection(filteredIds);
 
   const hasActiveFilters = Boolean(
     search ||
@@ -374,6 +404,29 @@ export default function RealStoneTransactionsPage() {
         )}
 
         <div className="bg-white rounded-2xl border border-champagne-200 shadow-sm overflow-hidden">
+          {(() => {
+            const selectedRows = visibleTxns.filter((t) => selectedIds.has(t.id));
+            const settleableSelected = selectedRows.filter(
+              (t) =>
+                t.transactionType === 'PURCHASE' &&
+                t.vendor?.id &&
+                Math.max((t.totalValue ?? 0) - (t.amountPaid ?? 0), 0) > 0
+            );
+            return (
+              <SelectionToolbar
+                selectedCount={selectedInView.length}
+                filteredCount={filteredIds.length}
+                allFilteredSelected={allFilteredSelected}
+                canSettle={canSettle}
+                settleableCount={settleableSelected.length}
+                onSettle={() => setBulkSettleOpen(true)}
+                canDelete={canDelete}
+                onDelete={() => setBulkDeleteOpen(true)}
+                onSelectAll={selectAllFiltered}
+                onDeselectAll={deselectAllFiltered}
+              />
+            );
+          })()}
           {isLoading ? (
             <p className="px-5 py-8 text-sm text-onyx-400">Loading…</p>
           ) : visibleTxns.length === 0 ? (
@@ -385,6 +438,19 @@ export default function RealStoneTransactionsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-slate-100 to-slate-50 text-xs text-onyx-600 uppercase">
                   <tr>
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={allFilteredSelected ? 'Deselect all' : 'Select all'}
+                        checked={allFilteredSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someFilteredSelected;
+                        }}
+                        onChange={toggleHeaderCheckbox}
+                        disabled={filteredIds.length === 0}
+                        className="h-4 w-4 rounded border-champagne-300 text-champagne-700 focus:ring-champagne-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </th>
                     <th className="px-3 py-3 text-left font-medium">Date</th>
                     <th className="px-3 py-3 text-left font-medium">Type</th>
                     <th className="px-3 py-3 text-left font-medium">Stone</th>
@@ -409,7 +475,16 @@ export default function RealStoneTransactionsPage() {
                       0
                     );
                     return (
-                      <tr key={t.id} className="border-t border-champagne-100 hover:bg-pearl-50/40">
+                      <tr key={t.id} className={`border-t border-champagne-100 hover:bg-pearl-50/40 ${selectedIds.has(t.id) ? 'bg-champagne-50/70' : ''}`}>
+                        <td className="px-3 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select transaction ${t.referenceNumber ?? t.id}`}
+                            checked={selectedIds.has(t.id)}
+                            onChange={() => toggleOne(t.id)}
+                            className="h-4 w-4 rounded border-champagne-300 text-champagne-700 focus:ring-champagne-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-3 py-3 text-onyx-700 whitespace-nowrap">
                           <div>{formatIstDate(t.createdAt)}</div>
                           <div className="text-xs text-onyx-300">{formatIstTime(t.createdAt)}</div>
@@ -565,6 +640,50 @@ export default function RealStoneTransactionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkDeleteOpen && (
+        <BulkDeleteModal
+          rows={visibleTxns.filter((t) => selectedIds.has(t.id))}
+          deleteFn={deleteRealStoneTransaction}
+          describeRow={(t) => t.referenceNumber ?? t.id.slice(0, 8)}
+          describeTypeLabel={(t) =>
+            String(t.transactionType ?? '').replace(/_/g, ' ')
+          }
+          onCancel={() => setBulkDeleteOpen(false)}
+          onDone={(failedIds) => {
+            keepFailed(failedIds);
+            setBulkDeleteOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['real-stone-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['real-stones'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors'] });
+          }}
+        />
+      )}
+      {bulkSettleOpen && (
+        <BulkSettleModal
+          rows={visibleTxns.filter(
+            (t) =>
+              selectedIds.has(t.id) &&
+              t.transactionType === 'PURCHASE' &&
+              t.vendor?.id &&
+              Math.max((t.totalValue ?? 0) - (t.amountPaid ?? 0), 0) > 0
+          )}
+          settleFn={settleRealStonePayment}
+          describeRow={(t) =>
+            [t.stone?.stoneType, t.stone?.shape, t.stone?.color]
+              .filter(Boolean)
+              .join(' · ') || (t.stone?.stockNumber ?? '—')
+          }
+          onCancel={() => setBulkSettleOpen(false)}
+          onDone={(failedIds) => {
+            keepFailed(failedIds);
+            setBulkSettleOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['real-stone-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors-outstanding'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors'] });
+          }}
+        />
       )}
     </div>
   );
