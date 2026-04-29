@@ -16,6 +16,12 @@ import {
   VendorDealsCategory,
   VENDOR_DEALS_CATEGORIES,
   VENDOR_DEALS_LABELS,
+  ForeignVendorDetails,
+  CURRENCY_BY_COUNTRY,
+  TAX_ID_LABEL_BY_COUNTRY,
+  INCOTERMS_OPTIONS,
+  PAYMENT_TERMS_OPTIONS,
+  HS_CODE_BY_DEALS,
   createVendor,
   updateVendor,
   lookupGstin,
@@ -29,6 +35,12 @@ import {
   CubeTransparentIcon,
   SparklesIcon,
   ArchiveBoxIcon,
+  GlobeAltIcon,
+  BuildingLibraryIcon,
+  TruckIcon,
+  ShieldCheckIcon,
+  BanknotesIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -145,6 +157,21 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
     city: vendor?.gstDetails?.city ?? '',
     pincode: vendor?.gstDetails?.pincode ?? '',
   });
+
+  // Foreign vendor details — only relevant when country !== India. Stashed on
+  // the gstDetails JSON blob server-side; pre-fill from the existing vendor.
+  const initialForeign: ForeignVendorDetails = vendor?.gstDetails?.foreignDetails ?? {};
+  const [foreign, setForeign] = useState<ForeignVendorDetails>(initialForeign);
+  // Track whether the user has manually edited the currency or HS code so we
+  // don't keep stomping their value on every dealsIn / country change.
+  const currencyTouched = useRef<boolean>(!!initialForeign.currency);
+  const hsCodeTouched = useRef<boolean>(!!initialForeign.defaultHsCode);
+  const taxLabelTouched = useRef<boolean>(!!initialForeign.taxIdLabel);
+  // Whether the optional Export details accordion is expanded. Auto-opens
+  // for foreign vendors so the user sees the new fields immediately.
+  const [foreignExpanded, setForeignExpanded] = useState<boolean>(
+    !!initialForeign.taxId || !!initialForeign.bankName || !!initialForeign.swift,
+  );
 
   useEffect(() => {
     if (vendor) return;
@@ -280,6 +307,69 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
     }
   }, [noGst, gstinValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // True when the vendor is international: drives the Export / International
+  // Details section, hides Indian-only manual fields, and makes the GSTIN
+  // input irrelevant. Also forces No-GST so server-side validation is happy.
+  const isForeign = useMemo(() => {
+    const c = (form.country || '').trim();
+    return c.length > 0 && c !== 'India';
+  }, [form.country]);
+
+  // When user picks a non-India country, force No-GST mode (clears GSTIN)
+  // and auto-open the Export accordion. When they switch back to India, we
+  // leave the foreign blob in state so toggling back/forward is non-destructive
+  // until they save.
+  useEffect(() => {
+    if (isForeign) {
+      if (!noGst) {
+        setNoGst(true);
+        setForm((f) => ({ ...f, gstNumber: '' }));
+        setGstDetails(null);
+        setGstStatus('idle');
+        setGstError(null);
+      }
+      setForeignExpanded(true);
+    }
+  }, [isForeign]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-default currency + Tax-ID label when the user picks a country, but
+  // only if they haven't already overridden them (currencyTouched / labelTouched).
+  useEffect(() => {
+    if (!isForeign) return;
+    const c = form.country || '';
+    setForeign((fd) => {
+      const next = { ...fd };
+      if (!currencyTouched.current) {
+        const cur = CURRENCY_BY_COUNTRY[c];
+        if (cur) next.currency = cur;
+      }
+      if (!taxLabelTouched.current) {
+        const lbl = TAX_ID_LABEL_BY_COUNTRY[c];
+        if (lbl) next.taxIdLabel = lbl;
+      }
+      // Country-of-origin defaults to the vendor's country if blank.
+      if (!next.countryOfOrigin) next.countryOfOrigin = c;
+      return next;
+    });
+  }, [isForeign, form.country]);
+
+  // Auto-suggest HS code from supply categories — first matched category wins.
+  useEffect(() => {
+    if (!isForeign || hsCodeTouched.current) return;
+    const cats = form.dealsIn ?? [];
+    const first = cats.find((c) => HS_CODE_BY_DEALS[c]);
+    if (first) {
+      setForeign((fd) => ({ ...fd, defaultHsCode: HS_CODE_BY_DEALS[first].code }));
+    }
+  }, [isForeign, form.dealsIn]);
+
+  // KPC (Kimberley Process Certificate) is required when the vendor supplies
+  // diamonds or stone packets — used to certify conflict-free origin on
+  // import. We only enforce it for foreign vendors.
+  const requiresKpc = isForeign && (form.dealsIn ?? []).some(
+    (c) => c === 'DIAMOND' || c === 'STONE_PACKET',
+  );
+
   // Field-level error map; computed every render so it stays in sync.
   const dealsInValue = form.dealsIn ?? [];
   const errors: Record<string, string | undefined> = {
@@ -290,13 +380,50 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
       !noGst && gstinUpper.length > 0 && !gstinValid
         ? 'Enter a valid 15-character GSTIN (or tick “Vendor does not have GST”)'
         : undefined,
-    pan: noGst && !panValid ? 'PAN must look like AAAAA9999A' : undefined,
-    pincode: noGst && !pincodeValid ? 'Pincode must be 6 digits' : undefined,
+    pan: noGst && !isForeign && !panValid ? 'PAN must look like AAAAA9999A' : undefined,
+    pincode: noGst && !isForeign && !pincodeValid ? 'Pincode must be 6 digits' : undefined,
     dealsIn:
       // Archive intent intentionally clears all categories — skip the
       // ≥1 rule when the user explicitly chose to archive.
       !archiveIntent && dealsInValue.length === 0
         ? 'Pick at least one supply category (or this vendor will not appear in any Receive form)'
+        : undefined,
+    // Foreign-vendor validations: only enforced when country !== India so
+    // domestic flows are unchanged. Required fields are the bare minimum
+    // needed to remit a wire payment + clear customs.
+    foreignTaxId:
+      isForeign && !(foreign.taxId || '').trim()
+        ? `${foreign.taxIdLabel || 'Tax ID'} is required for international vendors`
+        : undefined,
+    foreignBankName:
+      isForeign && !(foreign.bankName || '').trim()
+        ? 'Bank Name is required for international vendors'
+        : undefined,
+    foreignSwift:
+      isForeign && !(foreign.swift || '').trim()
+        ? 'SWIFT/BIC is required for international wire transfers'
+        : isForeign && foreign.swift && !/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(foreign.swift)
+        ? 'SWIFT/BIC must be 8 or 11 chars (e.g. CHASUS33XXX)'
+        : undefined,
+    foreignIban:
+      isForeign && foreign.iban && !/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/i.test(foreign.iban)
+        ? 'IBAN should start with 2-letter country + 2 digits (e.g. GB29NWBK60161331926819)'
+        : undefined,
+    foreignCurrency:
+      isForeign && !(foreign.currency || '').trim()
+        ? 'Currency is required (e.g. USD, EUR, AED)'
+        : undefined,
+    foreignBeneficiary:
+      isForeign && !(foreign.beneficiaryName || '').trim()
+        ? 'Beneficiary Name is required for wire transfers'
+        : undefined,
+    foreignKpc:
+      requiresKpc && !(foreign.kpcNumber || '').trim()
+        ? 'Kimberley Process Certificate # is required when importing diamonds / stone packets'
+        : undefined,
+    foreignHsCode:
+      isForeign && foreign.defaultHsCode && !/^\d{4,10}$/.test(foreign.defaultHsCode)
+        ? 'HS code must be 4–10 digits'
         : undefined,
   };
   const errorList = Object.entries(errors).filter(([, v]) => !!v) as [string, string][];
@@ -316,7 +443,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
         // path so it can never silently revert.
         dealsIn: archiveIntent ? [] : dealsInValue,
       };
-      if (noGst) {
+      if (noGst && !isForeign) {
         const m: ManualVendorDetails = {
           legalName: manual.legalName?.trim() || undefined,
           tradeName: manual.tradeName?.trim() || undefined,
@@ -327,6 +454,37 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
           pincode: manual.pincode?.trim() || undefined,
         };
         payload.manualDetails = m;
+      }
+      // Foreign vendor: ship the sanitized blob; pass null to clear when the
+      // user switched the country back to India on an existing foreign vendor.
+      if (isForeign) {
+        payload.foreignDetails = {
+          taxId: foreign.taxId?.trim() || undefined,
+          taxIdLabel: foreign.taxIdLabel?.trim() || undefined,
+          companyRegNo: foreign.companyRegNo?.trim() || undefined,
+          bankName: foreign.bankName?.trim() || undefined,
+          bankAddress: foreign.bankAddress?.trim() || undefined,
+          swift: foreign.swift?.toUpperCase().trim() || undefined,
+          iban: foreign.iban?.toUpperCase().trim() || undefined,
+          accountNumber: foreign.accountNumber?.trim() || undefined,
+          routingCode: foreign.routingCode?.trim() || undefined,
+          beneficiaryName: foreign.beneficiaryName?.trim() || undefined,
+          intermediaryBank: foreign.intermediaryBank?.trim() || undefined,
+          currency: foreign.currency?.toUpperCase().trim() || undefined,
+          incoterms: foreign.incoterms?.toUpperCase().trim() || undefined,
+          defaultHsCode: foreign.defaultHsCode?.trim() || undefined,
+          countryOfOrigin: foreign.countryOfOrigin?.trim() || undefined,
+          city: foreign.city?.trim() || undefined,
+          state: foreign.state?.trim() || undefined,
+          postalCode: foreign.postalCode?.trim() || undefined,
+          kpcNumber: foreign.kpcNumber?.trim() || undefined,
+          conflictFreeDeclared: foreign.conflictFreeDeclared || undefined,
+          paymentTerms: foreign.paymentTerms?.trim() || undefined,
+          letterOfCreditRequired: foreign.letterOfCreditRequired || undefined,
+        };
+      } else if (vendor?.gstDetails?.foreignDetails) {
+        // Existing foreign blob but user switched back to India → clear it.
+        payload.foreignDetails = null;
       }
       if (vendor) return updateVendor(vendor.id, payload);
       return createVendor(payload);
@@ -367,24 +525,42 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
           }}
           className="p-6 space-y-4"
         >
-          {/* No GST toggle */}
-          <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={noGst}
-              onChange={(e) => toggleNoGst(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-champagne-700 focus:ring-champagne-600"
-            />
-            <span className="text-sm font-medium text-gray-800">
-              Vendor does not have GST
-            </span>
-            <span className="ml-auto text-[11px] text-gray-500">
-              {noGst ? 'Enter all details manually' : 'GSTIN auto-fetches everything'}
-            </span>
-          </label>
+          {/* No GST toggle — hidden for international vendors (irrelevant) */}
+          {!isForeign && (
+            <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={noGst}
+                onChange={(e) => toggleNoGst(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-champagne-700 focus:ring-champagne-600"
+              />
+              <span className="text-sm font-medium text-gray-800">
+                Vendor does not have GST
+              </span>
+              <span className="ml-auto text-[11px] text-gray-500">
+                {noGst ? 'Enter all details manually' : 'GSTIN auto-fetches everything'}
+              </span>
+            </label>
+          )}
 
-          {/* GST mode */}
-          {!noGst && (
+          {/* Foreign vendor banner — visible whenever country !== India */}
+          {isForeign && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200">
+              <GlobeAltIcon className="w-6 h-6 text-sky-700 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-sky-900">
+                  International vendor — GSTIN not applicable
+                </p>
+                <p className="text-xs text-sky-800 mt-0.5">
+                  Fill the <strong>Export / International Details</strong> section below for banking,
+                  customs, and compliance fields needed for cross-border purchases.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* GST mode — hidden for international vendors */}
+          {!noGst && !isForeign && (
             <Field label="GSTIN *" hint="15-character GST number — fields below auto-populate" error={showErr('gstin') ? errors.gstin : undefined}>
               <div className="relative">
                 <input
@@ -477,8 +653,8 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
             </Field>
           )}
 
-          {/* Manual fields (No-GST mode) */}
-          {noGst && (
+          {/* Manual fields (No-GST mode, India only) */}
+          {noGst && !isForeign && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wider font-bold text-gray-500">
                 Vendor Details (manual entry)
@@ -597,6 +773,8 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
               hint={
                 !noGst && gstinValid
                   ? 'Auto-set from GSTIN — Indian registration'
+                  : isForeign
+                  ? 'International vendor — Export details required below'
                   : 'Defaults to India — change for international vendors'
               }
             >
@@ -722,6 +900,348 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
               className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-100 text-gray-700 font-mono cursor-not-allowed select-all text-sm"
             />
           </Field>
+
+          {/* ----------------------------------------------------------------
+              Export / International Details — only shown when country !== India.
+              Collapsible to keep the modal lean for the 99% domestic case.
+          ---------------------------------------------------------------- */}
+          {isForeign && (
+            <div className="rounded-xl border-2 border-sky-200 bg-gradient-to-br from-sky-50/50 to-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setForeignExpanded((v) => !v)}
+                aria-expanded={foreignExpanded}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-sky-50/70 transition focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-inset min-h-[56px]"
+              >
+                <GlobeAltIcon className="w-5 h-5 text-sky-700 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-sky-900">
+                    Export / International Details
+                  </p>
+                  <p className="text-[11px] text-sky-700">
+                    Banking, customs, and compliance for cross-border purchases
+                  </p>
+                </div>
+                <ChevronDownIcon
+                  className={`w-5 h-5 text-sky-700 transition-transform ${
+                    foreignExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {foreignExpanded && (
+                <div className="px-4 pb-4 space-y-4">
+                  {/* Identity & Tax */}
+                  <ForeignSection title="Identity & Tax" Icon={ShieldCheckIcon} accent="indigo">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Field
+                        label={`${foreign.taxIdLabel || 'Tax ID'} *`}
+                        hint="Foreign tax registration (EIN / VAT / TRN / ABN). No format check."
+                        error={showErr('foreignTaxId') ? errors.foreignTaxId : undefined}
+                      >
+                        <input
+                          data-field="foreignTaxId"
+                          value={foreign.taxId || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, taxId: e.target.value }))}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignTaxId: true }))}
+                          placeholder="e.g. 84-1234567 / GB123456789"
+                          className={`w-full px-4 py-2.5 rounded-lg border font-mono text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignTaxId')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-sky-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field label="Tax ID Label" hint="Auto-suggested from country — edit if needed">
+                        <input
+                          value={foreign.taxIdLabel || ''}
+                          onChange={(e) => {
+                            taxLabelTouched.current = true;
+                            setForeign((f) => ({ ...f, taxIdLabel: e.target.value }));
+                          }}
+                          placeholder="EIN / VAT / TRN / ABN"
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                      <Field label="Company Registration #" hint="Optional — corporate filing number">
+                        <input
+                          value={foreign.companyRegNo || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, companyRegNo: e.target.value }))}
+                          placeholder="e.g. 12345678 / KvK 1234567"
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                    </div>
+
+                    {/* International address detail */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                      <Field label="City">
+                        <input
+                          value={foreign.city || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, city: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                      <Field label="State / Province">
+                        <input
+                          value={foreign.state || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, state: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                      <Field label="Postal / ZIP Code">
+                        <input
+                          value={foreign.postalCode || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, postalCode: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                    </div>
+                  </ForeignSection>
+
+                  {/* Banking / Wire transfer */}
+                  <ForeignSection title="Banking & Wire Transfer" Icon={BuildingLibraryIcon} accent="emerald">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Field
+                        label="Bank Name *"
+                        error={showErr('foreignBankName') ? errors.foreignBankName : undefined}
+                      >
+                        <input
+                          data-field="foreignBankName"
+                          value={foreign.bankName || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, bankName: e.target.value }))}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignBankName: true }))}
+                          placeholder="e.g. HSBC Hong Kong"
+                          className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignBankName')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field
+                        label="Beneficiary Name *"
+                        hint="Account holder exactly as on bank records"
+                        error={showErr('foreignBeneficiary') ? errors.foreignBeneficiary : undefined}
+                      >
+                        <input
+                          data-field="foreignBeneficiary"
+                          value={foreign.beneficiaryName || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, beneficiaryName: e.target.value }))}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignBeneficiary: true }))}
+                          className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignBeneficiary')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field
+                        label="SWIFT / BIC *"
+                        hint="8 or 11 chars (e.g. CHASUS33XXX)"
+                        error={showErr('foreignSwift') ? errors.foreignSwift : undefined}
+                      >
+                        <input
+                          data-field="foreignSwift"
+                          value={foreign.swift || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, swift: e.target.value.toUpperCase() }))}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignSwift: true }))}
+                          maxLength={11}
+                          placeholder="CHASUS33XXX"
+                          className={`w-full px-4 py-2.5 rounded-lg border font-mono uppercase text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignSwift')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field
+                        label="IBAN"
+                        hint="UK / EU / UAE — leave blank for US/HK/SG accounts"
+                        error={showErr('foreignIban') ? errors.foreignIban : undefined}
+                      >
+                        <input
+                          data-field="foreignIban"
+                          value={foreign.iban || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, iban: e.target.value.toUpperCase() }))}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignIban: true }))}
+                          maxLength={34}
+                          placeholder="GB29NWBK60161331926819"
+                          className={`w-full px-4 py-2.5 rounded-lg border font-mono uppercase text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignIban')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field label="Account Number" hint="If different from IBAN (US / HK / SG / etc.)">
+                        <input
+                          value={foreign.accountNumber || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, accountNumber: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-mono text-sm"
+                        />
+                      </Field>
+                      <Field label="Routing / Sort / BSB / Transit" hint="ABA (US) · Sort (UK) · BSB (AU) · Transit (CA)">
+                        <input
+                          value={foreign.routingCode || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, routingCode: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-mono text-sm"
+                        />
+                      </Field>
+                      <Field
+                        label="Currency *"
+                        hint="ISO-4217 (auto-defaulted from country)"
+                        error={showErr('foreignCurrency') ? errors.foreignCurrency : undefined}
+                      >
+                        <input
+                          data-field="foreignCurrency"
+                          value={foreign.currency || ''}
+                          onChange={(e) => {
+                            currencyTouched.current = true;
+                            setForeign((f) => ({ ...f, currency: e.target.value.toUpperCase() }));
+                          }}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignCurrency: true }))}
+                          maxLength={3}
+                          placeholder="USD"
+                          className={`w-full px-4 py-2.5 rounded-lg border font-mono uppercase text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignCurrency')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field label="Intermediary Bank" hint="Optional — for chained wire transfers">
+                        <input
+                          value={foreign.intermediaryBank || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, intermediaryBank: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                    </div>
+                    <Field label="Bank Address" hint="Full bank branch address">
+                      <textarea
+                        value={foreign.bankAddress || ''}
+                        onChange={(e) => setForeign((f) => ({ ...f, bankAddress: e.target.value }))}
+                        rows={2}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
+                      />
+                    </Field>
+                  </ForeignSection>
+
+                  {/* Customs & Shipping */}
+                  <ForeignSection title="Customs & Shipping" Icon={TruckIcon} accent="amber">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Field label="Incoterms (2020)" hint="Who pays freight / insurance / duties">
+                        <select
+                          value={foreign.incoterms || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, incoterms: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white text-sm"
+                        >
+                          <option value="">— Select —</option>
+                          {INCOTERMS_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field
+                        label="Default HS Code"
+                        hint="Auto-suggested from supply categories"
+                        error={showErr('foreignHsCode') ? errors.foreignHsCode : undefined}
+                      >
+                        <input
+                          data-field="foreignHsCode"
+                          value={foreign.defaultHsCode || ''}
+                          onChange={(e) => {
+                            hsCodeTouched.current = true;
+                            setForeign((f) => ({ ...f, defaultHsCode: e.target.value.replace(/\D/g, '').slice(0, 10) }));
+                          }}
+                          onBlur={() => setTouched((t) => ({ ...t, foreignHsCode: true }))}
+                          placeholder="7102"
+                          className={`w-full px-4 py-2.5 rounded-lg border font-mono text-sm focus:ring-2 focus:border-transparent ${
+                            showErr('foreignHsCode')
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-amber-500'
+                          }`}
+                        />
+                      </Field>
+                      <Field label="Country of Origin" hint="Where goods originate">
+                        <input
+                          value={foreign.countryOfOrigin || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, countryOfOrigin: e.target.value }))}
+                          placeholder={form.country || ''}
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                        />
+                      </Field>
+                    </div>
+                  </ForeignSection>
+
+                  {/* Compliance + Commercial */}
+                  <ForeignSection title="Compliance & Commercial Terms" Icon={BanknotesIcon} accent="violet">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {requiresKpc && (
+                        <Field
+                          label="Kimberley Process Certificate # *"
+                          hint="Required for diamond / stone packet imports"
+                          error={showErr('foreignKpc') ? errors.foreignKpc : undefined}
+                        >
+                          <input
+                            data-field="foreignKpc"
+                            value={foreign.kpcNumber || ''}
+                            onChange={(e) => setForeign((f) => ({ ...f, kpcNumber: e.target.value }))}
+                            onBlur={() => setTouched((t) => ({ ...t, foreignKpc: true }))}
+                            placeholder="e.g. IN/2024/12345"
+                            className={`w-full px-4 py-2.5 rounded-lg border font-mono text-sm focus:ring-2 focus:border-transparent ${
+                              showErr('foreignKpc')
+                                ? 'border-red-400 focus:ring-red-500'
+                                : 'border-gray-300 focus:ring-violet-500'
+                            }`}
+                          />
+                        </Field>
+                      )}
+                      <Field label="Payment Terms" hint="When payment is due to vendor">
+                        <input
+                          list="paymentTermsList"
+                          value={foreign.paymentTerms || ''}
+                          onChange={(e) => setForeign((f) => ({ ...f, paymentTerms: e.target.value }))}
+                          placeholder="e.g. Net 30 / 50% Advance"
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                        />
+                        <datalist id="paymentTermsList">
+                          {PAYMENT_TERMS_OPTIONS.map((p) => (
+                            <option key={p} value={p} />
+                          ))}
+                        </datalist>
+                      </Field>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-50 border border-violet-200 cursor-pointer select-none flex-1 min-h-[44px]">
+                        <input
+                          type="checkbox"
+                          checked={!!foreign.conflictFreeDeclared}
+                          onChange={(e) => setForeign((f) => ({ ...f, conflictFreeDeclared: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-300 text-violet-700 focus:ring-violet-600"
+                        />
+                        <span className="text-sm font-medium text-gray-800">
+                          Vendor declares all goods are conflict-free
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-50 border border-violet-200 cursor-pointer select-none flex-1 min-h-[44px]">
+                        <input
+                          type="checkbox"
+                          checked={!!foreign.letterOfCreditRequired}
+                          onChange={(e) => setForeign((f) => ({ ...f, letterOfCreditRequired: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-300 text-violet-700 focus:ring-violet-600"
+                        />
+                        <span className="text-sm font-medium text-gray-800">
+                          Letter of Credit (LC) required for shipments
+                        </span>
+                      </label>
+                    </div>
+                  </ForeignSection>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* GST card actions */}
           {!noGst && gstDetails && gstStatus === 'ok' && (
@@ -858,5 +1378,40 @@ function ManualInput({ value, onChange }: { value?: string; onChange: (v: string
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-champagne-600 focus:border-transparent bg-white text-sm"
     />
+  );
+}
+
+/**
+ * Visual sub-card inside the Export / International Details accordion.
+ * Keeps the four logical groups (Identity, Banking, Customs, Compliance)
+ * visually separated without burying the user in deeply-nested layouts.
+ */
+function ForeignSection({
+  title,
+  Icon,
+  accent,
+  children,
+}: {
+  title: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: 'indigo' | 'emerald' | 'amber' | 'violet';
+  children: React.ReactNode;
+}) {
+  const headerCls: Record<typeof accent, string> = {
+    indigo: 'bg-indigo-50 border-indigo-200 text-indigo-900',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    amber: 'bg-amber-50 border-amber-200 text-amber-900',
+    violet: 'bg-violet-50 border-violet-200 text-violet-900',
+  };
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <header
+        className={`flex items-center gap-2 px-3 py-2 border-b ${headerCls[accent]}`}
+      >
+        <Icon className="w-4 h-4 flex-shrink-0" />
+        <h4 className="text-xs font-bold uppercase tracking-wider">{title}</h4>
+      </header>
+      <div className="p-3 space-y-3">{children}</div>
+    </section>
   );
 }

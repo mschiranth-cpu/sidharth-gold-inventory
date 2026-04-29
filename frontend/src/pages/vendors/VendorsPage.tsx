@@ -651,27 +651,76 @@ export default function VendorsPage() {
                                 )}
                               </div>
                             </div>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
+                          ) : (() => {
+                            // Foreign vendor: surface country + currency chips
+                            // in place of the GSTIN column so the user can
+                            // tell at a glance this is an international vendor.
+                            const country = v.country || v.gstDetails?.country || '';
+                            const fd = v.gstDetails?.foreignDetails;
+                            if (country && country !== 'India') {
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-semibold w-fit">
+                                    🌍 {country}
+                                  </span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {fd?.currency && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                                        {fd.currency}
+                                      </span>
+                                    )}
+                                    {fd?.incoterms && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold">
+                                        {fd.incoterms}
+                                      </span>
+                                    )}
+                                    {fd?.kpcNumber && (
+                                      <span
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded bg-violet-50 text-violet-800 border border-violet-200 text-[10px] font-semibold"
+                                        title={`Kimberley Process Cert: ${fd.kpcNumber}`}
+                                      >
+                                        KPC ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return <span className="text-gray-300">—</span>;
+                          })()}
                         </td>
                         <td className="px-4 py-3">
-                          {v.gstDetails?.state || v.gstDetails?.city ? (
-                            <div className="flex flex-col">
-                              {v.gstDetails?.state && (
-                                <span className="text-gray-900 text-sm">
-                                  {v.gstDetails.state}
-                                </span>
-                              )}
-                              {v.gstDetails?.city && (
-                                <span className="text-gray-500 text-xs">
-                                  {v.gstDetails.city}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
+                          {(() => {
+                            // Foreign vendors store address on foreignDetails;
+                            // domestic vendors use the India-side gstDetails
+                            // fields (state code 01-38). Prefer the foreign
+                            // copy so a vendor that was migrated India→Foreign
+                            // doesn't keep showing the stale Indian state.
+                            const fd = v.gstDetails?.foreignDetails;
+                            const isForeign =
+                              !!fd ||
+                              ((v.country || v.gstDetails?.country || '') !== 'India' &&
+                                !v.gstNumber);
+                            const state = isForeign
+                              ? fd?.state || ''
+                              : v.gstDetails?.state || '';
+                            const city = isForeign
+                              ? fd?.city || ''
+                              : v.gstDetails?.city || '';
+                            if (!state && !city) {
+                              return <span className="text-gray-300">—</span>;
+                            }
+                            return (
+                              <div className="flex flex-col">
+                                {state && (
+                                  <span className="text-gray-900 text-sm">{state}</span>
+                                )}
+                                {city && (
+                                  <span className="text-gray-500 text-xs">{city}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td
                           className={`px-4 py-3 text-right tabular-nums ${

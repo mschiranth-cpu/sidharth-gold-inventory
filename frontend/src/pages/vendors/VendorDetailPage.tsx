@@ -33,6 +33,8 @@ import {
   CubeTransparentIcon,
   ChevronDownIcon,
   BuildingLibraryIcon,
+  GlobeAltIcon,
+  TruckIcon,
 } from '@heroicons/react/24/outline';
 import type { MetalPayment } from '../../services/metal.service';
 import type { DiamondPayment } from '../../services/diamond.service';
@@ -170,6 +172,98 @@ function InfoRow({
         <p className={`text-sm text-onyx-900 break-words ${mono ? 'font-mono' : ''}`}>
           {value || <span className="text-onyx-400">—</span>}
         </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Read-only summary card for international vendors. Renders alongside the
+ * GST card on the detail page so payments / customs staff can see banking,
+ * customs, and compliance info at a glance without opening the edit modal.
+ */
+function ForeignVendorCard({
+  country,
+  details,
+}: {
+  country: string;
+  details: NonNullable<NonNullable<import('../../services/vendor.service').GstDetails>['foreignDetails']>;
+}) {
+  const Row = ({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) => (
+    <div className="flex flex-col">
+      <span className="text-[10px] uppercase tracking-wider font-bold text-onyx-500">{label}</span>
+      <span className={`text-sm text-onyx-900 break-words ${mono ? 'font-mono' : ''}`}>
+        {value || <span className="text-onyx-400">—</span>}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-sky-200 overflow-hidden">
+      <div className="px-6 py-4 bg-gradient-to-r from-sky-50 to-indigo-50 border-b border-sky-200 flex items-center gap-3">
+        <GlobeAltIcon className="w-6 h-6 text-sky-700" />
+        <div>
+          <h2 className="font-semibold text-sky-900">Export / International Details</h2>
+          <p className="text-[11px] text-sky-700 mt-0.5">
+            Cross-border banking, customs &amp; compliance for {country || 'this vendor'}
+          </p>
+        </div>
+      </div>
+      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Identity */}
+        <section className="space-y-3">
+          <h3 className="text-[11px] uppercase tracking-wider font-bold text-indigo-700 flex items-center gap-1.5">
+            <ShieldCheckIcon className="w-4 h-4" /> Identity & Tax
+          </h3>
+          <Row label={details.taxIdLabel || 'Tax ID'} value={details.taxId} mono />
+          <Row label="Company Reg #" value={details.companyRegNo} mono />
+          <Row label="Country of Origin" value={details.countryOfOrigin} />
+          {(details.city || details.state || details.postalCode) && (
+            <Row
+              label="Address"
+              value={[details.city, details.state, details.postalCode].filter(Boolean).join(', ')}
+            />
+          )}
+        </section>
+
+        {/* Banking */}
+        <section className="space-y-3">
+          <h3 className="text-[11px] uppercase tracking-wider font-bold text-emerald-700 flex items-center gap-1.5">
+            <BuildingLibraryIcon className="w-4 h-4" /> Banking & Wire
+          </h3>
+          <Row label="Bank Name" value={details.bankName} />
+          <Row label="Beneficiary" value={details.beneficiaryName} />
+          <Row label="SWIFT / BIC" value={details.swift} mono />
+          <Row label="IBAN" value={details.iban} mono />
+          <Row label="Account #" value={details.accountNumber} mono />
+          <Row label="Routing / Sort / BSB" value={details.routingCode} mono />
+          <Row label="Currency" value={details.currency} mono />
+          {details.intermediaryBank && <Row label="Intermediary Bank" value={details.intermediaryBank} />}
+          {details.bankAddress && <Row label="Bank Address" value={details.bankAddress} />}
+        </section>
+
+        {/* Customs + Compliance + Commercial */}
+        <section className="space-y-3">
+          <h3 className="text-[11px] uppercase tracking-wider font-bold text-amber-700 flex items-center gap-1.5">
+            <TruckIcon className="w-4 h-4" /> Customs & Commercial
+          </h3>
+          <Row label="Incoterms" value={details.incoterms} mono />
+          <Row label="Default HS Code" value={details.defaultHsCode} mono />
+          <Row label="Payment Terms" value={details.paymentTerms} />
+          {details.kpcNumber && <Row label="Kimberley Process #" value={details.kpcNumber} mono />}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {details.conflictFreeDeclared && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-50 text-violet-800 border border-violet-200 text-[11px] font-semibold">
+                ✓ Conflict-free declared
+              </span>
+            )}
+            {details.letterOfCreditRequired && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold">
+                ⚠ Letter of Credit required
+              </span>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -717,29 +811,65 @@ export default function VendorDetailPage() {
             </div>
           </div>
           <div className="lg:col-span-2">
-            {vendor.gstDetails ? (
-              <GstInfoCard gstDetails={vendor.gstDetails} variant="detail" />
-            ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-8 h-full flex flex-col items-center justify-center text-center gap-3">
-                <span className="w-12 h-12 rounded-2xl bg-champagne-50 text-champagne-700 inline-flex items-center justify-center">
-                  <ShieldCheckIcon className="w-6 h-6" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-onyx-800">No GST details on file</p>
-                  <p className="text-xs text-onyx-500 mt-1">
-                    Edit the vendor and add a GSTIN to fetch government-verified business details.
-                  </p>
+            {(() => {
+              // Foreign vendors store data on gstDetails.foreignDetails but
+              // have no real Indian GST fields. Rendering GstInfoCard for them
+              // shows mostly blank rows + a meaningless "source: parsed" tag,
+              // so we route them to a dedicated banner pointing at the
+              // ForeignVendorCard rendered below.
+              const isForeign =
+                !!vendor.gstDetails?.foreignDetails ||
+                ((vendor.country || vendor.gstDetails?.country || '') !== 'India' &&
+                  !vendor.gstNumber);
+              if (isForeign) {
+                return (
+                  <div className="bg-gradient-to-br from-sky-50 to-indigo-50 rounded-2xl shadow-sm border border-sky-200 p-8 h-full flex flex-col items-center justify-center text-center gap-3">
+                    <span className="w-12 h-12 rounded-2xl bg-white text-sky-700 inline-flex items-center justify-center shadow-sm">
+                      <GlobeAltIcon className="w-6 h-6" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-sky-900">International vendor</p>
+                      <p className="text-xs text-sky-700 mt-1">
+                        GSTIN does not apply. Banking, customs, and compliance details are shown
+                        below in the <strong>Export / International Details</strong> card.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              if (vendor.gstDetails) {
+                return <GstInfoCard gstDetails={vendor.gstDetails} variant="detail" />;
+              }
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-8 h-full flex flex-col items-center justify-center text-center gap-3">
+                  <span className="w-12 h-12 rounded-2xl bg-champagne-50 text-champagne-700 inline-flex items-center justify-center">
+                    <ShieldCheckIcon className="w-6 h-6" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-onyx-800">No GST details on file</p>
+                    <p className="text-xs text-onyx-500 mt-1">
+                      Edit the vendor and add a GSTIN to fetch government-verified business details.
+                    </p>
+                  </div>
+                  <Link
+                    to={`/app/vendors?edit=${vendor.id}`}
+                    className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-champagne-700 hover:text-onyx-900"
+                  >
+                    <PencilSquareIcon className="w-3.5 h-3.5" /> Add GSTIN
+                  </Link>
                 </div>
-                <Link
-                  to={`/app/vendors?edit=${vendor.id}`}
-                  className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-champagne-700 hover:text-onyx-900"
-                >
-                  <PencilSquareIcon className="w-3.5 h-3.5" /> Add GSTIN
-                </Link>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
+
+        {/* Foreign / international vendor card — only when we have foreignDetails */}
+        {vendor.gstDetails?.foreignDetails && (
+          <ForeignVendorCard
+            country={vendor.country || vendor.gstDetails?.country || ''}
+            details={vendor.gstDetails.foreignDetails}
+          />
+        )}
 
         {/* Purchase Transactions */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

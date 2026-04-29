@@ -368,6 +368,97 @@ function buildManualGstDetails(input: any): any | null {
   return hasAny ? m : null;
 }
 
+// ----------------------------------------------------------------------------
+// Foreign vendor (international supplier) details.
+//
+// When a vendor's country is not India, GSTIN is meaningless and the user
+// instead provides export/import compliance + remittance details. We stash
+// them on the same `gstDetails` JSON blob under a `foreignDetails` key to
+// avoid a schema migration.
+// ----------------------------------------------------------------------------
+const FOREIGN_INCOTERMS = new Set([
+  'EXW', 'FCA', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP',
+  'FAS', 'FOB', 'CFR', 'CIF',
+]);
+const SWIFT_REGEX = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/;
+const CURRENCY_REGEX = /^[A-Z]{3}$/;
+const HS_CODE_REGEX = /^\d{4,10}$/;
+
+/**
+ * Whitelist + sanitize a caller-supplied `foreignDetails` object. Returns
+ * `null` if every field is blank so we don't write empty noise. Throws if a
+ * structurally-invalid value is provided (caught by the route handler).
+ */
+function buildForeignDetails(input: any): any | null {
+  if (!input || typeof input !== 'object') return null;
+  const str = (v: any) => (v === undefined || v === null ? undefined : String(v).trim() || undefined);
+  const upper = (v: any) => {
+    const s = str(v);
+    return s ? s.toUpperCase() : undefined;
+  };
+  const bool = (v: any) =>
+    v === true || v === false ? v : undefined;
+
+  const swift = upper(input.swift);
+  if (swift && !SWIFT_REGEX.test(swift)) {
+    throw new Error('Invalid SWIFT/BIC code format');
+  }
+  const iban = upper(input.iban);
+  if (iban && !IBAN_REGEX.test(iban)) {
+    throw new Error('Invalid IBAN format');
+  }
+  const currency = upper(input.currency);
+  if (currency && !CURRENCY_REGEX.test(currency)) {
+    throw new Error('Currency must be a 3-letter ISO code (e.g. USD, EUR, AED)');
+  }
+  const incoterms = upper(input.incoterms);
+  if (incoterms && !FOREIGN_INCOTERMS.has(incoterms)) {
+    throw new Error(`Incoterms must be one of ${[...FOREIGN_INCOTERMS].join(', ')}`);
+  }
+  const defaultHsCode = str(input.defaultHsCode);
+  if (defaultHsCode && !HS_CODE_REGEX.test(defaultHsCode)) {
+    throw new Error('HS code must be 4–10 digits');
+  }
+
+  const out: Record<string, any> = {
+    // Identity
+    taxId: str(input.taxId),
+    taxIdLabel: str(input.taxIdLabel),
+    companyRegNo: str(input.companyRegNo),
+    // Banking
+    bankName: str(input.bankName),
+    bankAddress: str(input.bankAddress),
+    swift,
+    iban,
+    accountNumber: str(input.accountNumber),
+    routingCode: str(input.routingCode),
+    beneficiaryName: str(input.beneficiaryName),
+    intermediaryBank: str(input.intermediaryBank),
+    currency,
+    // Customs / Shipping
+    incoterms,
+    defaultHsCode,
+    countryOfOrigin: str(input.countryOfOrigin),
+    // Address detail
+    city: str(input.city),
+    state: str(input.state),
+    postalCode: str(input.postalCode),
+    // Compliance
+    kpcNumber: str(input.kpcNumber),
+    conflictFreeDeclared: bool(input.conflictFreeDeclared),
+    // Commercial terms
+    paymentTerms: str(input.paymentTerms),
+    letterOfCreditRequired: bool(input.letterOfCreditRequired),
+  };
+  // Strip undefined keys so the JSON blob stays small.
+  const compact: Record<string, any> = {};
+  for (const [k, v] of Object.entries(out)) {
+    if (v !== undefined && v !== '') compact[k] = v;
+  }
+  return Object.keys(compact).length > 0 ? compact : null;
+}
+
 /**
  * Generate the next vendor unique code in the form `VEN-001`, `VEN-002`, …
  * Reads the highest existing numeric suffix and increments by 1.
@@ -638,7 +729,7 @@ router.post(
   '/',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, email, country, gstNumber, address, manualDetails } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput } = req.body || {};
     if (!name) {
       return res.status(400).json({ success: false, error: 'name is required' });
     }
@@ -651,6 +742,12 @@ router.post(
     const cleanedEmail = email ? String(email).trim().toLowerCase() : '';
     if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
+    }
+    let foreignDetails: any = null;
+    try {
+      foreignDetails = buildForeignDetails(foreignInput);
+    } catch (e: any) {
+      return res.status(400).json({ success: false, error: e?.message || 'Invalid foreignDetails' });
     }
     const dealsInResult = parseDealsIn(req.body?.dealsIn);
     if (!dealsInResult.ok) {
@@ -694,6 +791,11 @@ router.post(
         ...(cleanedCountry ? { country: cleanedCountry } : {}),
       };
     }
+    // Stash foreign-vendor details on the same blob (foreignDetails key) so
+    // international suppliers don't require a separate schema column.
+    if (foreignDetails) {
+      gstDetails = { ...(gstDetails || {}), foreignDetails };
+    }
     // Auto-generate unique code (with retry on the rare race condition)
     for (let attempt = 0; attempt < 5; attempt++) {
       const uniqueCode = await generateNextCode();
@@ -724,7 +826,7 @@ router.put(
   '/:id',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, email, country, gstNumber, address, manualDetails } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput } = req.body || {};
     if (phone !== undefined && (!phone || !String(phone).trim())) {
       return res.status(400).json({ success: false, error: 'phone is required' });
     }
@@ -734,6 +836,16 @@ router.put(
     const cleanedEmail = email !== undefined ? String(email || '').trim().toLowerCase() : undefined;
     if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
+    }
+    // Foreign details are optional on PUT — undefined means "don't change",
+    // null means "clear them", an object means "replace".
+    let foreignDetails: any = undefined;
+    if (foreignInput !== undefined) {
+      try {
+        foreignDetails = foreignInput === null ? null : buildForeignDetails(foreignInput);
+      } catch (e: any) {
+        return res.status(400).json({ success: false, error: e?.message || 'Invalid foreignDetails' });
+      }
     }
     const dealsInResult = parseDealsIn(req.body?.dealsIn);
     if (!dealsInResult.ok) {
@@ -800,6 +912,19 @@ router.put(
         ...(cleanedCountry !== undefined ? { country: cleanedCountry || null } : {}),
       };
     }
+    // Foreign details: caller can pass {} or a full object to replace, or
+    // null to clear. Merge onto whichever blob we're about to write so we
+    // don't lose email/country/GST data.
+    if (foreignDetails !== undefined) {
+      const base: any = gstDetails ?? existingDetails ?? {};
+      if (foreignDetails === null) {
+        // Drop foreignDetails from the blob entirely.
+        const { foreignDetails: _drop, ...rest } = base;
+        gstDetails = rest;
+      } else {
+        gstDetails = { ...base, foreignDetails };
+      }
+    }
     try {
       const vendor = await prisma.vendor.update({
         where: { id: req.params.id },
@@ -813,7 +938,7 @@ router.put(
               }
             : manualDetails !== undefined
             ? { gstDetails: gstDetails ?? null }
-            : emailOrCountryChanged
+            : emailOrCountryChanged || foreignDetails !== undefined
             ? { gstDetails: gstDetails ?? null }
             : {}),
           ...(address !== undefined ? { address: address ? String(address).trim() : null } : {}),

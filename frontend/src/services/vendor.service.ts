@@ -90,7 +90,122 @@ export interface GstDetails {
   email?: string | null;
   /** ISO country name. India for any GST-registered vendor. */
   country?: string | null;
+  /** Foreign / international supplier metadata (also stashed on the blob). */
+  foreignDetails?: ForeignVendorDetails | null;
 }
+
+/**
+ * Optional foreign-vendor / international-supplier metadata. Persisted on the
+ * `gstDetails.foreignDetails` JSON blob (same pattern as the email/country
+ * stash) so we don't need to migrate the Vendor table for every overseas
+ * compliance field. Only populated when the vendor's country is not India.
+ */
+export interface ForeignVendorDetails {
+  // Identity
+  taxId?: string;          // EIN / VAT / TRN / ABN / generic
+  taxIdLabel?: string;     // 'EIN', 'VAT', 'TRN', 'ABN', 'Tax ID'
+  companyRegNo?: string;   // Company registration number (CRN, KvK, etc.)
+  // Banking
+  bankName?: string;
+  bankAddress?: string;
+  swift?: string;          // SWIFT/BIC (8 or 11 chars)
+  iban?: string;           // IBAN where applicable (UK/EU/UAE)
+  accountNumber?: string;
+  routingCode?: string;    // ABA / Sort Code / BSB / Transit
+  beneficiaryName?: string;
+  intermediaryBank?: string;
+  currency?: string;       // ISO-4217 (USD, EUR, AED, ...)
+  // Customs / Shipping
+  incoterms?: string;      // EXW / FOB / CIF / CFR / DDP / DAP / FCA / CPT / CIP / DPU / FAS
+  defaultHsCode?: string;  // 4-10 digits
+  countryOfOrigin?: string;
+  // Address detail
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  // Compliance (jewellery-specific)
+  kpcNumber?: string;      // Kimberley Process Certificate (rough diamonds)
+  conflictFreeDeclared?: boolean;
+  // Commercial terms
+  paymentTerms?: string;   // 'Advance 30%', 'Net 30', 'Net 60', 'LC at sight'
+  letterOfCreditRequired?: boolean;
+}
+
+/**
+ * Default ISO-4217 currency by country. Drives the auto-default in the
+ * vendor form when a foreign country is selected; user can always override.
+ */
+export const CURRENCY_BY_COUNTRY: Record<string, string> = {
+  'India': 'INR',
+  'United Arab Emirates': 'AED',
+  'Singapore': 'SGD',
+  'Hong Kong': 'HKD',
+  'Thailand': 'THB',
+  'United Kingdom': 'GBP',
+  'United States': 'USD',
+  'Belgium': 'EUR',
+  'Switzerland': 'CHF',
+  'Sri Lanka': 'LKR',
+  'Other': 'USD',
+};
+
+/**
+ * Suggested Tax ID label by country. Free text on the form so users can
+ * override for unusual jurisdictions.
+ */
+export const TAX_ID_LABEL_BY_COUNTRY: Record<string, string> = {
+  'United States': 'EIN',
+  'United Kingdom': 'VAT',
+  'United Arab Emirates': 'TRN',
+  'Singapore': 'GST',
+  'Hong Kong': 'BR No.',
+  'Thailand': 'Tax ID',
+  'Belgium': 'VAT',
+  'Switzerland': 'VAT (UID)',
+  'Sri Lanka': 'TIN',
+  'Other': 'Tax ID',
+};
+
+/** Incoterms 2020 - all options the user can pick from. */
+export const INCOTERMS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'EXW', label: 'EXW \u2014 Ex Works' },
+  { value: 'FCA', label: 'FCA \u2014 Free Carrier' },
+  { value: 'CPT', label: 'CPT \u2014 Carriage Paid To' },
+  { value: 'CIP', label: 'CIP \u2014 Carriage and Insurance Paid' },
+  { value: 'DAP', label: 'DAP \u2014 Delivered at Place' },
+  { value: 'DPU', label: 'DPU \u2014 Delivered at Place Unloaded' },
+  { value: 'DDP', label: 'DDP \u2014 Delivered Duty Paid' },
+  { value: 'FAS', label: 'FAS \u2014 Free Alongside Ship (sea)' },
+  { value: 'FOB', label: 'FOB \u2014 Free On Board (sea)' },
+  { value: 'CFR', label: 'CFR \u2014 Cost and Freight (sea)' },
+  { value: 'CIF', label: 'CIF \u2014 Cost, Insurance & Freight (sea)' },
+];
+
+/** Common payment-terms presets. Free text input still allowed. */
+export const PAYMENT_TERMS_OPTIONS: string[] = [
+  '100% Advance',
+  '50% Advance, 50% on Delivery',
+  'Net 15',
+  'Net 30',
+  'Net 45',
+  'Net 60',
+  'Net 90',
+  'LC at sight',
+  'LC 30 days',
+  'LC 60 days',
+  'LC 90 days',
+];
+
+/**
+ * Default HS-code suggestions by inventory category. HS codes are 4\u20106 digit
+ * customs classification codes; user can always override.
+ */
+export const HS_CODE_BY_DEALS: Record<VendorDealsCategory, { code: string; label: string }> = {
+  METAL: { code: '7108', label: '7108 \u2014 Gold (incl. plated with platinum), unwrought' },
+  DIAMOND: { code: '7102', label: '7102 \u2014 Diamonds, whether or not worked' },
+  REAL_STONE: { code: '7103', label: '7103 \u2014 Precious / semi-precious stones' },
+  STONE_PACKET: { code: '7103', label: '7103 \u2014 Precious / semi-precious stones (packets)' },
+};
 
 export interface ManualVendorDetails {
   legalName?: string;
@@ -118,6 +233,11 @@ export interface VendorInput {
    * but stays selectable in Edit modals + transaction history).
    */
   dealsIn?: VendorDealsCategory[];
+  /**
+   * Optional foreign-vendor metadata (banking, customs, compliance). Only
+   * sent when `country !== 'India'`. Pass `null` to clear an existing blob.
+   */
+  foreignDetails?: ForeignVendorDetails | null;
 }
 
 export async function getNextVendorCode(): Promise<string> {
