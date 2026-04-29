@@ -37,6 +37,7 @@ import {
 import { useRefreshInterval } from '../../contexts/RefreshIntervalContext';
 import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 import RefreshIntervalPicker from '../../components/RefreshIntervalPicker';
+import { formatIstDate } from '../../lib/dateUtils';
 
 const METAL_OPTIONS = [
   { value: 'GOLD', label: 'Gold', symbol: 'Au', tint: 'from-amber-400 via-amber-500 to-yellow-600', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -175,7 +176,7 @@ export default function RateManagementPage() {
         r.metalType,
         `${r.purity}K`,
         r.ratePerGram,
-        new Date(r.effectiveDate).toLocaleDateString('en-IN'),
+        formatIstDate(r.effectiveDate),
         r.source ?? '',
       ]),
     ]);
@@ -281,7 +282,7 @@ export default function RateManagementPage() {
                       {fmtInr(r.ratePerGram)}
                     </p>
                     <p className="text-[11px] text-onyx-400 mt-0.5">
-                      per gram · {new Date(r.effectiveDate).toLocaleDateString('en-IN')}
+                      per gram · {formatIstDate(r.effectiveDate)}
                     </p>
                   </>
                 ) : (

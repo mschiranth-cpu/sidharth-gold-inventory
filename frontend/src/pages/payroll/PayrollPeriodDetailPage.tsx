@@ -8,6 +8,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPayrollPeriods } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function PayrollPeriodDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
@@ -56,8 +57,8 @@ export default function PayrollPeriodDetailPage() {
             {new Date(0, period.month - 1).toLocaleString('en-IN', { month: 'long' })} {period.year}
           </h1>
           <p className="text-gray-600">
-            {new Date(period.startDate).toLocaleDateString('en-IN')} -{' '}
-            {new Date(period.endDate).toLocaleDateString('en-IN')}
+            {formatIstDate(period.startDate)} -{' '}
+            {formatIstDate(period.endDate)}
           </p>
         </div>
 

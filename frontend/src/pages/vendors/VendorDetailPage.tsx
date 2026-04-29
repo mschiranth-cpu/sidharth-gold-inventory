@@ -56,6 +56,7 @@ import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import GstInfoCard from '../../components/GstInfoCard';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatIstDate } from '../../lib/dateUtils';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
 
@@ -504,7 +505,7 @@ export default function VendorDetailPage() {
     ];
     for (const r of filtered) {
       rows.push([
-        new Date(r.createdAt).toLocaleDateString('en-IN'),
+        formatIstDate(r.createdAt),
         r.domain.toUpperCase(),
         r.description,
         r.measure,
@@ -879,7 +880,7 @@ export default function VendorDetailPage() {
                             ) : null}
                           </td>
                           <td className="px-4 py-3 text-onyx-700 whitespace-nowrap align-top">
-                            {new Date(row.createdAt).toLocaleDateString('en-IN')}
+                            {formatIstDate(row.createdAt)}
                           </td>
                           <td className="px-4 py-3 align-top">
                             <span

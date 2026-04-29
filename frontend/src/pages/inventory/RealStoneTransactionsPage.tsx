@@ -28,6 +28,7 @@ import {
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditRealStoneTransactionModal from '../../components/EditRealStoneTransactionModal';
+import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 const TXN_META: Record<string, { label: string; cls: string }> = {
   PURCHASE: { label: 'Purchase', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -404,7 +405,8 @@ export default function RealStoneTransactionsPage() {
                     return (
                       <tr key={t.id} className="border-t border-champagne-100 hover:bg-pearl-50/40">
                         <td className="px-3 py-3 text-onyx-700 whitespace-nowrap">
-                          {new Date(t.createdAt).toLocaleDateString('en-IN')}
+                          <div>{formatIstDate(t.createdAt)}</div>
+                          <div className="text-xs text-onyx-300">{formatIstTime(t.createdAt)}</div>
                         </td>
                         <td className="px-3 py-3">
                           <span className={`inline-block px-2 py-0.5 text-xs rounded-full border ${meta.cls}`}>

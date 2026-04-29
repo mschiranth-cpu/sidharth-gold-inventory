@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAllAttendance } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
+import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 export default function AttendanceReportsPage() {
   const [startDate, setStartDate] = useState(
@@ -82,7 +83,7 @@ export default function AttendanceReportsPage() {
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-bold text-gray-900">Detailed Attendance Report</h2>
             <p className="text-sm text-gray-600">
-              Date: {new Date(startDate).toLocaleDateString('en-IN')}
+              Date: {formatIstDate(startDate)}
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -126,12 +127,12 @@ export default function AttendanceReportsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {record.checkInTime
-                        ? new Date(record.checkInTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkInTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {record.checkOutTime
-                        ? new Date(record.checkOutTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkOutTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">

@@ -17,6 +17,7 @@ import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditMetalTransactionModal from '../../components/EditMetalTransactionModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatIstDate, formatIstTime, istDayBoundsMs } from '../../lib/dateUtils';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
 const EDIT_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
@@ -192,8 +193,8 @@ export default function MetalTransactionsPage() {
   // Apply client-side filters.
   const filteredTransactions = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const fromTs = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
-    const toTs = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
+    const fromTs = dateFrom ? istDayBoundsMs(dateFrom)?.startMs ?? null : null;
+    const toTs = dateTo ? istDayBoundsMs(dateTo)?.endMs ?? null : null;
 
     return (transactions as any[]).filter((t) => {
       // Date range
@@ -627,12 +628,9 @@ export default function MetalTransactionsPage() {
                       />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-onyx-700">
-                      <div>{new Date(txn.createdAt).toLocaleDateString('en-IN')}</div>
+                      <div>{formatIstDate(txn.createdAt)}</div>
                       <div className="text-xs text-onyx-300">
-                        {new Date(txn.createdAt).toLocaleTimeString('en-IN', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatIstTime(txn.createdAt)}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">

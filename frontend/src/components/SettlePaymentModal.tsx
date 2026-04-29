@@ -35,6 +35,10 @@ import {
   type StonePacketPayment,
 } from '../services/stone.service';
 import Button from './common/Button';
+import {
+  combineDateWithCurrentIstTimeISO,
+  formatIstDate,
+} from '../lib/dateUtils';
 
 type Domain = 'metal' | 'diamond' | 'realStone' | 'stonePacket';
 
@@ -138,7 +142,7 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled, do
         neftAmount: paymentMode === 'BOTH' ? neftAmount : undefined,
         neftUtr: neftUtr || undefined,
         neftBank: neftBank || undefined,
-        neftDate: neftDate ? new Date(neftDate).toISOString() : undefined,
+        neftDate: neftDate ? combineDateWithCurrentIstTimeISO(neftDate) : undefined,
         notes: notes || undefined,
         creditApplied: creditApplied > 0 ? creditApplied : undefined,
       };
@@ -248,7 +252,7 @@ export default function SettlePaymentModal({ transaction, onClose, onSettled, do
                       {payments.map((p) => (
                         <tr key={p.id} className="border-t border-gray-100">
                           <td className="px-3 py-2 text-gray-700">
-                            {new Date(p.recordedAt).toLocaleDateString('en-IN')}
+                            {formatIstDate(p.recordedAt)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-gray-900">
                             ₹{fmt(p.amount)}

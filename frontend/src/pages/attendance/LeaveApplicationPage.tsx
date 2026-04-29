@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { applyLeave, getLeaves } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function LeaveApplicationPage() {
   const queryClient = useQueryClient();
@@ -150,8 +151,8 @@ export default function LeaveApplicationPage() {
                       <div>
                         <p className="font-semibold text-gray-900">{leave.leaveType}</p>
                         <p className="text-sm text-gray-600">
-                          {new Date(leave.startDate).toLocaleDateString('en-IN')} -{' '}
-                          {new Date(leave.endDate).toLocaleDateString('en-IN')}
+                          {formatIstDate(leave.startDate)} -{' '}
+                          {formatIstDate(leave.endDate)}
                         </p>
                         <p className="text-xs text-gray-500">{leave.totalDays} days</p>
                       </div>

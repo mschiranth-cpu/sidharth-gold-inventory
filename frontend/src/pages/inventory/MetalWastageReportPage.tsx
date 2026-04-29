@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { getMeltingBatches } from '../../services/metal.service';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function MetalWastageReportPage() {
   const { data: batches = [], isLoading } = useQuery({
@@ -81,7 +82,7 @@ export default function MetalWastageReportPage() {
                   <div>
                     <h3 className="font-bold text-onyx-900">{batch.batchNumber}</h3>
                     <p className="text-sm text-onyx-500">
-                      {new Date(batch.meltedAt).toLocaleDateString('en-IN')} by{' '}
+                      {formatIstDate(batch.meltedAt)} by{' '}
                       {batch.meltedBy?.name}
                     </p>
                   </div>

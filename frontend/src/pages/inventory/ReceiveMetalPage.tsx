@@ -12,6 +12,10 @@ import { listVendors, type Vendor, type VendorDealsCategory, VENDOR_DEALS_LABELS
 import Button from '../../components/common/Button';
 import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 import VendorFormModal from '../../components/VendorFormModal';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 // Red asterisk for required-field labels
 const Req = () => <span className="text-accent-ruby ml-0.5">*</span>;
@@ -41,7 +45,7 @@ export default function ReceiveMetalPage() {
     referenceNumber: '',
     notes: '',
     // Defaults to today; user can pick any date via the calendar dropdown.
-    transactionDate: new Date().toISOString().slice(0, 10),
+    transactionDate: nowIstDateString(),
     // Payment / billing
     isBillable: true,
     paymentMode: 'CASH',           // 'CASH' | 'NEFT' | 'BOTH'
@@ -164,7 +168,7 @@ export default function ReceiveMetalPage() {
       referenceNumber: formData.referenceNumber,
       isBillable: formData.isBillable,
       transactionDate: formData.transactionDate
-        ? new Date(formData.transactionDate).toISOString()
+        ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
         : undefined,
     };
     // Always send payment fields. `isBillable` is preserved on the row purely
@@ -182,7 +186,7 @@ export default function ReceiveMetalPage() {
     if (isNeft) {
       if (formData.neftUtr) payload.neftUtr = formData.neftUtr;
       if (formData.neftBank) payload.neftBank = formData.neftBank;
-      if (formData.neftDate) payload.neftDate = new Date(formData.neftDate).toISOString();
+      if (formData.neftDate) payload.neftDate = combineDateWithCurrentIstTimeISO(formData.neftDate);
     }
     createMutation.mutate(payload);
   };
@@ -344,7 +348,7 @@ export default function ReceiveMetalPage() {
                   <input
                     type="date"
                     value={formData.transactionDate}
-                    max={new Date().toISOString().slice(0, 10)}
+                    max={nowIstDateString()}
                     onChange={(e) =>
                       setFormData({ ...formData, transactionDate: e.target.value })
                     }

@@ -1,6 +1,7 @@
 import { Calendar, RefreshCw, Pencil, Check, RotateCcw } from 'lucide-react';
 import type { DashboardRange, MarketRatesPayload } from '../../../../types/dashboard.types';
 import RefreshIntervalPicker from '../../../../components/RefreshIntervalPicker';
+import { formatIstTime } from '../../../../lib/dateUtils';
 
 interface HeroBarProps {
   userName: string;
@@ -67,10 +68,7 @@ export const HeroBar = ({
             {generatedAt && (
               <>
                 {' · '}Updated{' '}
-                {new Date(generatedAt).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatIstTime(generatedAt)}
               </>
             )}
           </p>

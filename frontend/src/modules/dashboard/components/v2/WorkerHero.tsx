@@ -1,5 +1,6 @@
 import { Briefcase, CheckCircle2 } from 'lucide-react';
 import type { WorkerDashboardOverview, MarketRatesPayload } from '../../../../types/dashboard.types';
+import { formatIstTime } from '../../../../lib/dateUtils';
 
 const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -41,10 +42,7 @@ export const WorkerHero = ({
             {generatedAt && (
               <>
                 {' · '}Updated{' '}
-                {new Date(generatedAt).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatIstTime(generatedAt)}
               </>
             )}
           </p>
@@ -59,19 +57,13 @@ export const WorkerHero = ({
             {attendance.checkInTime && (
               <span className="text-champagne-300/80">
                 · in{' '}
-                {new Date(attendance.checkInTime).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatIstTime(attendance.checkInTime)}
               </span>
             )}
             {attendance.checkOutTime && (
               <span className="text-champagne-300/80">
                 · out{' '}
-                {new Date(attendance.checkOutTime).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatIstTime(attendance.checkOutTime)}
               </span>
             )}
           </div>

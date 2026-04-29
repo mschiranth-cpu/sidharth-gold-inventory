@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { checkOut } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
+import { formatIstTime } from '../../lib/dateUtils';
 
 export default function CheckOutPage() {
   const navigate = useNavigate();
@@ -153,7 +154,7 @@ export default function CheckOutPage() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
-              Current time: {new Date().toLocaleTimeString('en-IN')}
+              Current time: {formatIstTime(new Date())}
             </p>
           </div>
         </div>

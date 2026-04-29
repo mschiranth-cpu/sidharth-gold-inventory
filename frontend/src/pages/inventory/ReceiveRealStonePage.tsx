@@ -21,6 +21,10 @@ import { type Vendor } from '../../services/vendor.service';
 import Button from '../../components/common/Button';
 import LiveRealStoneRatesCard from '../../components/LiveRealStoneRatesCard';
 import { VendorSelector, BillingPaymentCard } from './ReceiveMetalPage';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 const STONE_TYPES = [
   'RUBY', 'EMERALD', 'SAPPHIRE', 'TANZANITE', 'TOURMALINE',
@@ -62,7 +66,7 @@ export default function ReceiveRealStonePage() {
   const queryClient = useQueryClient();
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [referenceNumber, setReferenceNumber] = useState('');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [transactionDate, setTransactionDate] = useState(nowIstDateString());
   const [items, setItems] = useState<PurchaseItem[]>([blankItem()]);
   const [formData, setFormData] = useState({
     isBillable: true,
@@ -159,7 +163,7 @@ export default function ReceiveRealStonePage() {
       createRealStonePurchase({
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
-        transactionDate: transactionDate ? new Date(transactionDate).toISOString() : undefined,
+        transactionDate: transactionDate ? combineDateWithCurrentIstTimeISO(transactionDate) : undefined,
         items: items.map((it) => ({
           ...it,
           totalValue: it.caratWeight * it.pricePerCarat,
@@ -174,7 +178,7 @@ export default function ReceiveRealStonePage() {
               neftAmount: formData.paymentMode === 'BOTH' ? formData.neftAmount : undefined,
               neftUtr: formData.neftUtr || undefined,
               neftBank: formData.neftBank || undefined,
-              neftDate: formData.neftDate ? new Date(formData.neftDate).toISOString() : undefined,
+              neftDate: formData.neftDate ? combineDateWithCurrentIstTimeISO(formData.neftDate) : undefined,
               creditApplied: formData.creditApplied > 0 ? formData.creditApplied : undefined,
             }
           : {}),
@@ -265,7 +269,7 @@ export default function ReceiveRealStonePage() {
                 <input
                   type="date"
                   value={transactionDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={nowIstDateString()}
                   onChange={(e) => setTransactionDate(e.target.value)}
                   className={inputCls}
                 />

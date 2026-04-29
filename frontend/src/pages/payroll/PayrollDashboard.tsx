@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPayrollPeriods } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function PayrollDashboard() {
   const { data: periods = [], isLoading } = useQuery({
@@ -48,8 +49,8 @@ export default function PayrollDashboard() {
                     {period.year}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {new Date(period.startDate).toLocaleDateString('en-IN')} -{' '}
-                    {new Date(period.endDate).toLocaleDateString('en-IN')}
+                    {formatIstDate(period.startDate)} -{' '}
+                    {formatIstDate(period.endDate)}
                   </p>
                   <p className="text-sm text-gray-600">Working Days: {period.workingDays}</p>
                 </div>

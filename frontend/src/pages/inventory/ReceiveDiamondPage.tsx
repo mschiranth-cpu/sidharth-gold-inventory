@@ -21,6 +21,10 @@ import { type Vendor } from '../../services/vendor.service';
 import Button from '../../components/common/Button';
 import LiveDiamondRatesCard from '../../components/LiveDiamondRatesCard';
 import { VendorSelector, BillingPaymentCard } from './ReceiveMetalPage';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 const SHAPES = [
   'ROUND',
@@ -67,7 +71,7 @@ export default function ReceiveDiamondPage() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [transactionDate, setTransactionDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    nowIstDateString()
   );
   const [items, setItems] = useState<PurchaseItem[]>([blankItem()]);
   const [formData, setFormData] = useState({
@@ -183,7 +187,7 @@ export default function ReceiveDiamondPage() {
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
         transactionDate: transactionDate
-          ? new Date(transactionDate).toISOString()
+          ? combineDateWithCurrentIstTimeISO(transactionDate)
           : undefined,
         items: items.map((it) => ({
           ...it,
@@ -206,7 +210,7 @@ export default function ReceiveDiamondPage() {
               neftUtr: formData.neftUtr || undefined,
               neftBank: formData.neftBank || undefined,
               neftDate: formData.neftDate
-                ? new Date(formData.neftDate).toISOString()
+                ? combineDateWithCurrentIstTimeISO(formData.neftDate)
                 : undefined,
               creditApplied:
                 formData.creditApplied > 0 ? formData.creditApplied : undefined,
@@ -308,7 +312,7 @@ export default function ReceiveDiamondPage() {
                 <input
                   type="date"
                   value={transactionDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={nowIstDateString()}
                   onChange={(e) => setTransactionDate(e.target.value)}
                   className={inputCls}
                 />

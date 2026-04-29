@@ -15,6 +15,11 @@ import {
   type RealStoneTransaction,
 } from '../services/stone.service';
 import { getVendor, listVendors, type Vendor } from '../services/vendor.service';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+  toIstDateInputValue,
+} from '../lib/dateUtils';
 import Button from './common/Button';
 import LiveRealStoneRatesCard from './LiveRealStoneRatesCard';
 import { VendorSelector, BillingPaymentCard } from '../pages/inventory/ReceiveMetalPage';
@@ -67,10 +72,8 @@ const SHAPES = [
 const QUALITIES = ['AAA', 'AA', 'A', 'B', 'COMMERCIAL'];
 
 function isoToDateInput(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
+  // IST-aware: see dateUtils.ts.
+  return toIstDateInputValue(iso);
 }
 
 function stripVendorTag(notes: string | null | undefined): string {
@@ -185,7 +188,7 @@ export default function EditRealStoneTransactionModal({
         referenceNumber: formData.referenceNumber,
         isBillable: isPurchase ? formData.isBillable : false,
         transactionDate: formData.transactionDate
-          ? new Date(formData.transactionDate).toISOString()
+          ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
           : undefined,
       };
 
@@ -202,7 +205,7 @@ export default function EditRealStoneTransactionModal({
           payload.neftUtr = formData.neftUtr || '';
           payload.neftBank = formData.neftBank || '';
           payload.neftDate = formData.neftDate
-            ? new Date(formData.neftDate).toISOString()
+            ? combineDateWithCurrentIstTimeISO(formData.neftDate)
             : '';
         }
       }
@@ -405,7 +408,7 @@ export default function EditRealStoneTransactionModal({
                 <input
                   type="date"
                   value={formData.transactionDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={nowIstDateString()}
                   onChange={(e) =>
                     setFormData({ ...formData, transactionDate: e.target.value })
                   }

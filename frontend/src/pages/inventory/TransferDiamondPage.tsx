@@ -18,6 +18,10 @@ import {
   type Diamond,
 } from '../../services/diamond.service';
 import Button from '../../components/common/Button';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 export default function TransferDiamondPage() {
   const navigate = useNavigate();
@@ -27,7 +31,7 @@ export default function TransferDiamondPage() {
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [transactionDate, setTransactionDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    nowIstDateString()
   );
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +51,7 @@ export default function TransferDiamondPage() {
         toLocation,
         notes: notes || undefined,
         transactionDate: transactionDate
-          ? new Date(transactionDate).toISOString()
+          ? combineDateWithCurrentIstTimeISO(transactionDate)
           : undefined,
       }),
     onSuccess: () => {
@@ -175,7 +179,7 @@ export default function TransferDiamondPage() {
             <input
               type="date"
               value={transactionDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={nowIstDateString()}
               onChange={(e) => setTransactionDate(e.target.value)}
               className={inputCls}
             />

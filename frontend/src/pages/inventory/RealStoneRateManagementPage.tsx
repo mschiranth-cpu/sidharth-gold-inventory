@@ -16,6 +16,7 @@ import {
   type RealStoneRate,
 } from '../../services/stone.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 const STONE_TYPES = [
   'RUBY',
@@ -246,7 +247,7 @@ export default function RealStoneRateManagementPage() {
                         ₹{fmt(r.pricePerCarat)}
                       </td>
                       <td className="px-4 py-2 text-right text-xs text-onyx-400">
-                        {new Date(r.effectiveDate).toLocaleDateString('en-IN')}
+                        {formatIstDate(r.effectiveDate)}
                       </td>
                       <td className="px-4 py-2 text-xs text-onyx-500">{r.source ?? '—'}</td>
                       <td className="px-4 py-2 text-xs text-onyx-500">{r.createdBy?.name ?? '—'}</td>

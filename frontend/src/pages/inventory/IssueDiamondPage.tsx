@@ -21,6 +21,10 @@ import {
   type Diamond,
 } from '../../services/diamond.service';
 import Button from '../../components/common/Button';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 interface FormState {
   diamondId: string;
@@ -52,7 +56,7 @@ export default function IssueDiamondPage() {
     quantityPieces: 1,
     caratWeight: 0,
     notes: '',
-    transactionDate: new Date().toISOString().slice(0, 10),
+    transactionDate: nowIstDateString(),
   });
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -103,7 +107,7 @@ export default function IssueDiamondPage() {
         caratWeight: isParcel ? form.caratWeight : undefined,
         notes: form.notes || undefined,
         transactionDate: form.transactionDate
-          ? new Date(form.transactionDate).toISOString()
+          ? combineDateWithCurrentIstTimeISO(form.transactionDate)
           : undefined,
       }),
     onSuccess: () => {
@@ -301,7 +305,7 @@ export default function IssueDiamondPage() {
             <input
               type="date"
               value={form.transactionDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={nowIstDateString()}
               onChange={(e) => setForm({ ...form, transactionDate: e.target.value })}
               className={inputCls}
             />

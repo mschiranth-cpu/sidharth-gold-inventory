@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAllAttendance } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
+import { formatIstTime } from '../../lib/dateUtils';
 
 export default function AdminAttendancePage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0] || '');
@@ -156,12 +157,12 @@ export default function AdminAttendancePage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                       {record.checkInTime
-                        ? new Date(record.checkInTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkInTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                       {record.checkOutTime
-                        ? new Date(record.checkOutTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkOutTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">

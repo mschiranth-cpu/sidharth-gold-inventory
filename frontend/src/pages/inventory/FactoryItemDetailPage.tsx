@@ -8,6 +8,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFactoryItemById } from '../../services/factory.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function FactoryItemDetailPage() {
   const { itemId } = useParams<{ itemId: string }>();
@@ -130,7 +131,7 @@ export default function FactoryItemDetailPage() {
                           <p className="text-sm text-gray-600">Quantity: {txn.quantity}</p>
                         </div>
                         <p className="text-xs text-gray-500">
-                          {new Date(txn.createdAt).toLocaleDateString('en-IN')}
+                          {formatIstDate(txn.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -179,7 +180,7 @@ export default function FactoryItemDetailPage() {
                     <div key={log.id} className="p-3 bg-gray-50 rounded-xl">
                       <p className="text-sm font-semibold text-gray-900">{log.maintenanceType}</p>
                       <p className="text-xs text-gray-600">
-                        {new Date(log.performedAt).toLocaleDateString('en-IN')}
+                        {formatIstDate(log.performedAt)}
                       </p>
                     </div>
                   ))}

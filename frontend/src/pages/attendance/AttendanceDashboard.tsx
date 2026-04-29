@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMyAttendance } from '../../services/attendance.service';
 import Button from '../../components/common/Button';
+import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 export default function AttendanceDashboard() {
   const today = new Date();
@@ -168,16 +169,16 @@ export default function AttendanceDashboard() {
                 {attendance.map((record: any) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">
-                      {new Date(record.date).toLocaleDateString('en-IN')}
+                      {formatIstDate(record.date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                       {record.checkInTime
-                        ? new Date(record.checkInTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkInTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                       {record.checkOutTime
-                        ? new Date(record.checkOutTime).toLocaleTimeString('en-IN')
+                        ? formatIstTime(record.checkOutTime)
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-900">

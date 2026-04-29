@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentRealStoneRates, type RealStoneRate } from '../services/stone.service';
+import { formatIstDate } from '../lib/dateUtils';
 
 interface Props {
   selectedStoneType?: string;
@@ -115,7 +116,7 @@ export default function LiveRealStoneRatesCard({
                         ₹{fmt(r.pricePerCarat)}
                       </td>
                       <td className="px-2 py-1.5 text-right text-xs text-onyx-400">
-                        {new Date(r.effectiveDate).toLocaleDateString('en-IN')}
+                        {formatIstDate(r.effectiveDate)}
                       </td>
                     </tr>
                   );

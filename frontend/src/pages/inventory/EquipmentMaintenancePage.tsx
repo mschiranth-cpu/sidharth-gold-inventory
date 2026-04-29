@@ -11,6 +11,7 @@ import {
   createEquipmentMaintenance,
 } from '../../services/factory.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function EquipmentMaintenancePage() {
   const queryClient = useQueryClient();
@@ -209,12 +210,12 @@ export default function EquipmentMaintenancePage() {
                   </div>
                   <p className="text-sm text-gray-700 mb-2">{log.description}</p>
                   <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>Performed: {new Date(log.performedAt).toLocaleDateString('en-IN')}</span>
+                    <span>Performed: {formatIstDate(log.performedAt)}</span>
                     {log.performedBy && <span>By: {log.performedBy}</span>}
                     {log.cost && <span>Cost: ₹{log.cost.toLocaleString('en-IN')}</span>}
                     {log.nextDueDate && (
                       <span className="text-amber-600">
-                        Next Due: {new Date(log.nextDueDate).toLocaleDateString('en-IN')}
+                        Next Due: {formatIstDate(log.nextDueDate)}
                       </span>
                     )}
                   </div>

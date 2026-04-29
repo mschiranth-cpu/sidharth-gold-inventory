@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentDiamondRates, type DiamondRate } from '../services/diamond.service';
+import { formatIstDate } from '../lib/dateUtils';
 
 interface Props {
   selectedShape?: string;
@@ -123,7 +124,7 @@ export default function LiveDiamondRatesCard({
                         ₹{fmt(r.pricePerCarat)}
                       </td>
                       <td className="px-2 py-1.5 text-right text-xs text-onyx-400">
-                        {new Date(r.effectiveDate).toLocaleDateString('en-IN')}
+                        {formatIstDate(r.effectiveDate)}
                       </td>
                     </tr>
                   );

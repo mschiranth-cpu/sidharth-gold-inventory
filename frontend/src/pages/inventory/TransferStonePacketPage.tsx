@@ -15,6 +15,10 @@ import {
   type StonePacket,
 } from '../../services/stone.service';
 import Button from '../../components/common/Button';
+import {
+  combineDateWithCurrentIstTimeISO,
+  nowIstDateString,
+} from '../../lib/dateUtils';
 
 export default function TransferStonePacketPage() {
   const navigate = useNavigate();
@@ -23,7 +27,7 @@ export default function TransferStonePacketPage() {
   const [packetId, setPacketId] = useState('');
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [transactionDate, setTransactionDate] = useState(nowIstDateString());
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +45,7 @@ export default function TransferStonePacketPage() {
         fromLocation: fromLocation || undefined,
         toLocation,
         notes: notes || undefined,
-        transactionDate: transactionDate ? new Date(transactionDate).toISOString() : undefined,
+        transactionDate: transactionDate ? combineDateWithCurrentIstTimeISO(transactionDate) : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stone-packet-transactions'] });
@@ -157,7 +161,7 @@ export default function TransferStonePacketPage() {
             <input
               type="date"
               value={transactionDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={nowIstDateString()}
               onChange={(e) => setTransactionDate(e.target.value)}
               className={inputCls}
             />

@@ -7,6 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getMyPayslips } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { formatIstDate } from '../../lib/dateUtils';
 
 export default function MyPayslipsPage() {
   const { data: payslips = [], isLoading } = useQuery({
@@ -45,8 +46,8 @@ export default function MyPayslipsPage() {
                     {payslip.period.year}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {new Date(payslip.period.startDate).toLocaleDateString('en-IN')} -{' '}
-                    {new Date(payslip.period.endDate).toLocaleDateString('en-IN')}
+                    {formatIstDate(payslip.period.startDate)} -{' '}
+                    {formatIstDate(payslip.period.endDate)}
                   </p>
                 </div>
                 <span
