@@ -224,8 +224,23 @@ export default function ReceiveDiamondPage() {
           }
           if (rest.notes?.trim()) noteParts.push(rest.notes.trim());
           const composedNotes = noteParts.join(' ').trim();
+          // LOOSE: backend requires BOTH `colorBand` (the range, e.g. "G-H")
+          // AND `color` (a single DiamondColor enum letter — schema column is
+          // an enum, not free string). The dropdown stores the range in
+          // `it.color`; split it into a lower-bound enum letter for `color`
+          // and forward the full range as `colorBand`. Without this the
+          // server returns 400 "colorBand is required for LOOSE diamonds".
+          let resolvedColor = rest.color;
+          let resolvedColorBand: string | undefined;
+          if (it.category === 'LOOSE') {
+            resolvedColorBand = rest.color;
+            const lower = rest.color.split(/[-/]/)[0]?.trim();
+            if (lower) resolvedColor = lower;
+          }
           return {
             ...rest,
+            color: resolvedColor,
+            colorBand: resolvedColorBand,
             shape: finalShape,
             notes: composedNotes || undefined,
             totalValue: it.caratWeight * it.pricePerCarat,
@@ -274,7 +289,20 @@ export default function ReceiveDiamondPage() {
     const v = validate();
     setErrors(v);
     setServerError(null);
-    if (Object.keys(v).length > 0) return;
+    if (Object.keys(v).length > 0) {
+      // Surface the validation failure: scroll the form back to the first error
+      // so a user clicking "Record Purchase" at the bottom doesn't see a silent
+      // no-op when the failing field is off-screen (vendor / items card).
+      requestAnimationFrame(() => {
+        const firstErr = document.querySelector<HTMLElement>('[data-error="true"]');
+        if (firstErr) {
+          firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+      return;
+    }
     submit.mutate();
   };
 
@@ -374,7 +402,10 @@ export default function ReceiveDiamondPage() {
             </div>
 
             {errors.items && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-accent-ruby/10 text-accent-ruby text-sm">
+              <div
+                data-error="true"
+                className="mb-3 px-3 py-2 rounded-lg bg-accent-ruby/10 text-accent-ruby text-sm"
+              >
                 {errors.items}
               </div>
             )}
@@ -655,6 +686,23 @@ export default function ReceiveDiamondPage() {
           {serverError && (
             <div className="px-4 py-3 rounded-xl bg-accent-ruby/10 border border-accent-ruby/30 text-accent-ruby text-sm">
               {serverError}
+            </div>
+          )}
+
+          {Object.keys(errors).length > 0 && (
+            <div
+              role="alert"
+              className="px-4 py-3 rounded-xl bg-accent-ruby/10 border border-accent-ruby/30 text-accent-ruby text-sm"
+            >
+              <div className="font-semibold mb-1">Please fix the following before recording:</div>
+              <ul className="list-disc pl-5 space-y-0.5">
+                {errors.vendor && <li>{errors.vendor}</li>}
+                {errors.items && <li>{errors.items}</li>}
+                {errors.paymentMode && <li>{errors.paymentMode}</li>}
+                {errors.paymentStatus && <li>{errors.paymentStatus}</li>}
+                {errors.amountPaid && <li>{errors.amountPaid}</li>}
+                {errors.paymentSplit && <li>{errors.paymentSplit}</li>}
+              </ul>
             </div>
           )}
 
