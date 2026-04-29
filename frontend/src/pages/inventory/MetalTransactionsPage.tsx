@@ -10,6 +10,7 @@ import {
   deleteMetalTransaction,
   exportMetalTransactionsXlsx,
   getAllMetalTransactions,
+  settleMetalPayment,
   type MetalTransaction,
 } from '../../services/metal.service';
 import { Link } from 'react-router-dom';
@@ -158,6 +159,8 @@ export default function MetalTransactionsPage() {
   const [deleteTxn, setDeleteTxn] = useState<MetalTransaction | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
 
   const toggleOne = (id: string) => {
     setSelectedIds((prev) => {
@@ -527,38 +530,75 @@ export default function MetalTransactionsPage() {
 
         {/* Transactions Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-champagne-200 overflow-hidden">
-          {selectedInView.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-champagne-50 border-b border-champagne-100">
-              <div className="text-sm text-onyx-900">
-                <span className="font-semibold">{selectedInView.length}</span>{' '}
-                selected
-                {filteredIds.length !== selectedInView.length && (
-                  <span className="text-champagne-800">
-                    {' '}
-                    · {filteredIds.length} in current view
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {!allFilteredSelected && (
+          {selectedInView.length > 0 && (() => {
+            // Selectable rows visible in the current view, partitioned by
+            // bulk-action eligibility so the toolbar can show accurate counts
+            // ("Settle 3" reflects only PURCHASE+HALF/PENDING with a vendor).
+            const selectedRows = filteredTransactions.filter((t: any) =>
+              selectedIds.has(t.id)
+            );
+            const settleableSelected = selectedRows.filter(
+              (t: any) =>
+                t.transactionType === 'PURCHASE' &&
+                t.vendor?.id &&
+                (t.paymentStatus === 'HALF' ||
+                  t.paymentStatus === 'PENDING' ||
+                  !t.paymentStatus)
+            );
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-champagne-50 border-b border-champagne-100">
+                <div className="text-sm text-onyx-900">
+                  <span className="font-semibold">{selectedInView.length}</span>{' '}
+                  selected
+                  {filteredIds.length !== selectedInView.length && (
+                    <span className="text-champagne-800">
+                      {' '}
+                      · {filteredIds.length} in current view
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {canSettle && settleableSelected.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkSettleOpen(true)}
+                      className="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5"
+                      aria-label={`Settle ${settleableSelected.length} selected payments`}
+                    >
+                      <span aria-hidden="true">₹</span>
+                      Settle {settleableSelected.length}
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkDeleteOpen(true)}
+                      className="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-accent-ruby hover:bg-accent-ruby/90 transition-colors"
+                      aria-label={`Delete ${selectedInView.length} selected transactions`}
+                    >
+                      Delete {selectedInView.length}
+                    </button>
+                  )}
+                  {!allFilteredSelected && (
+                    <button
+                      type="button"
+                      onClick={selectAllFiltered}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-champagne-700 hover:bg-champagne-800 transition-colors"
+                    >
+                      Select all {filteredIds.length}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={selectAllFiltered}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-champagne-700 hover:bg-champagne-800 transition-colors"
+                    onClick={deselectAllFiltered}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-champagne-800 bg-white border border-champagne-200 hover:bg-champagne-50 transition-colors"
                   >
-                    Select all {filteredIds.length}
+                    Deselect all
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={deselectAllFiltered}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-champagne-800 bg-white border border-champagne-200 hover:bg-champagne-50 transition-colors"
-                >
-                  Deselect all
-                </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gradient-to-r from-slate-100 to-slate-50 sticky top-0 z-10">
@@ -784,6 +824,51 @@ export default function MetalTransactionsPage() {
             setDeleteError(null);
           }}
           onConfirm={() => deleteMutation.mutate(deleteTxn.id)}
+        />
+      )}
+      {bulkDeleteOpen && (
+        <BulkDeleteModal
+          rows={filteredTransactions.filter((t: any) => selectedIds.has(t.id))}
+          onCancel={() => setBulkDeleteOpen(false)}
+          onDone={(failedIds) => {
+            // Keep failed rows selected so the user can investigate them;
+            // drop everything that succeeded.
+            setSelectedIds((prev) => {
+              const next = new Set<string>();
+              for (const id of prev) if (failedIds.has(id)) next.add(id);
+              return next;
+            });
+            setBulkDeleteOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['metal-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['metal-stock-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['metal-stock'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors'] });
+          }}
+        />
+      )}
+      {bulkSettleOpen && (
+        <BulkSettleModal
+          rows={filteredTransactions.filter(
+            (t: any) =>
+              selectedIds.has(t.id) &&
+              t.transactionType === 'PURCHASE' &&
+              t.vendor?.id &&
+              (t.paymentStatus === 'HALF' ||
+                t.paymentStatus === 'PENDING' ||
+                !t.paymentStatus)
+          )}
+          onCancel={() => setBulkSettleOpen(false)}
+          onDone={(failedIds) => {
+            setSelectedIds((prev) => {
+              const next = new Set<string>();
+              for (const id of prev) if (failedIds.has(id)) next.add(id);
+              return next;
+            });
+            setBulkSettleOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['metal-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors-outstanding'] });
+            queryClient.invalidateQueries({ queryKey: ['vendors'] });
+          }}
         />
       )}
     </div>
@@ -1088,6 +1173,480 @@ function ExportMenu({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// BULK DELETE MODAL
+// ----------------------------------------------------------------------------
+// Deletes multiple selected transactions sequentially. Some rows may be
+// rejected by the backend (e.g. PURCHASE rows with settled payments) — we
+// surface per-row errors and keep failed rows selected so the user can act
+// on them.
+// ============================================================================
+function BulkDeleteModal({
+  rows,
+  onCancel,
+  onDone,
+}: {
+  rows: any[];
+  onCancel: () => void;
+  onDone: (failedIds: Set<string>) => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [errors, setErrors] = useState<{ id: string; ref: string; msg: string }[]>([]);
+  const total = rows.length;
+
+  // Quick breakdown so the user knows what they're about to delete.
+  const summary = useMemo(() => {
+    const byType: Record<string, number> = {};
+    let purchaseValue = 0;
+    let withSettlements = 0;
+    for (const t of rows) {
+      const k = String(t.transactionType ?? '').replace(/_/g, ' ');
+      byType[k] = (byType[k] ?? 0) + 1;
+      if (t.transactionType === 'PURCHASE') {
+        purchaseValue += t.totalValue ?? 0;
+        if ((t.amountPaid ?? 0) > 0) withSettlements += 1;
+      }
+    }
+    return { byType, purchaseValue, withSettlements };
+  }, [rows]);
+
+  const run = async () => {
+    setRunning(true);
+    setErrors([]);
+    setDone(0);
+    const failed: { id: string; ref: string; msg: string }[] = [];
+    // Sequential to avoid overwhelming the backend / racing stock updates.
+    for (const t of rows) {
+      try {
+        await deleteMetalTransaction(t.id);
+      } catch (e: any) {
+        failed.push({
+          id: t.id,
+          ref: t.referenceNumber ?? t.id.slice(0, 8),
+          msg:
+            e?.response?.data?.error?.message ||
+            e?.message ||
+            'Failed to delete',
+        });
+      }
+      setDone((n) => n + 1);
+    }
+    setErrors(failed);
+    setRunning(false);
+    if (failed.length === 0) {
+      onDone(new Set());
+    }
+    // Else leave the modal open so the user can read the errors. They close
+    // it manually with the Done button below.
+  };
+
+  const close = () => onDone(new Set(errors.map((e) => e.id)));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={running ? undefined : onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-gray-200 flex items-start gap-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-accent-ruby" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-onyx-900">
+              Delete {total} {total === 1 ? 'transaction' : 'transactions'}?
+            </h2>
+            <p className="text-sm text-onyx-500 mt-1">
+              Stock balances and vendor credits will be re-balanced for each row. This cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-3">
+          {/* Type breakdown */}
+          <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm space-y-1">
+            {Object.entries(summary.byType).map(([k, n]) => (
+              <div key={k} className="flex items-center justify-between text-onyx-700">
+                <span>{k}</span>
+                <span className="font-semibold">{n}</span>
+              </div>
+            ))}
+            {summary.purchaseValue > 0 && (
+              <div className="flex items-center justify-between text-onyx-500 text-xs pt-1 mt-1 border-t border-slate-200">
+                <span>Total purchase value affected</span>
+                <span>₹{summary.purchaseValue.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+          </div>
+
+          {summary.withSettlements > 0 && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+              <strong>{summary.withSettlements}</strong> selected purchase{summary.withSettlements === 1 ? ' has' : 's have'} recorded payments. The backend will reject those — they'll stay selected so you can void the settlements first.
+            </div>
+          )}
+
+          {running && (
+            <div className="rounded-lg bg-champagne-50 border border-champagne-200 p-3">
+              <div className="flex items-center justify-between text-xs text-onyx-600 mb-2">
+                <span>Deleting…</span>
+                <span className="font-mono">{done} / {total}</span>
+              </div>
+              <div className="h-2 bg-white rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent-ruby transition-all duration-200"
+                  style={{ width: `${(done / Math.max(total, 1)) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!running && errors.length > 0 && (
+            <div className="rounded-lg bg-rose-50 border border-accent-ruby/30 p-3 max-h-48 overflow-y-auto">
+              <p className="text-xs font-semibold text-accent-ruby mb-2">
+                {errors.length} of {total} could not be deleted:
+              </p>
+              <ul className="text-xs text-onyx-700 space-y-1">
+                {errors.map((e) => (
+                  <li key={e.id}>
+                    <span className="font-mono">{e.ref}</span> — {e.msg}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+          {!running && errors.length === 0 && (
+            <>
+              <Button type="button" variant="secondary" onClick={onCancel}>
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={run}
+                className="px-4 py-2 rounded-xl bg-accent-ruby hover:bg-accent-ruby/90 text-white font-medium min-h-[44px]"
+              >
+                Delete {total} {total === 1 ? 'transaction' : 'transactions'}
+              </button>
+            </>
+          )}
+          {!running && errors.length > 0 && (
+            <button
+              type="button"
+              onClick={close}
+              className="px-4 py-2 rounded-xl bg-onyx-700 hover:bg-onyx-800 text-white font-medium min-h-[44px]"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// BULK SETTLE MODAL
+// ----------------------------------------------------------------------------
+// Settles partial/pending PURCHASE rows in bulk against their respective
+// vendors. Each row gets its own input (defaulted to balance due) so the
+// user can apply different amounts per row. A shared payment mode + notes
+// applies to all rows. Submitting issues one settleMetalPayment call per
+// row sequentially; per-row errors are surfaced and failed rows stay
+// selected.
+// NEFT-with-UTR is intentionally NOT bulk-settleable (each NEFT typically
+// has its own UTR / bank reference). Use the per-row Settle button for those.
+// ============================================================================
+function BulkSettleModal({
+  rows,
+  onCancel,
+  onDone,
+}: {
+  rows: any[];
+  onCancel: () => void;
+  onDone: (failedIds: Set<string>) => void;
+}) {
+  // Per-row input value (string for controlled input; coerced on submit).
+  const [amounts, setAmounts] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const t of rows) {
+      const due = Math.max(0, (t.totalValue ?? 0) - (t.amountPaid ?? 0));
+      init[t.id] = due.toFixed(2);
+    }
+    return init;
+  });
+  const [paymentMode] = useState<'CASH'>('CASH'); // bulk path is CASH-only
+  const [notes, setNotes] = useState('');
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [errors, setErrors] = useState<{ id: string; ref: string; msg: string }[]>([]);
+
+  const total = rows.length;
+  // Group rows by vendor for clearer display.
+  const groups = useMemo(() => {
+    const map = new Map<string, { vendor: any; items: any[]; totalDue: number }>();
+    for (const t of rows) {
+      const k = t.vendor.id;
+      if (!map.has(k)) {
+        map.set(k, { vendor: t.vendor, items: [], totalDue: 0 });
+      }
+      const g = map.get(k)!;
+      g.items.push(t);
+      g.totalDue += Math.max(0, (t.totalValue ?? 0) - (t.amountPaid ?? 0));
+    }
+    return Array.from(map.values());
+  }, [rows]);
+
+  const grandTotal = useMemo(
+    () =>
+      Object.values(amounts).reduce(
+        (s, v) => s + (Number(v) || 0),
+        0
+      ),
+    [amounts]
+  );
+
+  const run = async () => {
+    setRunning(true);
+    setErrors([]);
+    setDone(0);
+    const failed: { id: string; ref: string; msg: string }[] = [];
+    for (const t of rows) {
+      const amt = Number(amounts[t.id] || '0');
+      if (amt <= 0) {
+        // Skipped — user explicitly zeroed; treat as success (don't keep selected).
+        setDone((n) => n + 1);
+        continue;
+      }
+      try {
+        await settleMetalPayment(t.id, {
+          amount: amt,
+          paymentMode,
+          notes: notes || undefined,
+        });
+      } catch (e: any) {
+        failed.push({
+          id: t.id,
+          ref: t.referenceNumber ?? t.id.slice(0, 8),
+          msg:
+            e?.response?.data?.error?.message ||
+            e?.message ||
+            'Failed to settle',
+        });
+      }
+      setDone((n) => n + 1);
+    }
+    setErrors(failed);
+    setRunning(false);
+    if (failed.length === 0) {
+      onDone(new Set());
+    }
+  };
+
+  const close = () => onDone(new Set(errors.map((e) => e.id)));
+
+  const fmt = (n: number) =>
+    `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
+      onClick={running ? undefined : onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-gray-200 flex items-start gap-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+            <span className="text-2xl text-emerald-700 leading-none">₹</span>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-onyx-900">
+              Settle {total} {total === 1 ? 'payment' : 'payments'}
+            </h2>
+            <p className="text-sm text-onyx-500 mt-1">
+              Records a CASH settlement against each row. Adjust per-row amounts as needed.
+              For NEFT settlements with UTR/bank refs, use the per-row Settle button instead.
+            </p>
+          </div>
+          {!running && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-onyx-300 hover:text-onyx-500 text-2xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {groups.map((g) => (
+            <div key={g.vendor.id} className="rounded-xl border border-champagne-200 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-champagne-50/60 border-b border-champagne-100">
+                <div className="min-w-0">
+                  <div className="font-semibold text-onyx-900 truncate">
+                    {g.vendor.name}
+                  </div>
+                  <div className="text-[11px] font-mono text-onyx-400">
+                    {g.vendor.uniqueCode}
+                  </div>
+                </div>
+                <div className="text-xs text-onyx-500 text-right">
+                  <div>{g.items.length} {g.items.length === 1 ? 'txn' : 'txns'}</div>
+                  <div className="font-semibold text-onyx-700">{fmt(g.totalDue)} due</div>
+                </div>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-[11px] text-onyx-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold">Reference</th>
+                    <th className="px-3 py-2 text-left font-semibold">Metal</th>
+                    <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2 text-right font-semibold">Paid</th>
+                    <th className="px-3 py-2 text-right font-semibold">Due</th>
+                    <th className="px-3 py-2 text-right font-semibold">Settle now</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {g.items.map((t: any) => {
+                    const due = Math.max(
+                      0,
+                      (t.totalValue ?? 0) - (t.amountPaid ?? 0)
+                    );
+                    return (
+                      <tr key={t.id}>
+                        <td className="px-3 py-2 text-onyx-700 font-mono text-xs">
+                          {t.referenceNumber ?? t.id.slice(0, 8)}
+                        </td>
+                        <td className="px-3 py-2 text-onyx-700">
+                          {t.metalType} {t.purity}K
+                        </td>
+                        <td className="px-3 py-2 text-right text-onyx-700">
+                          {fmt(t.totalValue ?? 0)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-emerald-700">
+                          {fmt(t.amountPaid ?? 0)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-amber-700 font-semibold">
+                          {fmt(due)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            min={0}
+                            max={due}
+                            step="0.01"
+                            value={amounts[t.id] ?? ''}
+                            disabled={running}
+                            onChange={(e) =>
+                              setAmounts((prev) => ({
+                                ...prev,
+                                [t.id]: e.target.value,
+                              }))
+                            }
+                            className="w-28 px-2 py-1 rounded border border-champagne-300 text-sm text-right focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+
+          <div>
+            <label className="block text-xs font-semibold text-onyx-500 uppercase tracking-wider mb-1">
+              Notes (applied to all settlements)
+            </label>
+            <input
+              type="text"
+              value={notes}
+              disabled={running}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Bulk cash settlement"
+              className="w-full px-3 py-2 rounded-xl border border-champagne-300 text-sm focus:ring-2 focus:ring-champagne-500 focus:border-champagne-500 outline-none"
+            />
+          </div>
+
+          {running && (
+            <div className="rounded-lg bg-champagne-50 border border-champagne-200 p-3">
+              <div className="flex items-center justify-between text-xs text-onyx-600 mb-2">
+                <span>Settling…</span>
+                <span className="font-mono">{done} / {total}</span>
+              </div>
+              <div className="h-2 bg-white rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-600 transition-all duration-200"
+                  style={{ width: `${(done / Math.max(total, 1)) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!running && errors.length > 0 && (
+            <div className="rounded-lg bg-rose-50 border border-accent-ruby/30 p-3 max-h-48 overflow-y-auto">
+              <p className="text-xs font-semibold text-accent-ruby mb-2">
+                {errors.length} of {total} could not be settled:
+              </p>
+              <ul className="text-xs text-onyx-700 space-y-1">
+                {errors.map((e) => (
+                  <li key={e.id}>
+                    <span className="font-mono">{e.ref}</span> — {e.msg}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3">
+          <div className="text-sm text-onyx-700">
+            Total to settle:{' '}
+            <span className="font-bold text-emerald-700">{fmt(grandTotal)}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {!running && errors.length === 0 && (
+              <>
+                <Button type="button" variant="secondary" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <button
+                  type="button"
+                  onClick={run}
+                  disabled={grandTotal <= 0}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white font-medium min-h-[44px]"
+                >
+                  Settle {fmt(grandTotal)}
+                </button>
+              </>
+            )}
+            {!running && errors.length > 0 && (
+              <button
+                type="button"
+                onClick={close}
+                className="px-4 py-2 rounded-xl bg-onyx-700 hover:bg-onyx-800 text-white font-medium min-h-[44px]"
+              >
+                Done
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
