@@ -36,6 +36,7 @@ function gstCacheSet(key: string, data: any) {
 
 // ---------- Helpers ----------
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 const STATE_CODES: Record<string, string> = {
   '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
@@ -566,7 +567,7 @@ router.post(
   '/',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, gstNumber, address, manualDetails } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails } = req.body || {};
     if (!name) {
       return res.status(400).json({ success: false, error: 'name is required' });
     }
@@ -576,6 +577,13 @@ router.post(
     if (gstNumber && !GSTIN_REGEX.test(String(gstNumber).toUpperCase())) {
       return res.status(400).json({ success: false, error: 'Invalid GSTIN format' });
     }
+    const cleanedEmail = email ? String(email).trim().toLowerCase() : '';
+    if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
+      return res.status(400).json({ success: false, error: 'Invalid email format' });
+    }
+    // GSTIN starts with a 2-digit Indian state code — if a GSTIN is supplied,
+    // the vendor is Indian-registered. Coerce country to keep data consistent.
+    const cleanedCountry = gstNumber ? 'India' : (country ? String(country).trim() : '');
     // Reject duplicate GSTIN (case-insensitive).
     if (gstNumber) {
       const cleanedGstin = String(gstNumber).toUpperCase().trim();
@@ -596,6 +604,15 @@ router.post(
       if (r.ok) gstDetails = r.data;
     } else {
       gstDetails = buildManualGstDetails(manualDetails);
+    }
+    // Stash email + country on the gstDetails JSON blob so we don't need a
+    // schema migration for these optional contact fields.
+    if (cleanedEmail || cleanedCountry) {
+      gstDetails = {
+        ...(gstDetails || {}),
+        ...(cleanedEmail ? { email: cleanedEmail } : {}),
+        ...(cleanedCountry ? { country: cleanedCountry } : {}),
+      };
     }
     // Auto-generate unique code (with retry on the rare race condition)
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -626,13 +643,23 @@ router.put(
   '/:id',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, gstNumber, address, manualDetails } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails } = req.body || {};
     if (phone !== undefined && (!phone || !String(phone).trim())) {
       return res.status(400).json({ success: false, error: 'phone is required' });
     }
     if (gstNumber && !GSTIN_REGEX.test(String(gstNumber).toUpperCase())) {
       return res.status(400).json({ success: false, error: 'Invalid GSTIN format' });
     }
+    const cleanedEmail = email !== undefined ? String(email || '').trim().toLowerCase() : undefined;
+    if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
+      return res.status(400).json({ success: false, error: 'Invalid email format' });
+    }
+    const cleanedCountry =
+      gstNumber
+        ? 'India'
+        : country !== undefined
+        ? String(country || '').trim()
+        : undefined;
     // Reject duplicate GSTIN (case-insensitive), excluding this vendor.
     if (gstNumber) {
       const cleanedGstin = String(gstNumber).toUpperCase().trim();
@@ -672,6 +699,18 @@ router.put(
     ) {
       gstDetails = existingDetails;
     }
+    // Merge email + country onto whichever gstDetails we're about to write,
+    // OR onto the existing blob if neither GST nor manual fields were touched
+    // (so a vendor can be updated with email/country alone).
+    const emailOrCountryChanged = cleanedEmail !== undefined || cleanedCountry !== undefined;
+    if (emailOrCountryChanged) {
+      const base: any = gstDetails ?? existingDetails ?? {};
+      gstDetails = {
+        ...base,
+        ...(cleanedEmail !== undefined ? { email: cleanedEmail || null } : {}),
+        ...(cleanedCountry !== undefined ? { country: cleanedCountry || null } : {}),
+      };
+    }
     try {
       const vendor = await prisma.vendor.update({
         where: { id: req.params.id },
@@ -684,6 +723,8 @@ router.put(
                 gstDetails: gstDetails ?? null,
               }
             : manualDetails !== undefined
+            ? { gstDetails: gstDetails ?? null }
+            : emailOrCountryChanged
             ? { gstDetails: gstDetails ?? null }
             : {}),
           ...(address !== undefined ? { address: address ? String(address).trim() : null } : {}),

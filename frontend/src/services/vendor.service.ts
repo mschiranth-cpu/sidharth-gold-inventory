@@ -6,6 +6,8 @@ export interface Vendor {
   name: string;
   uniqueCode: string;
   phone: string | null;
+  email?: string | null;
+  country?: string | null;
   gstNumber: string | null;
   gstDetails: GstDetails | null;
   address: string | null;
@@ -49,6 +51,10 @@ export interface GstDetails {
   stateJurisdiction?: string | null;
   source: 'parsed' | 'gstincheck' | 'mastergst' | 'rapidapi' | 'rapidapi-tool' | 'manual';
   notice?: string | null;
+  /** Co-located on the gstDetails JSON blob to avoid a schema migration. */
+  email?: string | null;
+  /** ISO country name. India for any GST-registered vendor. */
+  country?: string | null;
 }
 
 export interface ManualVendorDetails {
@@ -65,6 +71,8 @@ export interface ManualVendorDetails {
 export interface VendorInput {
   name: string;
   phone?: string;
+  email?: string;
+  country?: string;
   gstNumber?: string;
   address?: string;
   manualDetails?: ManualVendorDetails;

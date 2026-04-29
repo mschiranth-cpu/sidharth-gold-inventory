@@ -25,6 +25,28 @@ import { isLiveSource, sourceLabel, statusBadgeClass, formatGstDate } from './Gs
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const PINCODE_REGEX = /^[0-9]{6}$/;
+// Practical email regex — catches the common typos without rejecting valid
+// addresses with +tags or sub-domains.
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+/**
+ * Country options surfaced in the vendor form. India sits on top because
+ * ≥ 99% of vendors are local; the rest are common precious-stone hubs.
+ * Anything outside this list can be typed via the free-text fallback.
+ */
+const COUNTRY_OPTIONS = [
+  'India',
+  'United Arab Emirates',
+  'Singapore',
+  'Hong Kong',
+  'Thailand',
+  'United Kingdom',
+  'United States',
+  'Belgium',
+  'Switzerland',
+  'Sri Lanka',
+  'Other',
+];
 
 const STATE_CODES: Record<string, string> = {
   '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
@@ -52,6 +74,14 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
   const [form, setForm] = useState<VendorInput>({
     name: vendor?.name ?? '',
     phone: vendor?.phone ?? '',
+    email: vendor?.email ?? vendor?.gstDetails?.email ?? '',
+    country:
+      vendor?.country ??
+      vendor?.gstDetails?.country ??
+      // Default to India for new vendors. GSTIN-bearing vendors are India-
+      // only by definition; for No-GST vendors India is still the 99% case
+      // and the user can switch to another country if needed.
+      'India',
     gstNumber: vendor?.gstNumber ?? '',
     address: vendor?.address ?? '',
   });
@@ -185,11 +215,23 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
   const panUpper = (manual.pan || '').toUpperCase().trim();
   const panValid = panUpper.length === 0 || PAN_REGEX.test(panUpper);
   const pincodeValid = !manual.pincode || PINCODE_REGEX.test(manual.pincode);
+  const emailTrim = (form.email || '').trim();
+  const emailValid = emailTrim.length === 0 || EMAIL_REGEX.test(emailTrim);
+
+  // GSTIN is India-only by definition (state codes 01–38 are all Indian
+  // states). The moment a valid GSTIN is entered we lock Country to India
+  // so users can’t introduce a contradictory value downstream.
+  useEffect(() => {
+    if (!noGst && gstinValid && form.country !== 'India') {
+      setForm((f) => ({ ...f, country: 'India' }));
+    }
+  }, [noGst, gstinValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Field-level error map; computed every render so it stays in sync.
   const errors: Record<string, string | undefined> = {
     name: !form.name.trim() ? 'Vendor name is required' : undefined,
     phone: validatePhone(form.phone) || undefined,
+    email: !emailValid ? 'Enter a valid email (e.g. name@company.com)' : undefined,
     gstin:
       !noGst && gstinUpper.length > 0 && !gstinValid
         ? 'Enter a valid 15-character GSTIN (or tick “Vendor does not have GST”)'
@@ -205,6 +247,8 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
       const payload: VendorInput = {
         name: form.name.trim(),
         phone: form.phone?.trim() || undefined,
+        email: emailTrim || undefined,
+        country: (form.country || '').trim() || undefined,
         gstNumber: noGst ? undefined : (gstinUpper || undefined),
         address: form.address?.trim() || undefined,
       };
@@ -456,6 +500,61 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                 onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
                 hasError={showErr('phone')}
               />
+            </Field>
+          </div>
+
+          {/* Email + Country */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field
+              label="Email"
+              hint={!showErr('email') ? 'Optional — used for invoice copies & alerts' : undefined}
+              error={showErr('email') ? errors.email : undefined}
+            >
+              <input
+                data-field="email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={form.email || ''}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                placeholder="vendor@company.com"
+                className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:border-transparent text-sm ${
+                  showErr('email')
+                    ? 'border-red-400 focus:ring-red-500'
+                    : emailTrim && emailValid
+                    ? 'border-emerald-400 focus:ring-emerald-500'
+                    : 'border-gray-300 focus:ring-champagne-600'
+                }`}
+              />
+            </Field>
+            <Field
+              label="Country"
+              hint={
+                !noGst && gstinValid
+                  ? 'Auto-set from GSTIN — Indian registration'
+                  : 'Defaults to India — change for international vendors'
+              }
+            >
+              <select
+                data-field="country"
+                value={form.country || ''}
+                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                disabled={!noGst && gstinValid}
+                aria-disabled={!noGst && gstinValid}
+                className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:border-transparent text-sm bg-white ${
+                  !noGst && gstinValid
+                    ? 'border-emerald-300 bg-emerald-50/50 cursor-not-allowed'
+                    : 'border-gray-300 focus:ring-champagne-600'
+                }`}
+              >
+                <option value="">— Select Country —</option>
+                {COUNTRY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 
