@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDownTrayIcon,
+  ArrowLeftIcon,
   ArrowPathIcon,
   ArrowUpTrayIcon,
   ArrowsRightLeftIcon,
@@ -174,45 +175,50 @@ export default function DiamondTransactionsPage() {
   };
 
   return (
-    <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
-              Diamond Transactions
-            </h1>
-            <p className="text-onyx-500 mt-1">
-              {totals.txnCount} of {(txns as DiamondTransaction[]).length} transactions
-              {hasActiveFilters && ' (filtered)'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link to="/app/inventory/diamonds/receive">
-              <Button variant="primary">
+    <div className="py-4 sm:py-6 bg-gradient-to-b from-pearl to-white min-h-screen">
+      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[1760px] px-4 sm:px-6 lg:px-8">
+        {/* Sticky page header */}
+        <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 mb-4 bg-pearl/85 backdrop-blur-md border-b border-champagne-100/60">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
+                Diamond Transactions
+              </h1>
+              <p className="text-onyx-500 mt-0.5 text-sm">
+                {totals.txnCount} of {(txns as DiamondTransaction[]).length} transactions
+                {hasActiveFilters && ' (filtered)'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link to="/app/inventory/diamonds/receive">
+                <Button variant="primary">
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                  Receive
+                </Button>
+              </Link>
+              <Link to="/app/inventory/diamonds/issue">
+                <Button variant="secondary">
+                  <ArrowUpTrayIcon className="h-4 w-4 mr-1" />
+                  Issue
+                </Button>
+              </Link>
+              <Link to="/app/inventory/diamonds/transfer">
+                <Button variant="ghost">
+                  <ArrowsRightLeftIcon className="h-4 w-4 mr-1" />
+                  Transfer
+                </Button>
+              </Link>
+              <Button type="button" variant="secondary" onClick={handleExport}>
                 <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                Receive
+                Export Excel
               </Button>
-            </Link>
-            <Link to="/app/inventory/diamonds/issue">
-              <Button variant="secondary">
-                <ArrowUpTrayIcon className="h-4 w-4 mr-1" />
-                Issue
-              </Button>
-            </Link>
-            <Link to="/app/inventory/diamonds/transfer">
-              <Button variant="ghost">
-                <ArrowsRightLeftIcon className="h-4 w-4 mr-1" />
-                Transfer
-              </Button>
-            </Link>
-            <Button type="button" variant="secondary" onClick={handleExport}>
-              <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-              Export Excel
-            </Button>
-            <Link to="/app/inventory/diamonds">
-              <Button variant="secondary">Back to Dashboard</Button>
-            </Link>
+              <Link to="/app/inventory/diamonds" aria-label="Back to Diamond Inventory dashboard">
+                <Button variant="secondary">
+                  <ArrowLeftIcon className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 

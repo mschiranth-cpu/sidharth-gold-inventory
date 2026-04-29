@@ -13,6 +13,7 @@ import {
   type MetalTransaction,
 } from '../../services/metal.service';
 import { Link } from 'react-router-dom';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditMetalTransactionModal from '../../components/EditMetalTransactionModal';
@@ -347,24 +348,29 @@ export default function MetalTransactionsPage() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-b from-pearl to-white min-h-screen">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
-              Metal Transactions
-            </h1>
-            <p className="text-onyx-500 mt-1">
-              {summary.count} of {(transactions as any[]).length} transactions
-              {hasActiveFilters && ' (filtered)'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <ExportMenu filters={filters} dateFrom={dateFrom} dateTo={dateTo} />
-            <Link to="/app/inventory/metal">
-              <Button variant="secondary">Back to Dashboard</Button>
-            </Link>
+    <div className="py-4 sm:py-6 bg-gradient-to-b from-pearl to-white min-h-screen">
+      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[1760px] px-4 sm:px-6 lg:px-8">
+        {/* Sticky page header — keeps title + Back button always reachable */}
+        <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 mb-4 bg-pearl/85 backdrop-blur-md border-b border-champagne-100/60">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-champagne-800 via-champagne-700 to-onyx-800 bg-clip-text text-transparent">
+                Metal Transactions
+              </h1>
+              <p className="text-onyx-500 mt-0.5 text-sm">
+                {summary.count} of {(transactions as any[]).length} transactions
+                {hasActiveFilters && ' (filtered)'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <ExportMenu filters={filters} dateFrom={dateFrom} dateTo={dateTo} />
+              <Link to="/app/inventory/metal" aria-label="Back to Metal Inventory dashboard">
+                <Button variant="secondary">
+                  <ArrowLeftIcon className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
