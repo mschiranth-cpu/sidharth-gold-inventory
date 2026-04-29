@@ -13,6 +13,9 @@ import {
   VendorInput,
   GstDetails,
   ManualVendorDetails,
+  VendorDealsCategory,
+  VENDOR_DEALS_CATEGORIES,
+  VENDOR_DEALS_LABELS,
   createVendor,
   updateVendor,
   lookupGstin,
@@ -21,6 +24,42 @@ import {
 import Button from './common/Button';
 import PhoneInput, { validatePhone } from './common/PhoneInput';
 import { isLiveSource, sourceLabel, statusBadgeClass, formatGstDate } from './GstInfoCard';
+import {
+  CubeIcon,
+  CubeTransparentIcon,
+  SparklesIcon,
+  ArchiveBoxIcon,
+} from '@heroicons/react/24/outline';
+
+/**
+ * Display metadata for the 4 supply-category checkbox cards. Order is
+ * deliberate: matches the order of the Receive… pages in the sidebar.
+ */
+const DEALS_CATEGORY_META: Record<
+  VendorDealsCategory,
+  { Icon: typeof CubeIcon; tint: string; ring: string }
+> = {
+  METAL: {
+    Icon: CubeIcon,
+    tint: 'bg-amber-50 text-amber-700 border-amber-200',
+    ring: 'ring-amber-300 bg-amber-100',
+  },
+  DIAMOND: {
+    Icon: CubeTransparentIcon,
+    tint: 'bg-sky-50 text-sky-700 border-sky-200',
+    ring: 'ring-sky-300 bg-sky-100',
+  },
+  REAL_STONE: {
+    Icon: SparklesIcon,
+    tint: 'bg-violet-50 text-violet-700 border-violet-200',
+    ring: 'ring-violet-300 bg-violet-100',
+  },
+  STONE_PACKET: {
+    Icon: ArchiveBoxIcon,
+    tint: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    ring: 'ring-emerald-300 bg-emerald-100',
+  },
+};
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -84,6 +123,15 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
       'India',
     gstNumber: vendor?.gstNumber ?? '',
     address: vendor?.address ?? '',
+    // New vendors default to all 4 supply categories pre-checked (matches
+    // server POST default and the migration backfill). Existing vendors
+    // come from `vendor.dealsIn`; if the API didn't return it (legacy
+    // shape) we fall back to all-4 so they don't accidentally get archived.
+    dealsIn: vendor
+      ? (vendor.dealsIn && vendor.dealsIn.length > 0
+        ? [...vendor.dealsIn]
+        : (vendor.dealsIn === undefined ? [...VENDOR_DEALS_CATEGORIES] : []))
+      : [...VENDOR_DEALS_CATEGORIES],
   });
   const [previewCode, setPreviewCode] = useState<string>(vendor?.uniqueCode ?? '…');
 
@@ -113,6 +161,11 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showAllErrors, setShowAllErrors] = useState(false);
+  // "Archive" intent — when true, the next save submits `dealsIn: []`
+  // (vendor stays in DB + transaction history but disappears from every
+  // Receive-form dropdown). Bypasses the ≥1-category UI validation.
+  // Reset on every form interaction except the dedicated Archive button.
+  const [archiveIntent, setArchiveIntent] = useState(false);
   // Snapshot of name pre-auto-fill so the user can revert.
   const autoFillSnapshot = useRef<{ name: string; address: string } | null>(null);
   const autoFilledValues = useRef<{ name: string; address: string } | null>(null);
@@ -228,6 +281,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
   }, [noGst, gstinValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Field-level error map; computed every render so it stays in sync.
+  const dealsInValue = form.dealsIn ?? [];
   const errors: Record<string, string | undefined> = {
     name: !form.name.trim() ? 'Vendor name is required' : undefined,
     phone: validatePhone(form.phone) || undefined,
@@ -238,6 +292,12 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
         : undefined,
     pan: noGst && !panValid ? 'PAN must look like AAAAA9999A' : undefined,
     pincode: noGst && !pincodeValid ? 'Pincode must be 6 digits' : undefined,
+    dealsIn:
+      // Archive intent intentionally clears all categories — skip the
+      // ≥1 rule when the user explicitly chose to archive.
+      !archiveIntent && dealsInValue.length === 0
+        ? 'Pick at least one supply category (or this vendor will not appear in any Receive form)'
+        : undefined,
   };
   const errorList = Object.entries(errors).filter(([, v]) => !!v) as [string, string][];
   const showErr = (k: string) => (touched[k] || showAllErrors) && !!errors[k];
@@ -251,6 +311,10 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
         country: (form.country || '').trim() || undefined,
         gstNumber: noGst ? undefined : (gstinUpper || undefined),
         address: form.address?.trim() || undefined,
+        // Archive intent forces empty array regardless of any leftover
+        // checkbox state — single source of truth for the soft-archive
+        // path so it can never silently revert.
+        dealsIn: archiveIntent ? [] : dealsInValue,
       };
       if (noGst) {
         const m: ManualVendorDetails = {
@@ -558,6 +622,85 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
             </Field>
           </div>
 
+          {/* Supply Categories — drives which Receive forms list this vendor */}
+          <Field
+            label="Supply Categories *"
+            hint={
+              dealsInValue.length === 0
+                ? undefined
+                : 'Vendor will appear only in the Receive forms ticked here'
+            }
+            error={showErr('dealsIn') ? errors.dealsIn : undefined}
+          >
+            <div
+              role="group"
+              aria-label="Supply categories"
+              data-field="dealsIn"
+              tabIndex={-1}
+              className="grid grid-cols-2 sm:grid-cols-4 gap-2 outline-none"
+            >
+              {VENDOR_DEALS_CATEGORIES.map((key) => {
+                const meta = DEALS_CATEGORY_META[key];
+                const checked = dealsInValue.includes(key);
+                const Icon = meta.Icon;
+                return (
+                  <label
+                    key={key}
+                    className={`group relative flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 min-h-[80px] cursor-pointer select-none transition-all focus-within:ring-2 focus-within:ring-offset-1 ${
+                      checked
+                        ? `${meta.ring} border-current shadow-sm`
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={checked}
+                      onChange={(e) => {
+                        setTouched((t) => ({ ...t, dealsIn: true }));
+                        setForm((f) => {
+                          const cur = new Set(f.dealsIn ?? []);
+                          if (e.target.checked) cur.add(key);
+                          else cur.delete(key);
+                          return { ...f, dealsIn: Array.from(cur) as VendorDealsCategory[] };
+                        });
+                      }}
+                    />
+                    <Icon
+                      className={`w-6 h-6 ${
+                        checked ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={`text-xs font-semibold ${
+                        checked ? 'text-slate-900' : 'text-slate-600'
+                      }`}
+                    >
+                      {VENDOR_DEALS_LABELS[key]}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full border flex items-center justify-center text-[10px] font-bold ${
+                        checked
+                          ? 'bg-slate-900 border-slate-900 text-white'
+                          : 'bg-white border-slate-300 text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {dealsInValue.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                ⚠ This vendor will <strong>not</strong> appear in any Receive form until at least
+                one category is selected.
+              </p>
+            )}
+          </Field>
+
           <Field
             label="Address"
             hint={!noGst && gstDetails?.address ? 'Defaulted from GST — edit if needed' : undefined}
@@ -617,7 +760,39 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{submitError}</div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 pt-2">
+            {vendor && dealsInValue.length > 0 && (
+              <button
+                type="button"
+                disabled={saveMut.isPending}
+                onClick={() => {
+                  // Confirm the soft-archive intent (it's reversible — admin
+                  // can re-tick categories later — but staff might click it by
+                  // mistake, so guard with a synchronous confirm).
+                  const ok = window.confirm(
+                    `Archive "${vendor.name}"?\n\n` +
+                      `• Vendor stays in the database and on every existing transaction.\n` +
+                      `• They will NOT appear in any Receive form (Metal/Diamond/Real Stone/Stone Packet).\n` +
+                      `• You can un-archive any time by editing this vendor and re-ticking categories.\n\n` +
+                      `Continue?`,
+                  );
+                  if (!ok) return;
+                  setArchiveIntent(true);
+                  // Visually reflect the new state before submit so the
+                  // warning chip + chips state are accurate if the request
+                  // is slow / fails.
+                  setForm((f) => ({ ...f, dealsIn: [] }));
+                  setSubmitError(null);
+                  // Submit on next tick so React commits the state changes
+                  // before the mutation reads them.
+                  setTimeout(() => saveMut.mutate(), 0);
+                }}
+                className="sm:mr-auto px-3 py-2 rounded-lg text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-300 hover:bg-amber-100 disabled:opacity-50"
+                title="Soft-archive: hide from all Receive forms while keeping history intact"
+              >
+                📦 Archive vendor
+              </button>
+            )}
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" isLoading={saveMut.isPending} disabled={saveMut.isPending}>
               {vendor ? 'Save Changes' : 'Create Vendor'}

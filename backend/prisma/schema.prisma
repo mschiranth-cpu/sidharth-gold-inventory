@@ -983,6 +983,12 @@ model Vendor {
   gstNumber     String?  @map("gst_number")
   gstDetails    Json?    @map("gst_details")
   address       String?
+  // Which inventory categories this vendor supplies. Drives the
+  // VendorSelector filter on each Receive form. Tokens:
+  // 'METAL' | 'DIAMOND' | 'REAL_STONE' | 'STONE_PACKET'.
+  // Default `[]` is intentional (= soft-archived); the migration backfills
+  // existing rows with all 4 so legacy vendors stay visible everywhere.
+  dealsIn       String[] @default([]) @map("deals_in")
   // Vendor credit balance — over-payments on receipts are parked here and
   // auto-applied to the next billable purchase from the same vendor.
   creditBalance Float    @default(0) @map("credit_balance")
@@ -996,6 +1002,12 @@ model Vendor {
 
   @@index([name])
   @@index([gstNumber])
+  // GIN index on `deals_in` powers the `?dealsIn=METAL` filter
+  // (`{ has: '<token>' }` Prisma query \u2192 Postgres array containment).
+  // Declared here so `prisma migrate dev` keeps it in sync \u2014 the
+  // 20260429000000_add_vendor_deals_in migration already created it,
+  // so this declaration is a no-op against the live schema.
+  @@index([dealsIn], type: Gin)
   @@map("vendors")
 }
 

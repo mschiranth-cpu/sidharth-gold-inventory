@@ -38,6 +38,55 @@ function gstCacheSet(key: string, data: any) {
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/**
+ * Inventory categories a vendor can supply. Drives the VendorSelector
+ * filter on each Receive form. Source-of-truth list — referenced from
+ * frontend types via mirroring (kept in sync manually — 4 tokens, low
+ * churn).
+ */
+const DEALS_IN_VALUES = ['METAL', 'DIAMOND', 'REAL_STONE', 'STONE_PACKET'] as const;
+type DealsInValue = (typeof DEALS_IN_VALUES)[number];
+const DEALS_IN_SET = new Set<string>(DEALS_IN_VALUES);
+
+/**
+ * Normalises and validates a `dealsIn` array from a request body.
+ * Returns:
+ *  - `{ ok: true, value: undefined }` when the field was not provided
+ *    (caller decides the default — we default to all-4 on POST so new
+ *    vendors are visible everywhere out of the box; PUT preserves the
+ *    existing value).
+ *  - `{ ok: true, value: string[] }` when the field is a valid array
+ *    (deduplicated; empty array is allowed — acts as soft-archive).
+ *  - `{ ok: false, error }` when the input is malformed or contains
+ *    unknown tokens (rejected with 400).
+ */
+function parseDealsIn(
+  raw: unknown,
+): { ok: true; value: DealsInValue[] | undefined } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, value: undefined };
+  if (raw === null) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: 'dealsIn must be an array of category tokens' };
+  }
+  const cleaned: DealsInValue[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const token = String(item || '').trim().toUpperCase();
+    if (!token) continue;
+    if (!DEALS_IN_SET.has(token)) {
+      return {
+        ok: false,
+        error: `Invalid dealsIn value '${token}'. Allowed: ${DEALS_IN_VALUES.join(', ')}`,
+      };
+    }
+    if (!seen.has(token)) {
+      seen.add(token);
+      cleaned.push(token as DealsInValue);
+    }
+  }
+  return { ok: true, value: cleaned };
+}
+
 const STATE_CODES: Record<string, string> = {
   '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
   '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
@@ -344,19 +393,41 @@ async function generateNextCode(): Promise<string> {
 // All routes require auth
 router.use(authenticate);
 
-// GET /api/vendors  (list, optional ?search=)
+// GET /api/vendors  (list, optional ?search= and ?dealsIn=)
 router.get('/', async (req: Request, res: Response) => {
   const search = String(req.query.search || '').trim();
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { uniqueCode: { contains: search, mode: 'insensitive' as const } },
-          { gstNumber: { contains: search, mode: 'insensitive' as const } },
-          { phone: { contains: search } },
-        ],
+  // ?dealsIn=METAL  filters to vendors flagged for that category. Single
+  // value only (each Receive page is single-category). Unknown values are
+  // rejected with 400 so the caller catches typos early.
+  const rawDealsIn = req.query.dealsIn;
+  let dealsInFilter: string | undefined;
+  if (rawDealsIn !== undefined) {
+    const token = String(rawDealsIn).trim().toUpperCase();
+    if (token) {
+      if (!DEALS_IN_SET.has(token)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid dealsIn '${token}'. Allowed: ${DEALS_IN_VALUES.join(', ')}`,
+        });
       }
-    : {};
+      dealsInFilter = token;
+    }
+  }
+  const filters: any[] = [];
+  if (search) {
+    filters.push({
+      OR: [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { uniqueCode: { contains: search, mode: 'insensitive' as const } },
+        { gstNumber: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search } },
+      ],
+    });
+  }
+  if (dealsInFilter) {
+    filters.push({ dealsIn: { has: dealsInFilter } });
+  }
+  const where = filters.length === 0 ? {} : filters.length === 1 ? filters[0] : { AND: filters };
   const vendors = await prisma.vendor.findMany({ where, orderBy: { name: 'asc' } });
   res.json({ success: true, data: vendors });
 });
@@ -581,6 +652,15 @@ router.post(
     if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
     }
+    const dealsInResult = parseDealsIn(req.body?.dealsIn);
+    if (!dealsInResult.ok) {
+      return res.status(400).json({ success: false, error: dealsInResult.error });
+    }
+    // POST default: when caller omitted the field, ship all 4 categories
+    // so the new vendor is visible in every Receive form (matches the
+    // form's pre-checked default and the migration backfill).
+    const dealsIn: DealsInValue[] =
+      dealsInResult.value === undefined ? [...DEALS_IN_VALUES] : dealsInResult.value;
     // GSTIN starts with a 2-digit Indian state code — if a GSTIN is supplied,
     // the vendor is Indian-registered. Coerce country to keep data consistent.
     const cleanedCountry = gstNumber ? 'India' : (country ? String(country).trim() : '');
@@ -626,6 +706,7 @@ router.post(
             gstNumber: gstNumber ? String(gstNumber).toUpperCase().trim() : null,
             gstDetails,
             address: address ? String(address).trim() : null,
+            dealsIn,
           },
         });
         return res.status(201).json({ success: true, data: vendor });
@@ -654,6 +735,14 @@ router.put(
     if (cleanedEmail && !EMAIL_REGEX.test(cleanedEmail)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
     }
+    const dealsInResult = parseDealsIn(req.body?.dealsIn);
+    if (!dealsInResult.ok) {
+      return res.status(400).json({ success: false, error: dealsInResult.error });
+    }
+    // PUT semantics: only update `dealsIn` if the caller sent it.
+    // `[]` is a valid value (soft-archive — vendor stops appearing in any
+    // Receive form but stays selectable in Edit modals + transaction history).
+    const dealsInUpdate: DealsInValue[] | undefined = dealsInResult.value;
     const cleanedCountry =
       gstNumber
         ? 'India'
@@ -728,6 +817,7 @@ router.put(
             ? { gstDetails: gstDetails ?? null }
             : {}),
           ...(address !== undefined ? { address: address ? String(address).trim() : null } : {}),
+          ...(dealsInUpdate !== undefined ? { dealsIn: dealsInUpdate } : {}),
         },
       });
       res.json({ success: true, data: vendor });

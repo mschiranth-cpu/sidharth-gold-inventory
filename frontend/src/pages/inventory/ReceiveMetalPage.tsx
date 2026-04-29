@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createMetalTransaction } from '../../services/metal.service';
-import { listVendors, type Vendor } from '../../services/vendor.service';
+import { listVendors, type Vendor, type VendorDealsCategory, VENDOR_DEALS_LABELS } from '../../services/vendor.service';
 import Button from '../../components/common/Button';
 import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 import VendorFormModal from '../../components/VendorFormModal';
@@ -208,6 +208,7 @@ export default function ReceiveMetalPage() {
             if (v) setErrors((prev) => ({ ...prev, vendor: undefined }));
           }}
           error={errors.vendor}
+          dealsIn="METAL"
         />
 
         {!selectedVendor && (
@@ -506,9 +507,15 @@ interface VendorSelectorProps {
   selected: Vendor | null;
   onSelect: (v: Vendor | null) => void;
   error?: string;
+  /**
+   * Restrict the dropdown to vendors flagged for this supply category.
+   * Omit on Edit…Modal usage so historical vendors stay selectable even
+   * if they've since been narrowed/archived.
+   */
+  dealsIn?: VendorDealsCategory;
 }
 
-export function VendorSelector({ selected, onSelect, error }: VendorSelectorProps) {
+export function VendorSelector({ selected, onSelect, error, dealsIn }: VendorSelectorProps) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -520,8 +527,11 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
   const listRef = useRef<HTMLUListElement | null>(null);
 
   const { data: vendors = [], isLoading } = useQuery({
-    queryKey: ['vendors'],
-    queryFn: () => listVendors(),
+    // Cache key includes the category so different Receive pages don't
+    // share each other's filtered results. Prefix-based invalidation
+    // (`['vendors']`) still busts every variant correctly.
+    queryKey: ['vendors', dealsIn ?? null],
+    queryFn: () => listVendors(undefined, dealsIn),
     staleTime: 60_000,
   });
 
@@ -661,8 +671,27 @@ export function VendorSelector({ selected, onSelect, error }: VendorSelectorProp
           {isLoading ? (
             <div className="p-6 text-center text-sm text-onyx-400">Loading vendors…</div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-onyx-400">
-              {vendors.length === 0 ? (
+            <div className="p-6 text-center text-sm text-onyx-500 space-y-2">
+              {vendors.length === 0 && dealsIn ? (
+                <>
+                  <p>
+                    No vendors registered for{' '}
+                    <strong>{VENDOR_DEALS_LABELS[dealsIn]}</strong>.
+                  </p>
+                  <p className="text-xs text-onyx-400">
+                    Open the Vendors page and tick this supply category for the
+                    relevant vendor, or{' '}
+                    <button
+                      type="button"
+                      className="text-champagne-700 hover:underline font-medium"
+                      onClick={() => setShowAddModal(true)}
+                    >
+                      add a new vendor
+                    </button>
+                    .
+                  </p>
+                </>
+              ) : vendors.length === 0 ? (
                 <>
                   No vendors yet —{' '}
                   <button

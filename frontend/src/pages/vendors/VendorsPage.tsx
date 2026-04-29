@@ -30,12 +30,68 @@ import {
   deleteVendor,
   listVendorOutstanding,
   type VendorOutstanding,
+  type VendorDealsCategory,
+  VENDOR_DEALS_CATEGORIES,
+  VENDOR_DEALS_LABELS,
+  VENDOR_DEALS_SHORT,
 } from '../../services/vendor.service';
 import VendorFormModal from '../../components/VendorFormModal';
 
-type FilterKey = 'all' | 'verified' | 'noGst' | 'outstanding' | 'credit';
+type FilterKey =
+  | 'all'
+  | 'verified'
+  | 'noGst'
+  | 'outstanding'
+  | 'credit'
+  | 'archived'
+  | 'dealsMetal'
+  | 'dealsDiamond'
+  | 'dealsRealStone'
+  | 'dealsStonePacket';
 type SortKey = 'name' | 'outstanding' | 'paid' | 'credit';
 type SortDir = 'asc' | 'desc';
+
+/**
+ * Maps the supply-category filter keys to their underlying token. Lets the
+ * filter chip strip and the visible-list filter share one source of truth.
+ */
+const FILTER_TO_DEALS: Partial<Record<FilterKey, VendorDealsCategory>> = {
+  dealsMetal: 'METAL',
+  dealsDiamond: 'DIAMOND',
+  dealsRealStone: 'REAL_STONE',
+  dealsStonePacket: 'STONE_PACKET',
+};
+
+/**
+ * Per-category chip styling for both the row chips (small "M/D/RS/SP" pills)
+ * and the filter chip strip. Keeps colour assignments aligned with the
+ * VendorFormModal cards so users learn the colour→category mapping.
+ */
+const DEALS_CHIP_STYLE: Record<
+  VendorDealsCategory,
+  { active: string; idle: string; filterIdle: string }
+> = {
+  METAL: {
+    active: 'bg-amber-100 text-amber-800 border-amber-300',
+    idle: 'bg-slate-50 text-slate-300 border-slate-200',
+    filterIdle: 'bg-amber-50 text-amber-800',
+  },
+  DIAMOND: {
+    active: 'bg-sky-100 text-sky-800 border-sky-300',
+    idle: 'bg-slate-50 text-slate-300 border-slate-200',
+    filterIdle: 'bg-sky-50 text-sky-800',
+  },
+  REAL_STONE: {
+    active: 'bg-violet-100 text-violet-800 border-violet-300',
+    idle: 'bg-slate-50 text-slate-300 border-slate-200',
+    filterIdle: 'bg-violet-50 text-violet-800',
+  },
+  STONE_PACKET: {
+    active: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    idle: 'bg-slate-50 text-slate-300 border-slate-200',
+    filterIdle: 'bg-emerald-50 text-emerald-800',
+  },
+};
 
 const AVATAR_PALETTE = [
   'bg-champagne-100 text-champagne-800',
@@ -137,6 +193,8 @@ export default function VendorsPage() {
   const visible = useMemo(() => {
     let list = vendors.filter((v) => {
       const o = outstandingMap.get(v.id);
+      const dealsCat = FILTER_TO_DEALS[filter];
+      if (dealsCat) return (v.dealsIn ?? []).includes(dealsCat);
       switch (filter) {
         case 'verified':
           return isVerified(v);
@@ -146,6 +204,11 @@ export default function VendorsPage() {
           return (o?.outstanding ?? 0) > 0;
         case 'credit':
           return (v.creditBalance ?? 0) > 0;
+        case 'archived':
+          // Soft-archived = explicitly empty dealsIn array. Treat
+          // "undefined" as legacy (not archived) so old API responses
+          // don't surface as archived by accident.
+          return Array.isArray(v.dealsIn) && v.dealsIn.length === 0;
         default:
           return true;
       }
@@ -219,6 +282,8 @@ export default function VendorsPage() {
       'Name',
       'Unique Code',
       'Phone',
+      'Email',
+      'Country',
       'GSTIN',
       'Verified',
       'Status',
@@ -228,6 +293,7 @@ export default function VendorsPage() {
       'City',
       'Pincode',
       'Business Type',
+      'Deals In',
       'Outstanding',
       'Paid',
       'Credit',
@@ -240,6 +306,8 @@ export default function VendorsPage() {
         v.name,
         v.uniqueCode,
         v.phone || '',
+        v.email || v.gstDetails?.email || '',
+        v.country || v.gstDetails?.country || '',
         v.gstNumber || '',
         isVerified(v) ? 'Yes' : '',
         v.gstDetails?.status || '',
@@ -249,6 +317,8 @@ export default function VendorsPage() {
         v.gstDetails?.city || '',
         v.gstDetails?.pincode || '',
         v.gstDetails?.businessType || '',
+        // Semicolon-joined so it survives Excel's comma split-on-import.
+        (v.dealsIn ?? []).join(';'),
         (o?.outstanding ?? 0).toFixed(2),
         (o?.totalPaid ?? 0).toFixed(2),
         (v.creditBalance ?? 0).toFixed(2),
@@ -285,6 +355,32 @@ export default function VendorsPage() {
       count: vendors.filter((v) => (v.creditBalance ?? 0) > 0).length,
       cls: 'bg-sky-100 text-sky-800',
     },
+    {
+      key: 'archived',
+      label: 'Archived',
+      count: vendors.filter(
+        (v) => Array.isArray(v.dealsIn) && v.dealsIn.length === 0,
+      ).length,
+      cls: 'bg-slate-200 text-slate-700',
+    },
+    // Per-category supply filters — mirror the order on the Receive pages.
+    ...VENDOR_DEALS_CATEGORIES.map((cat) => {
+      const filterKey = (
+        cat === 'METAL'
+          ? 'dealsMetal'
+          : cat === 'DIAMOND'
+          ? 'dealsDiamond'
+          : cat === 'REAL_STONE'
+          ? 'dealsRealStone'
+          : 'dealsStonePacket'
+      ) as FilterKey;
+      return {
+        key: filterKey,
+        label: `Supplies ${VENDOR_DEALS_LABELS[cat]}`,
+        count: vendors.filter((v) => (v.dealsIn ?? []).includes(cat)).length,
+        cls: DEALS_CHIP_STYLE[cat].filterIdle,
+      };
+    }),
   ];
 
   return (
@@ -493,6 +589,28 @@ export default function VendorsPage() {
                                   {v.gstDetails.businessType}
                                 </span>
                               )}
+                              {/* Supply-category chips: bright when flagged,
+                                  dim when not. Empty array (soft-archived)
+                                  shows all 4 dimmed so the gap is obvious. */}
+                              <div className="mt-1 flex flex-wrap gap-1" aria-label="Supply categories">
+                                {VENDOR_DEALS_CATEGORIES.map((cat) => {
+                                  const on = (v.dealsIn ?? []).includes(cat);
+                                  const style = DEALS_CHIP_STYLE[cat];
+                                  return (
+                                    <span
+                                      key={cat}
+                                      title={`${VENDOR_DEALS_LABELS[cat]}${
+                                        on ? '' : ' — not flagged for this category'
+                                      }`}
+                                      className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1 rounded border text-[10px] font-bold tracking-wide ${
+                                        on ? style.active : style.idle
+                                      }`}
+                                    >
+                                      {VENDOR_DEALS_SHORT[cat]}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         </td>

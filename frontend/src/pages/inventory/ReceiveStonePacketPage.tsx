@@ -238,6 +238,7 @@ export default function ReceiveStonePacketPage() {
               if (v) setErrors((prev) => ({ ...prev, vendor: undefined }));
             }}
             error={errors.vendor}
+            dealsIn="STONE_PACKET"
           />
 
           <div className="rounded-2xl bg-white border border-champagne-200 p-5 shadow-sm">

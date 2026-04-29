@@ -268,6 +268,7 @@ export default function ReceiveDiamondPage() {
               if (v) setErrors((prev) => ({ ...prev, vendor: undefined }));
             }}
             error={errors.vendor}
+            dealsIn="DIAMOND"
           />
 
           <LiveDiamondRatesCard

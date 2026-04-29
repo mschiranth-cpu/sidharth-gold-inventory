@@ -230,6 +230,7 @@ export default function ReceiveRealStonePage() {
               if (v) setErrors((prev) => ({ ...prev, vendor: undefined }));
             }}
             error={errors.vendor}
+            dealsIn="REAL_STONE"
           />
 
           <LiveRealStoneRatesCard

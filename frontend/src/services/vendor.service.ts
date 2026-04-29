@@ -1,6 +1,34 @@
 import api from './api';
 import type { MetalTransaction } from './metal.service';
 
+/**
+ * Inventory categories a vendor can supply. Drives the VendorSelector
+ * filter on each Receive form (Metal / Diamond / Real Stone / Stone
+ * Packet). Mirrors the backend `DEALS_IN_VALUES` whitelist.
+ */
+export type VendorDealsCategory = 'METAL' | 'DIAMOND' | 'REAL_STONE' | 'STONE_PACKET';
+
+export const VENDOR_DEALS_CATEGORIES: VendorDealsCategory[] = [
+  'METAL',
+  'DIAMOND',
+  'REAL_STONE',
+  'STONE_PACKET',
+];
+
+export const VENDOR_DEALS_LABELS: Record<VendorDealsCategory, string> = {
+  METAL: 'Metal',
+  DIAMOND: 'Diamond',
+  REAL_STONE: 'Real Stone',
+  STONE_PACKET: 'Stone Packet',
+};
+
+export const VENDOR_DEALS_SHORT: Record<VendorDealsCategory, string> = {
+  METAL: 'M',
+  DIAMOND: 'D',
+  REAL_STONE: 'RS',
+  STONE_PACKET: 'SP',
+};
+
 export interface Vendor {
   id: string;
   name: string;
@@ -11,6 +39,13 @@ export interface Vendor {
   gstNumber: string | null;
   gstDetails: GstDetails | null;
   address: string | null;
+  /**
+   * Which inventory categories this vendor supplies. Empty array =
+   * soft-archived (won't appear in any Receive form). Optional on the
+   * type so older callers/tests that build Vendor objects by hand keep
+   * compiling — the API always returns it as an array.
+   */
+  dealsIn?: VendorDealsCategory[];
   /** Outstanding credit owed back to the vendor (over-payments parked here). */
   creditBalance: number;
   createdAt: string;
@@ -76,6 +111,13 @@ export interface VendorInput {
   gstNumber?: string;
   address?: string;
   manualDetails?: ManualVendorDetails;
+  /**
+   * Inventory categories this vendor supplies. Server treats `undefined`
+   * as "default to all 4" on create, and as "don't change" on update.
+   * Pass `[]` to soft-archive (vendor stops appearing in Receive forms
+   * but stays selectable in Edit modals + transaction history).
+   */
+  dealsIn?: VendorDealsCategory[];
 }
 
 export async function getNextVendorCode(): Promise<string> {
@@ -83,8 +125,14 @@ export async function getNextVendorCode(): Promise<string> {
   return r.data.data.uniqueCode;
 }
 
-export async function listVendors(search?: string): Promise<Vendor[]> {
-  const r = await api.get('/vendors', { params: search ? { search } : {} });
+export async function listVendors(
+  search?: string,
+  dealsIn?: VendorDealsCategory,
+): Promise<Vendor[]> {
+  const params: Record<string, string> = {};
+  if (search) params.search = search;
+  if (dealsIn) params.dealsIn = dealsIn;
+  const r = await api.get('/vendors', { params });
   return r.data.data;
 }
 
