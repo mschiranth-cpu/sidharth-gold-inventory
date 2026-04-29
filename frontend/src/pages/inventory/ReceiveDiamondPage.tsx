@@ -40,6 +40,22 @@ const SHAPES = [
   'CUSTOM',
 ];
 const COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+// Loose / melee parcels are graded as colour RANGES (GIA convention) because
+// individual stones in a parcel are too small to colour-grade one-by-one.
+// Ref: Wikipedia — "Diamonds in the normal color range are graded loose
+// (for example F–G)."
+const LOOSE_COLORS = [
+  'D-E',
+  'E-F',
+  'F-G',
+  'G-H',
+  'H-I',
+  'I-J',
+  'J-K',
+  'K-L',
+  'L-M',
+  'M-N',
+];
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1'];
 const CATEGORIES = ['SOLITAIRE', 'LOOSE'] as const;
 
@@ -385,8 +401,20 @@ export default function ReceiveDiamondPage() {
                           value={it.category}
                           onChange={(e) => {
                             const next = e.target.value as PurchaseItem['category'];
+                            // Reset colour to a sensible default for the new
+                            // category so a single-letter grade doesn't carry
+                            // over to LOOSE (which uses ranges) and vice versa.
+                            const nextColor =
+                              next === 'LOOSE'
+                                ? LOOSE_COLORS.includes(it.color)
+                                  ? it.color
+                                  : 'G-H'
+                                : COLORS.includes(it.color)
+                                  ? it.color
+                                  : 'G';
                             updateItem(idx, {
                               category: next,
+                              color: nextColor,
                               // Solitaires are always 1 piece — keep state consistent.
                               ...(next === 'SOLITAIRE' ? { totalPieces: 1 } : {}),
                             });
@@ -431,13 +459,16 @@ export default function ReceiveDiamondPage() {
                       <div>
                         <label className="block text-xs font-medium text-onyx-600 mb-1">
                           Color
+                          {it.category === 'LOOSE' && (
+                            <span className="ml-1 text-onyx-400 font-normal">(range)</span>
+                          )}
                         </label>
                         <select
                           value={it.color}
                           onChange={(e) => updateItem(idx, { color: e.target.value })}
                           className={inputCls}
                         >
-                          {COLORS.map((c) => (
+                          {(it.category === 'LOOSE' ? LOOSE_COLORS : COLORS).map((c) => (
                             <option key={c} value={c}>
                               {c}
                             </option>

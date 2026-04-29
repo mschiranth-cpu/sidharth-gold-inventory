@@ -57,6 +57,19 @@ const SHAPES = [
   'CUSTOM',
 ];
 const COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+// Loose / melee parcels are graded as colour RANGES (GIA convention).
+const LOOSE_COLORS = [
+  'D-E',
+  'E-F',
+  'F-G',
+  'G-H',
+  'H-I',
+  'I-J',
+  'J-K',
+  'K-L',
+  'L-M',
+  'M-N',
+];
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1'];
 
 function isoToDateInput(iso: string | null | undefined): string {
@@ -337,11 +350,27 @@ export default function EditDiamondTransactionModal({
                   className={inputClass(errors.color)}
                 >
                   <option value="">— select —</option>
-                  {COLORS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  <optgroup label="Solitaire (single grade)">
+                    {COLORS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Loose / melee (range)">
+                    {LOOSE_COLORS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {/* Round-trip any legacy / unexpected value so the form
+                      shows the saved colour even if it isn't in either list. */}
+                  {formData.color &&
+                    !COLORS.includes(formData.color) &&
+                    !LOOSE_COLORS.includes(formData.color) && (
+                      <option value={formData.color}>{formData.color}</option>
+                    )}
                 </select>
               </div>
 
