@@ -62,43 +62,39 @@ function currentIstTimeOfDay(): { h: number; m: number; s: number } {
 
 /**
  * Convert a `YYYY-MM-DD` (the value of an `<input type="date">`) into a
- * proper ISO timestamp anchored at "now" in **IST** on that date.
+ * proper ISO timestamp anchored at the **current IST wall-clock time**
+ * on that date.
  *
- *   - If the date is today (in IST) \u2192 attach the current IST clock time
- *     (so a transaction recorded at 14:32 shows as 2:32 PM, not 5:30 AM).
- *   - If the date is in the past (a back-dated entry) \u2192 attach 12:00
- *     IST (noon) so it's clearly "during business hours of that day".
- *   - If the date is in the future \u2192 still attach 12:00 IST.
+ * The transaction date stays whatever the user picked, but the time
+ * component always reflects "right now" in IST. So:
+ *
+ *   - Same-day entry at 14:32 IST → `…T14:32:…` on the picked date.
+ *   - Back-dated entry saved at 11:21 IST → `…T11:21:…` on the back-date
+ *     (NOT noon, NOT 5:30 AM).
+ *   - Future-dated entry → still uses current IST clock time.
  *
  * The returned string is a true UTC ISO that round-trips through Postgres
  * and renders correctly when run back through `formatIstDateTime`.
  *
  * @example
+ *   // Called at 11:21:08 IST on 29/04/2026 with a back-dated entry:
  *   combineDateWithCurrentIstTimeISO('2026-04-28')
- *   \u2192 '2026-04-28T14:32:11.000Z'  (when called at 14:32 IST today = 28th)
- *   \u2192 '2026-04-28T06:30:00.000Z'  (when called on a different day = noon IST)
+ *   → '2026-04-28T05:51:08.000Z'  (= 11:21:08 IST on the 28th)
  */
 export function combineDateWithCurrentIstTimeISO(yyyyMmDd: string): string {
   if (!yyyyMmDd || !/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) {
     // Defensive: fall back to the existing behaviour rather than crash.
     return new Date(yyyyMmDd).toISOString();
   }
-  const today = nowIstDateString();
   const [yStr, moStr, dStr] = yyyyMmDd.split('-');
   const year = Number(yStr);
   const month = Number(moStr); // 1-12
   const day = Number(dStr);
 
-  let h: number;
-  let m: number;
-  let s: number;
-  if (yyyyMmDd === today) {
-    ({ h, m, s } = currentIstTimeOfDay());
-  } else {
-    h = 12;
-    m = 0;
-    s = 0;
-  }
+  // Always stamp the current IST wall-clock time, regardless of whether
+  // the picked date is today, back-dated, or future. The semantics: the
+  // user picks the calendar day; the moment-of-save provides the clock.
+  const { h, m, s } = currentIstTimeOfDay();
 
   // IST is UTC+05:30, no DST. Subtract 5h30m from the IST wall time
   // to get the equivalent UTC instant, then build a UTC Date object.
