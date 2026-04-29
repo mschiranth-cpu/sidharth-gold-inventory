@@ -70,6 +70,7 @@ interface PurchaseItem {
   pricePerCarat: number;
   certNumber?: string;
   certificationLab?: string;
+  dueDate?: string; // LOOSE only — stored as YYYY-MM-DD; emitted into notes as [Due: ...]
   notes?: string;
 }
 
@@ -209,14 +210,24 @@ export default function ReceiveDiamondPage() {
           ? combineDateWithCurrentIstTimeISO(transactionDate)
           : undefined,
         items: items.map((it) => {
-          const { customShape, ...rest } = it;
+          const { customShape, dueDate, ...rest } = it;
           const finalShape =
             it.shape === 'CUSTOM'
               ? (customShape ?? '').trim().toUpperCase()
               : it.shape;
+          // LOOSE rows store their due date inline in notes as a structured
+          // prefix — mirrors the [Vendor: …] tag used elsewhere — so we don't
+          // need a backend schema change to capture it.
+          const noteParts: string[] = [];
+          if (it.category === 'LOOSE' && dueDate) {
+            noteParts.push(`[Due: ${dueDate}]`);
+          }
+          if (rest.notes?.trim()) noteParts.push(rest.notes.trim());
+          const composedNotes = noteParts.join(' ').trim();
           return {
             ...rest,
             shape: finalShape,
+            notes: composedNotes || undefined,
             totalValue: it.caratWeight * it.pricePerCarat,
             // Per-item billing block — server will distribute amountPaid
             // proportionally; we only attach billing on the FIRST item to avoid
@@ -393,40 +404,59 @@ export default function ReceiveDiamondPage() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div>
+                      <div className="col-span-2 md:col-span-1">
                         <label className="block text-xs font-medium text-onyx-600 mb-1">
                           Category
                         </label>
-                        <select
-                          value={it.category}
-                          onChange={(e) => {
-                            const next = e.target.value as PurchaseItem['category'];
-                            // Reset colour to a sensible default for the new
-                            // category so a single-letter grade doesn't carry
-                            // over to LOOSE (which uses ranges) and vice versa.
-                            const nextColor =
-                              next === 'LOOSE'
-                                ? LOOSE_COLORS.includes(it.color)
-                                  ? it.color
-                                  : 'G-H'
-                                : COLORS.includes(it.color)
-                                  ? it.color
-                                  : 'G';
-                            updateItem(idx, {
-                              category: next,
-                              color: nextColor,
-                              // Solitaires are always 1 piece — keep state consistent.
-                              ...(next === 'SOLITAIRE' ? { totalPieces: 1 } : {}),
-                            });
-                          }}
-                          className={inputCls}
+                        <div
+                          role="group"
+                          aria-label="Diamond category"
+                          className="inline-flex w-full rounded-xl border border-champagne-300 p-1 bg-white"
                         >
-                          {CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
+                          {CATEGORIES.map((c) => {
+                            const active = it.category === c;
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => {
+                                  if (it.category === c) return;
+                                  // Reset colour to a sensible default for the new
+                                  // category so a single-letter grade doesn't carry
+                                  // over to LOOSE (which uses ranges) and vice versa.
+                                  const nextColor =
+                                    c === 'LOOSE'
+                                      ? LOOSE_COLORS.includes(it.color)
+                                        ? it.color
+                                        : 'G-H'
+                                      : COLORS.includes(it.color)
+                                        ? it.color
+                                        : 'G';
+                                  updateItem(idx, {
+                                    category: c,
+                                    color: nextColor,
+                                    // Solitaires are always 1 piece.
+                                    // LOOSE hides the pieces field — keep state at
+                                    // 1 silently so totals & API stay valid.
+                                    totalPieces: 1,
+                                    // Drop solitaire-only fields when switching to LOOSE.
+                                    ...(c === 'LOOSE'
+                                      ? { certNumber: '', certificationLab: '' }
+                                      : { dueDate: '' }),
+                                  });
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm font-semibold rounded-lg transition focus:outline-none focus:ring-2 focus:ring-champagne-500 ${
+                                  active
+                                    ? 'bg-gradient-to-r from-champagne-700 to-champagne-600 text-white shadow-sm'
+                                    : 'text-onyx-600 hover:bg-champagne-50'
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-onyx-600 mb-1">
@@ -510,16 +540,13 @@ export default function ReceiveDiamondPage() {
                       {it.category === 'LOOSE' ? (
                         <div>
                           <label className="block text-xs font-medium text-onyx-600 mb-1">
-                            Total Pieces
+                            Due Date
                           </label>
                           <input
-                            type="number"
-                            min={1}
-                            value={it.totalPieces || ''}
+                            type="date"
+                            value={it.dueDate ?? ''}
                             onChange={(e) =>
-                              updateItem(idx, {
-                                totalPieces: parseInt(e.target.value) || 1,
-                              })
+                              updateItem(idx, { dueDate: e.target.value })
                             }
                             className={inputCls}
                           />
@@ -550,7 +577,7 @@ export default function ReceiveDiamondPage() {
                           className={inputCls}
                         />
                       </div>
-                      <div>
+                      <div className="md:col-span-2">
                         <label className="block text-xs font-medium text-onyx-600 mb-1">
                           Item Total
                         </label>
@@ -562,34 +589,38 @@ export default function ReceiveDiamondPage() {
                           })}
                         </div>
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-onyx-600 mb-1">
-                          Cert Number
-                        </label>
-                        <input
-                          type="text"
-                          value={it.certNumber || ''}
-                          onChange={(e) =>
-                            updateItem(idx, { certNumber: e.target.value })
-                          }
-                          className={inputCls}
-                          placeholder="GIA / IGI / HRD"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-onyx-600 mb-1">
-                          Lab
-                        </label>
-                        <input
-                          type="text"
-                          value={it.certificationLab || ''}
-                          onChange={(e) =>
-                            updateItem(idx, { certificationLab: e.target.value })
-                          }
-                          className={inputCls}
-                          placeholder="GIA"
-                        />
-                      </div>
+                      {it.category !== 'LOOSE' && (
+                        <>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-onyx-600 mb-1">
+                              Cert Number
+                            </label>
+                            <input
+                              type="text"
+                              value={it.certNumber || ''}
+                              onChange={(e) =>
+                                updateItem(idx, { certNumber: e.target.value })
+                              }
+                              className={inputCls}
+                              placeholder="GIA / IGI / HRD"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-onyx-600 mb-1">
+                              Lab
+                            </label>
+                            <input
+                              type="text"
+                              value={it.certificationLab || ''}
+                              onChange={(e) =>
+                                updateItem(idx, { certificationLab: e.target.value })
+                              }
+                              className={inputCls}
+                              placeholder="GIA"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
