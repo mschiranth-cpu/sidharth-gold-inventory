@@ -108,6 +108,7 @@ const ClientApprovalPage = lazy(() => import('./pages/admin/ClientApprovalPage')
 const OrderApprovalPage = lazy(() => import('./pages/admin/OrderApprovalPage'));
 const VendorsPage = lazy(() => import('./pages/vendors/VendorsPage'));
 const VendorDetailPage = lazy(() => import('./pages/vendors/VendorDetailPage'));
+const AgingReportPage = lazy(() => import('./pages/vendors/AgingReportPage'));
 
 // Inventory Pages (Phase 2)
 const MainInventoryDashboard = lazy(() => import('./pages/inventory/MainInventoryDashboard'));
@@ -134,6 +135,12 @@ const DiamondRateManagementPage = lazy(
   () => import('./pages/inventory/DiamondRateManagementPage')
 );
 const DiamondLotsPage = lazy(() => import('./pages/inventory/DiamondLotsPage'));
+const DiamondPurchaseOrdersPage = lazy(
+  () => import('./pages/diamonds/DiamondPurchaseOrdersPage')
+);
+const DiamondPurchaseOrderDetailPage = lazy(
+  () => import('./pages/diamonds/DiamondPurchaseOrderDetailPage')
+);
 
 // Real Stone module
 const RealStoneInventoryDashboard = lazy(
@@ -538,6 +545,17 @@ function App() {
           />
 
           <Route
+            path="vendors/aging"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
+                <LazyRoute>
+                  <AgingReportPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="vendors/:id"
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
@@ -745,6 +763,30 @@ function App() {
               >
                 <LazyRoute>
                   <DiamondLotsPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="diamonds/purchase-orders"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondPurchaseOrdersPage />
+                </LazyRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="diamonds/purchase-orders/:id"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
+              >
+                <LazyRoute>
+                  <DiamondPurchaseOrderDetailPage />
                 </LazyRoute>
               </ProtectedRoute>
             }

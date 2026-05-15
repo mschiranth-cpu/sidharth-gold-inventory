@@ -117,6 +117,24 @@ export interface DiamondTransaction {
   neftDate?: string | null;
   creditApplied?: number | null;
   creditGenerated?: number | null;
+  /** Payment due-date (ISO). Computed from vendor.paymentDueDays at create time. */
+  dueDate?: string | null;
+  /**
+   * Sieve mesh / size bucket FK (LOOSE only). Pinned at receive time so
+   * historical receives keep their sieve even if the parent parcel is
+   * later re-sieved or merged.
+   */
+  sieveSizeId?: number | null;
+  /** Snapshot of the sieve master row — included by the backend list endpoints. */
+  sieveSize?: {
+    id: number;
+    code: string;
+    kind: 'MESH' | 'SINGLE';
+    piecesPerCaratAvg?: number | null;
+    weightPerPieceCt?: number | null;
+    mmFrom?: number;
+    mmTo?: number;
+  } | null;
   payments?: DiamondPayment[];
 }
 
@@ -208,6 +226,8 @@ export async function createDiamondPurchase(data: {
   vendorId?: string;
   referenceNumber?: string;
   transactionDate?: string;
+  /** Per-invoice due-date override (ISO). Pre-fills from vendor.paymentDueDays. */
+  dueDate?: string;
   notes?: string;
   items: any[];
 }): Promise<DiamondTransaction[]> {

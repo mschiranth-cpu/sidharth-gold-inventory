@@ -144,6 +144,7 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
         ? [...vendor.dealsIn]
         : (vendor.dealsIn === undefined ? [...VENDOR_DEALS_CATEGORIES] : []))
       : [...VENDOR_DEALS_CATEGORIES],
+    paymentDueDays: vendor?.paymentDueDays ?? 0,
   });
   const [previewCode, setPreviewCode] = useState<string>(vendor?.uniqueCode ?? '…');
 
@@ -457,6 +458,10 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
         // checkbox state — single source of truth for the soft-archive
         // path so it can never silently revert.
         dealsIn: archiveIntent ? [] : dealsInValue,
+        paymentDueDays:
+          form.paymentDueDays === null || form.paymentDueDays === undefined
+            ? null
+            : Number(form.paymentDueDays),
       };
       if (noGst && !isForeign) {
         const m: ManualVendorDetails = {
@@ -754,6 +759,35 @@ export default function VendorFormModal({ vendor, onClose, onSaved }: VendorForm
                 onChange={(v) => setForm({ ...form, phone: v })}
                 onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
                 hasError={showErr('phone')}
+              />
+            </Field>
+          </div>
+
+          {/* Payment Due Days — vendor's default credit period (NET-N).
+              Distinct from the existing creditBalance (monetary) — this is
+              the *period*, in days, that this vendor lets us pay over. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field
+              label="Payment Due Days"
+              hint='Default payment due X days after purchase (NET-X). 0 = pay immediately. Each invoice can override this.'
+            >
+              <input
+                data-field="paymentDueDays"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={365}
+                step={1}
+                value={form.paymentDueDays ?? 0}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm({
+                    ...form,
+                    paymentDueDays: v === '' ? 0 : Math.max(0, Math.min(365, Math.floor(Number(v) || 0))),
+                  });
+                }}
+                placeholder="e.g. 30"
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-champagne-600 focus:border-transparent text-sm"
               />
             </Field>
           </div>

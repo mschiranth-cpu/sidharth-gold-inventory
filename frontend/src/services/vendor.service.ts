@@ -48,6 +48,14 @@ export interface Vendor {
   dealsIn?: VendorDealsCategory[];
   /** Outstanding credit owed back to the vendor (over-payments parked here). */
   creditBalance: number;
+  /**
+   * Default payment due-period in days (NET-N). Used to pre-fill the dueDate
+   * datepicker on every Receive form. `0` = "due immediately / cash".
+   * Distinct from `creditBalance` (monetary) and `Order.paymentTerms` (enum
+   * for customer orders). Optional for backwards compatibility — older API
+   * responses may omit this field; the backend defaults it to 0.
+   */
+  paymentDueDays?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -238,6 +246,12 @@ export interface VendorInput {
    * sent when `country !== 'India'`. Pass `null` to clear an existing blob.
    */
   foreignDetails?: ForeignVendorDetails | null;
+  /**
+   * Default payment due-period in days (NET-N). Used by the backend to
+   * pre-compute `dueDate` on every PURCHASE row this vendor produces.
+   * 0 = "due immediately / cash". Pass `null` to clear.
+   */
+  paymentDueDays?: number | null;
 }
 
 export async function getNextVendorCode(): Promise<string> {
@@ -298,6 +312,56 @@ export async function listVendorOutstanding(): Promise<VendorOutstanding[]> {
 export async function getVendorOutstanding(id: string): Promise<VendorOutstanding | null> {
   try {
     const r = await api.get(`/vendors/${id}/outstanding`);
+    return r.data.data ?? null;
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Aging report row — buckets a vendor's open balance by how many days
+ * past the dueDate each open invoice is. Mirrors the backend
+ * `/api/vendors/aging` shape.
+ */
+export interface VendorAging {
+  vendorId: string;
+  name: string;
+  uniqueCode: string;
+  current: number;   // not yet overdue (days_overdue == 0)
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  over_90: number;
+  totalOpen: number;
+  openCount: number;
+}
+
+export interface VendorAgingLineItem {
+  id: string;
+  kind: 'METAL' | 'DIAMOND' | 'REAL_STONE' | 'STONE_PACKET';
+  reference: string | null;
+  transactionDate: string;
+  dueDate: string | null;
+  totalValue: number;
+  amountPaid: number;
+  balance: number;
+  daysOverdue: number;
+  paymentStatus: string | null;
+}
+
+export interface VendorAgingDetail extends VendorAging {
+  lineItems: VendorAgingLineItem[];
+}
+
+export async function listVendorAging(): Promise<VendorAging[]> {
+  const r = await api.get('/vendors/aging');
+  return r.data.data;
+}
+
+export async function getVendorAging(id: string): Promise<VendorAgingDetail | null> {
+  try {
+    const r = await api.get(`/vendors/${id}/aging`);
     return r.data.data ?? null;
   } catch (err: any) {
     if (err?.response?.status === 404) return null;

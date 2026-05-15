@@ -147,6 +147,9 @@ export default function EditDiamondTransactionModal({
       neftBank: txn.neftBank ?? '',
       neftDate: isoToDateInput(txn.neftDate),
       creditApplied: txn.creditApplied ?? 0,
+      // Per-invoice dueDate override. Empty string here ⇒ explicitly clear
+      // (server will fall back to vendor-default on save).
+      dueDate: isoToDateInput(txn.dueDate),
     };
   });
 
@@ -210,6 +213,12 @@ export default function EditDiamondTransactionModal({
         transactionDate: formData.transactionDate
           ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
           : undefined,
+        // Send explicit dueDate so backend's "preserve user override" branch
+        // takes effect; null clears the column (vendor default reapplied
+        // automatically only if the user also changed vendor or txn-date).
+        dueDate: formData.dueDate
+          ? combineDateWithCurrentIstTimeISO(formData.dueDate)
+          : null,
       };
 
       if (isPurchase) {
@@ -475,6 +484,26 @@ export default function EditDiamondTransactionModal({
                   className={inputClass()}
                 />
               </div>
+
+              {isPurchase && (
+                <div>
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dueDate: e.target.value })
+                    }
+                    className={inputClass()}
+                  />
+                  <p className="mt-1 text-[11px] text-onyx-400">
+                    Override the vendor's default. Clear to recompute from
+                    vendor on save.
+                  </p>
+                </div>
+              )}
 
               <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-onyx-700 mb-2">

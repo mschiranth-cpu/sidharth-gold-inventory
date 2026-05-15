@@ -8,6 +8,7 @@ import { PrismaClient, DiamondShape, DiamondColor, DiamondClarity } from '@prism
 import * as XLSX from 'xlsx';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../middleware/errorHandler';
+import { computeDueDate } from '../../utils/credit';
 import {
   CreateDiamondLotRequest,
   CreateDiamondRequest,
@@ -261,15 +262,23 @@ export async function createDiamondPurchase(
 
   const result = await prisma.$transaction(async (tx) => {
     let availableCredit = 0;
+    let vendorForCredit: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (data.vendorId) {
       // Lock vendor for the entire multi-item batch.
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${data.vendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: data.vendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
       availableCredit = vendor?.creditBalance ?? 0;
+      vendorForCredit = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
     }
+    // Resolve the dueDate ONCE per invoice — every line item shares the same
+    // due-date (it's an invoice-level commitment, not a per-line one).
+    const baseDate = txnDate ?? new Date();
+    const invoiceDueDate = computeDueDate(baseDate, vendorForCredit, data.dueDate);
 
     const created: any[] = [];
     let runningBalanceDelta = 0;
@@ -304,7 +313,13 @@ export async function createDiamondPurchase(
           ? item.stockNumber
           : `DIA-${stamp}-${String(idx + 1).padStart(3, '0')}`;
 
-      // 2. Create the Diamond row.
+      // 2. Create the Diamond row. sieveSizeId only applies to LOOSE parcels;
+      //    SOLITAIRE rows leave it null (their measurements/depth/table track
+      //    individual stones instead of mesh-bucket math).
+      const sieveSizeId =
+        category === 'LOOSE' && typeof item.sieveSizeId === 'number'
+          ? item.sieveSizeId
+          : null;
       const diamond = await tx.diamond.create({
         data: {
           stockNumber,
@@ -328,6 +343,7 @@ export async function createDiamondPurchase(
           pricePerCarat: item.pricePerCarat,
           totalPrice,
           totalPieces: category === 'LOOSE' ? item.totalPieces ?? null : null,
+          sieveSizeId,
           lotId: item.lotId,
           status: 'IN_STOCK',
         },
@@ -382,6 +398,8 @@ export async function createDiamondPurchase(
           neftDate,
           creditApplied: billing.creditApplied > 0 ? billing.creditApplied : undefined,
           creditGenerated: billing.creditGenerated > 0 ? billing.creditGenerated : undefined,
+          dueDate: invoiceDueDate,
+          sieveSizeId,
         },
         include: {
           diamond: true,
@@ -644,6 +662,19 @@ export async function getAllDiamondTransactions(filters?: {
       diamond: { select: { id: true, stockNumber: true, category: true, shape: true, color: true, clarity: true } },
       vendor: { select: { id: true, name: true, uniqueCode: true, creditBalance: true } },
       createdBy: { select: { name: true } },
+      // Sieve master snapshot — pulled in so DiamondTransactionsPage can
+      // render the sieve chip without a separate lookup.
+      sieveSize: {
+        select: {
+          id: true,
+          code: true,
+          kind: true,
+          piecesPerCaratAvg: true,
+          weightPerPieceCt: true,
+          mmFrom: true,
+          mmTo: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -721,6 +752,39 @@ export async function updateDiamondTransaction(
     const neftDate = data.neftDate ? new Date(data.neftDate) : undefined;
     const txnDate = data.transactionDate ? new Date(data.transactionDate) : undefined;
 
+    // dueDate handling — preserve manual override unless caller explicitly
+    // changed dueDate, OR vendor / transactionDate changed (which invalidates
+    // the previously-computed dueDate).
+    let nextDueDate: Date | null | undefined = old.dueDate ?? undefined;
+    if (isPurchase) {
+      if (data.dueDate !== undefined) {
+        // Explicit override (could be `null` to clear, or ISO string to set).
+        if (data.dueDate === null || data.dueDate === '') {
+          nextDueDate = null;
+        } else {
+          const d = new Date(data.dueDate);
+          if (!Number.isNaN(d.getTime())) nextDueDate = d;
+        }
+      } else if (
+        (data.vendorId !== undefined && data.vendorId !== old.vendorId) ||
+        txnDate !== undefined
+      ) {
+        // Recompute: vendor or txn-date changed and no manual override sent.
+        let vendorForDue: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
+        if (newVendorId) {
+          const v = await tx.vendor.findUnique({
+            where: { id: newVendorId },
+            select: { paymentDueDays: true, gstDetails: true },
+          });
+          if (v) vendorForDue = { paymentDueDays: v.paymentDueDays, gstDetails: v.gstDetails };
+        }
+        const baseDate = txnDate ?? old.createdAt;
+        nextDueDate = computeDueDate(baseDate, vendorForDue);
+      }
+    } else {
+      nextDueDate = null;
+    }
+
     const updated = await tx.diamondTransaction.update({
       where: { id },
       data: {
@@ -741,6 +805,7 @@ export async function updateDiamondTransaction(
         neftDate: isPurchase ? (data.neftDate !== undefined ? neftDate ?? null : old.neftDate) : null,
         creditApplied: isPurchase && creditApplied > 0 ? creditApplied : null,
         creditGenerated: isPurchase && creditGenerated > 0 ? creditGenerated : null,
+        dueDate: nextDueDate ?? null,
       },
       include: {
         diamond: true,

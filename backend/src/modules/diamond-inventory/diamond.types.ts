@@ -51,6 +51,12 @@ export interface CreateDiamondRequest {
    * issue. For SOLITAIRE: ignored / null (treated as 1).
    */
   totalPieces?: number;
+  /**
+   * FK to the SieveSize master table (LOOSE parcels only). Drives the
+   * pieces ↔ carats auto-conversion on the receive form. SOLITAIRE rows
+   * leave this null.
+   */
+  sieveSizeId?: number;
   lotId?: string;
 }
 
@@ -110,6 +116,12 @@ export interface CreateDiamondPurchaseRequest {
   referenceNumber?: string;
   /** ISO date — back-dates all items in this invoice. Defaults to now(). */
   transactionDate?: string;
+  /**
+   * Optional invoice-level due-date override (ISO string). Pre-fills from
+   * `vendor.paymentDueDays` on the UI; backend falls back to the vendor
+   * default when omitted. See `backend/src/utils/credit.ts#computeDueDate`.
+   */
+  dueDate?: string;
   notes?: string;
   items: DiamondPurchaseItem[];
 }
@@ -201,6 +213,8 @@ export interface UpdateDiamondTransactionRequest {
   neftBank?: string;
   neftDate?: string;
   creditApplied?: number;
+  /** Per-invoice due-date override (ISO string). Admin-only edit affordance. */
+  dueDate?: string | null;
 }
 
 /** Mirror of SettleMetalPaymentRequest. */

@@ -46,6 +46,12 @@ export interface CreateMetalTransactionRequest {
   // Vendor credit to apply against this purchase (deducted from Vendor.creditBalance).
   // Server clamps to min(creditApplied, vendor.creditBalance, totalValue).
   creditApplied?: number;
+  /**
+   * Optional per-invoice override for the payment due-date (ISO). Pre-fills
+   * from `vendor.paymentDueDays` on the UI; backend computes from vendor
+   * default when omitted. See `backend/src/utils/credit.ts#computeDueDate`.
+   */
+  dueDate?: string;
 }
 
 export interface UpdateMetalTransactionRequest {
@@ -75,6 +81,8 @@ export interface UpdateMetalTransactionRequest {
   neftBank?: string;
   neftDate?: string;
   creditApplied?: number;
+  /** Per-invoice due-date override (ISO). Admin-only edit affordance. */
+  dueDate?: string | null;
 }
 
 export interface SettleMetalPaymentRequest {

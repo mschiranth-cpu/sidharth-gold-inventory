@@ -1,7 +1,7 @@
 <!-- nexusgraphai:start -->
 # NexusGraphAI — Code Intelligence
 
-This project is indexed by NexusGraphAI as **Sidharth Gold Inventory Site** (3466 symbols, 7438 relationships, 212 execution flows). Use the NexusGraphAI MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by NexusGraphAI as **sidharth-gold-inventory** (7014 symbols, 12139 relationships, 248 execution flows). Use the NexusGraphAI MCP tools to understand code, assess impact, and navigate safely.
 
 > If any NexusGraphAI tool warns the index is stale, run `npx nexus-graph-ai analyze` in terminal first.
 
@@ -17,7 +17,7 @@ This project is indexed by NexusGraphAI as **Sidharth Gold Inventory Site** (346
 
 1. `nexusgraphai_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `nexusgraphai_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ nexusgraphai://repo/Sidharth Gold Inventory Site/process/{processName}` — trace the full execution flow step by step
+3. `READ nexusgraphai://repo/sidharth-gold-inventory/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `nexusgraphai_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -56,10 +56,10 @@ This project is indexed by NexusGraphAI as **Sidharth Gold Inventory Site** (346
 
 | Resource | Use for |
 |----------|---------|
-| `nexusgraphai://repo/Sidharth Gold Inventory Site/context` | Codebase overview, check index freshness |
-| `nexusgraphai://repo/Sidharth Gold Inventory Site/clusters` | All functional areas |
-| `nexusgraphai://repo/Sidharth Gold Inventory Site/processes` | All execution flows |
-| `nexusgraphai://repo/Sidharth Gold Inventory Site/process/{name}` | Step-by-step execution trace |
+| `nexusgraphai://repo/sidharth-gold-inventory/context` | Codebase overview, check index freshness |
+| `nexusgraphai://repo/sidharth-gold-inventory/clusters` | All functional areas |
+| `nexusgraphai://repo/sidharth-gold-inventory/processes` | All execution flows |
+| `nexusgraphai://repo/sidharth-gold-inventory/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 

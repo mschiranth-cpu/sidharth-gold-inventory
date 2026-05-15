@@ -145,6 +145,8 @@ export interface RealStoneTransaction {
   neftDate?: string | null;
   creditApplied?: number | null;
   creditGenerated?: number | null;
+  /** Payment due-date (ISO). Computed from vendor.paymentDueDays at create time. */
+  dueDate?: string | null;
   payments?: RealStonePayment[];
 }
 
@@ -236,6 +238,8 @@ export interface StonePacketTransaction {
   neftDate?: string | null;
   creditApplied?: number | null;
   creditGenerated?: number | null;
+  /** Payment due-date (ISO). Computed from vendor.paymentDueDays at create time. */
+  dueDate?: string | null;
   payments?: StonePacketPayment[];
 }
 
@@ -291,6 +295,8 @@ export async function createRealStonePurchase(data: {
   vendorId?: string;
   referenceNumber?: string;
   transactionDate?: string;
+  /** Per-invoice due-date override (ISO). Falls back to vendor.paymentDueDays. */
+  dueDate?: string;
   notes?: string;
   items: any[];
 }): Promise<RealStoneTransaction[]> {
@@ -447,6 +453,8 @@ export async function createStonePacketPurchase(data: {
   vendorId?: string;
   referenceNumber?: string;
   transactionDate?: string;
+  /** Per-invoice due-date override (ISO). Falls back to vendor.paymentDueDays. */
+  dueDate?: string;
   notes?: string;
   items: any[];
 }): Promise<StonePacketTransaction[]> {

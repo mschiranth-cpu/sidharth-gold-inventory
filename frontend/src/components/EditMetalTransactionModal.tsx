@@ -126,6 +126,7 @@ export default function EditMetalTransactionModal({
     neftBank: txn.neftBank ?? '',
     neftDate: isoToDateInput(txn.neftDate),
     creditApplied: txn.creditApplied ?? 0,
+    dueDate: isoToDateInput(txn.dueDate),
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -185,6 +186,9 @@ export default function EditMetalTransactionModal({
         transactionDate: formData.transactionDate
           ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
           : undefined,
+        dueDate: formData.dueDate
+          ? combineDateWithCurrentIstTimeISO(formData.dueDate)
+          : null,
       };
 
       if (isPurchase) {
@@ -420,6 +424,28 @@ export default function EditMetalTransactionModal({
                 </div>
               </div>
             </div>
+
+            {isPurchase && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dueDate: e.target.value })
+                    }
+                    className={inputClass()}
+                  />
+                  <p className="mt-1 text-[11px] text-onyx-400">
+                    Override the vendor's default. Clear to recompute from
+                    vendor on save.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-onyx-700 mb-2">Notes</label>
