@@ -456,6 +456,18 @@ export default function DiamondInventoryDashboard() {
                               .filter(Boolean)
                               .join(' · ') || '—'}
                           </span>
+                          {t.sieveSize?.code && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold border bg-champagne-50 text-champagne-800 border-champagne-200 tabular-nums"
+                              title={
+                                t.sieveSize.kind === 'MESH'
+                                  ? `Sieve ${t.sieveSize.code} · ≈${t.sieveSize.piecesPerCaratAvg ?? '?'} pcs/ct`
+                                  : `Size ${t.sieveSize.code}`
+                              }
+                            >
+                              {t.sieveSize.kind === 'MESH' ? 'Sieve' : 'Size'} {t.sieveSize.code}
+                            </span>
+                          )}
                           {t.vendor && (
                             <span className="text-xs text-champagne-700 font-medium truncate max-w-[160px]">
                               {t.vendor.name}

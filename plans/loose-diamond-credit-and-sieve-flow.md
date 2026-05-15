@@ -420,8 +420,19 @@ The prod box's GitHub credentials (`wincredman` / Git Credential Manager) appear
 3. Temporarily embed a fine-scoped PAT in `remote.origin.url` (`git remote set-url origin https://x-access-token:<PAT>@github.com/...`) — least preferred (PAT in plaintext config).
 After any of those, the next `AtivaGitAutoCommit` cycle (or another manual push) will fast-forward `origin/main` to `582445c`.
 
-### ⏳ Pending follow-ups
-- Resolve the GCM credential rot above so `origin/main` catches up.
-- Add `npx prisma generate` to `scripts/deploy.ps1` (between "Building backend" and any commands that depend on the new Prisma client) so future schema-touching deploys don't require the manual workaround we used today.
-- Run the deferred integration tests (`tests/integration/aging.test.ts`, `tests/integration/diamondPurchaseOrder.test.ts`) once the local dev DB drift is reconciled.
-- Re-run nexus-graph-ai full reanalyze post-deploy to refresh the index against prod-aligned `main`.
+### ✅ Gap-Analysis Closeout (2026-05-15 evening)
+
+Open gap-analysis items from the cross-check have been addressed in this iteration:
+
+| # | Item | Resolution |
+|---|---|---|
+| g1 | Home dashboard missing `VendorOverdueWidget` | Created `frontend/src/modules/dashboard/components/v2/VendorOverdueWidget.tsx` (sibling to `VendorOutstandingWidget`); registered new section id `vendors-overdue` in `ADMIN_DEFAULT_ORDER` / `ADMIN_LABELS` in `DashboardV2.tsx`. `useDashboardLayout`'s union-with-defaults logic auto-inserts the new section into existing users' saved layouts. Self-fetches `/api/vendors/aging` (60s stale) and links into the AgingReportPage. |
+| g2 | Sieve chip missing on `DiamondInventoryDashboard` recent activity | Added a `Sieve {code}` / `Size {code}` chip rendered inline with shape/color/clarity in the recent-activity list, with full pcs/ct + mm tooltip. Sieve column on `DiamondTransactionsPage` is unchanged. |
+| g3 | Sieve seed embedded in SQL patch only | Created dedicated `backend/prisma/seeds/sieve-sizes.ts` (33 MESH + 8 SINGLE rows, fully typed, upsert-by-`code` so re-runs preserve FKs) and wired it into `seed.ts main()` after the data-clear step (sieve master is intentionally never wiped). Standalone runnable too: `npx ts-node prisma/seeds/sieve-sizes.ts`. |
+| g4 | `useSieveAutoCalc` lacked frontend unit tests | Added `frontend/src/hooks/__tests__/useSieveAutoCalc.test.ts` (15 cases): MESH + SINGLE conversions in both directions, null-guards for invalid inputs, describeSieve formatting, and round-trip stability. All 15 green under `vitest run`. |
+| g5 | `scripts/deploy.ps1` missing `npx prisma generate` | Restructured the deploy flow: stop backend service → `prisma generate` → backend build → `prisma migrate deploy` → restart service. Stopping first releases the locked `query_engine-windows.dll.node` so generate succeeds; running generate before tsc means newly added Prisma models compile cleanly without the manual wrapper we used on 2026-05-15. Doc-block in the script updated with the 10-step order. |
+
+### ⏳ Pending follow-ups (not in scope of this iteration)
+- **Resolve the GCM credential rot** on the production server console as user `pc` so `origin/main` catches up with prod. Requires interactive `git credential-manager configure` (or SSH remote / scoped PAT) — must be done locally on the Windows box, can't be automated remotely.
+- **Run the deferred integration tests** (`tests/integration/aging.test.ts`, `tests/integration/diamondPurchaseOrder.test.ts`) once the local dev DB drift on `diamond_transactions` is reconciled by the developer.
+- **Re-run nexus-graph-ai full reanalyze** post-deploy to refresh the index against the new gap-closeout commit.
