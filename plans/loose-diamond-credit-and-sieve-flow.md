@@ -386,13 +386,42 @@ All three pre-flight checks performed before Phase 1 implementation:
 - `App.tsx`: lazy-loaded `/app/diamonds/purchase-orders` and `/app/diamonds/purchase-orders/:id` routes.
 - `Sidebar.tsx`: "Diamond Purchase Orders" entry under Main Inventory; `inventoryChildPaths` updated for active-state highlighting.
 
-### ⚠️ Database Schema Drift (still open)
-`psql` revealed that the local `diamond_transactions` table is missing `vendor_id`, `total_value`, `payment_status`, and `due_date` — i.e. the live DB is several migrations behind `schema.prisma`. The Phase 1 SQL patch (`2026-05-15_add_payment_due_days_and_due_dates.sql`) and the new Phase 4 SQL patch will both fail under the current state. The patches themselves are correct and idempotent; they just need the prerequisite drift reconciled first. **Owner: user.** Code changes in this branch deliberately tolerate this — `tsc` is clean and Prisma client regenerated against the updated schema, so once the DB catches up the patches apply cleanly in order.
+### ⚠️ Database Schema Drift (resolved on prod, still open on local dev DB)
+`psql` against the **local dev DB** revealed that `diamond_transactions` is missing `vendor_id`, `total_value`, `payment_status`, and `due_date`. The patches still won't apply against the local DB until the user reconciles those columns.
+
+The **production DB** turned out NOT to be drifted: pre-deploy schema probe on 2026-05-15 confirmed `diamond_transactions` already had `vendor_id`, `total_value`, `payment_status`, and only `due_date` / `sieve_size_id` / `purchase_order_id` were missing — exactly what the three patches add. All three patches applied cleanly in production (see "Production Deployment" below).
+
+### ✅ Production Deployment — 2026-05-15 20:49 IST
+- **Commit**: `582445c feat(credit+sieve+po): vendor credit terms, aging report, sieve master, diamond POs` (one squashed commit on top of `bd665fc`).
+- **Local Mac → prod transfer**: Local push to `origin/main` blocked (Mac `gh` auth = `cmadraha_cisco`, no write access to `mschiranth-cpu/sidharth-gold-inventory`). Worked around by `git format-patch` → `scp ativa:/tmp/` → `git am` directly on the prod box. Working tree on prod clean before & after.
+- **DB patches applied** (in order, with backup at `D:\backups\sql-patch-20260515_204920\affected-tables.sql`):
+  1. `2026-05-15_add_payment_due_days_and_due_dates.sql` — added `vendors.payment_due_days`, `due_date` on all 4 transaction tables, indexes; backfilled 22 rows.
+  2. `2026-05-15_add_sieve_sizes.sql` — created `sieve_sizes` (41 rows seeded: 33 MESH + 8 SIZE), added `sieve_size_id` FK on `diamond_transactions`.
+  3. `2026-05-15_add_diamond_purchase_orders.sql` — created `diamond_purchase_orders` + `diamond_purchase_order_lines`, added `purchase_order_id` FK on `diamond_transactions`.
+- **Build / restart** (`scripts\deploy.ps1`):
+  - `nssm stop AtivaGoldInventoryBackend` (released the locked `query_engine-windows.dll.node`).
+  - `npx prisma generate` (deploy.ps1 doesn't do this — see "Follow-ups" below).
+  - `npx vite build` → all new chunks emitted (`AgingReportPage`, `DiamondPurchaseOrdersPage`, `DiamondPurchaseOrderDetailPage`, `diamondPurchaseOrder.service`).
+  - `npm run build` (backend tsc) → clean.
+  - `npx prisma migrate deploy` → 0 pending (SQL patches already covered the schema).
+  - Service restarted; cloudflared tunnel verified connected.
+- **Smoke checks**:
+  - `https://ativa-jewels.com/health` → 200
+  - `https://ativa-jewels.com/api/sieve-sizes` → 200, returns 41 sizes (`+000/-00` … `-2/-3`).
+  - `https://ativa-jewels.com/api/diamond-purchase-orders` → 401 (auth-gated, route registered).
+  - `https://ativa-jewels.com/api/vendors/aging` → 401 (auth-gated, route registered).
+
+### ⚠️ GitHub origin/main behind prod by 1 commit (open)
+The prod box's GitHub credentials (`wincredman` / Git Credential Manager) appear to have rotted since the last successful auto-sync on 2026-04-29. `AtivaGitAutoCommit` and a manual `git push origin main` from prod both fail with `fatal: Unable to persist credentials with the 'wincredman' credential store … bash: line 1: /dev/tty: No such device or address`. Prod runtime is unaffected — the commit is on prod's local `main` (`582445c`) and the live site serves that code. Only the GitHub mirror is stale.
+
+**To resolve (manual, on the prod box console as user `pc`)** — pick one:
+1. `git credential-manager configure` then `git push origin main` once interactively to refresh the cached PAT.
+2. Add an SSH remote and push once via SSH key.
+3. Temporarily embed a fine-scoped PAT in `remote.origin.url` (`git remote set-url origin https://x-access-token:<PAT>@github.com/...`) — least preferred (PAT in plaintext config).
+After any of those, the next `AtivaGitAutoCommit` cycle (or another manual push) will fast-forward `origin/main` to `582445c`.
 
 ### ⏳ Pending follow-ups
-- Apply the four SQL patches in order:
-  1. `2026-05-15_add_payment_due_days_and_due_dates.sql`
-  2. `2026-05-15_add_sieve_sizes.sql`
-  3. `2026-05-15_add_diamond_purchase_orders.sql`
-- Run the deferred integration tests (`tests/integration/aging.test.ts`, `tests/integration/diamondPurchaseOrder.test.ts`) once the DB is in sync.
-- Phase 5 final smoke: `npm run build` for backend + `npx vite build` for frontend, then full BATS run.
+- Resolve the GCM credential rot above so `origin/main` catches up.
+- Add `npx prisma generate` to `scripts/deploy.ps1` (between "Building backend" and any commands that depend on the new Prisma client) so future schema-touching deploys don't require the manual workaround we used today.
+- Run the deferred integration tests (`tests/integration/aging.test.ts`, `tests/integration/diamondPurchaseOrder.test.ts`) once the local dev DB drift is reconciled.
+- Re-run nexus-graph-ai full reanalyze post-deploy to refresh the index against prod-aligned `main`.
