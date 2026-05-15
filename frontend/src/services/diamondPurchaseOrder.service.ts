@@ -23,7 +23,12 @@ export interface DiamondPoLine {
     id: number;
     code: string;
     sizeLabel: string | null;
+    /** MESH: drives pcs ↔ cts auto-calc. */
     piecesPerCaratAvg: number | null;
+    /** SINGLE: full carat weight of one stone — used both directions. */
+    weightPerPieceCt: number | null;
+    mmFrom: number;
+    mmTo: number;
     kind: 'MESH' | 'SINGLE';
   } | null;
   /** Variance fields only present on detail GET. */
