@@ -1,9 +1,8 @@
-import type { SieveSize } from '../services/sieveSize.service';
-
 /**
  * Pure helpers for bidirectional pieces ↔ carats conversion driven by a
  * SieveSize row. Kept as plain functions (not a hook) so the same logic can
- * power both ReceiveDiamondPage and the upcoming Diamond PO line editor.
+ * power both the New PO modal and the Record-Receive modal on the PO detail
+ * page.
  *
  * Conversion math:
  *   - MESH:    pieces = round(carats × piecesPerCaratAvg)
@@ -13,11 +12,22 @@ import type { SieveSize } from '../services/sieveSize.service';
  *
  * Returns NaN-safe defaults for missing/zero inputs so the caller can pipe
  * the result straight into a controlled `<input type="number">`.
+ *
+ * Accepts a minimal structural shape (`SieveLike`) so callers can pass either
+ * the full `SieveSize` master row or the trimmed nested copy that ships in
+ * `DiamondPoLine.sieveSize` — both expose the conversion fields used here.
  */
+export interface SieveLike {
+  kind: 'MESH' | 'SINGLE';
+  piecesPerCaratAvg: number | null;
+  weightPerPieceCt: number | null;
+  mmFrom: number;
+  mmTo: number;
+}
 
 export function piecesFromCarats(
   carats: number | null | undefined,
-  sieve: SieveSize | null | undefined
+  sieve: SieveLike | null | undefined
 ): number {
   if (!sieve || !carats || carats <= 0) return 0;
   if (sieve.kind === 'MESH') {
@@ -31,7 +41,7 @@ export function piecesFromCarats(
 
 export function caratsFromPieces(
   pieces: number | null | undefined,
-  sieve: SieveSize | null | undefined
+  sieve: SieveLike | null | undefined
 ): number {
   if (!sieve || !pieces || pieces <= 0) return 0;
   if (sieve.kind === 'MESH') {
@@ -43,7 +53,7 @@ export function caratsFromPieces(
   return Math.round(pieces * sieve.weightPerPieceCt * 1000) / 1000;
 }
 
-export function describeSieve(sieve: SieveSize | null | undefined): string {
+export function describeSieve(sieve: SieveLike | null | undefined): string {
   if (!sieve) return '';
   if (sieve.kind === 'MESH') {
     const ppc = sieve.piecesPerCaratAvg ?? 0;

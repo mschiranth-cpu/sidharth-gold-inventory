@@ -3,7 +3,7 @@
  * Shows existing POs (with status filter) and a "+ New PO" form modal that
  * creates a DRAFT or PLACED PO with one or more sieve-keyed lines.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,8 +20,13 @@ import {
   DIAMOND_PO_STATUS_LABEL,
   DIAMOND_PO_STATUS_CLS,
 } from '../../services/diamondPurchaseOrder.service';
-import { listSieveSizes } from '../../services/sieveSize.service';
+import { listSieveSizes, type SieveSize } from '../../services/sieveSize.service';
 import { listVendors } from '../../services/vendor.service';
+import {
+  caratsFromPieces,
+  describeSieve,
+  piecesFromCarats,
+} from '../../hooks/useSieveAutoCalc';
 import Button from '../../components/common/Button';
 
 const fmt = (n: number | null | undefined) =>
@@ -76,6 +81,11 @@ export default function DiamondPurchaseOrdersPage() {
   const [notes, setNotes] = useState('');
   const [submitAs, setSubmitAs] = useState<'DRAFT' | 'PLACED'>('PLACED');
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  // Per-line touched flags — once a user types into pieces/cts directly we stop
+  // overwriting that side from sieve-driven auto-calc. Mirrors the
+  // `lastAutoCurrency` pattern used in VendorFormModal.
+  const piecesTouchedRef = useRef<boolean[]>([false]);
+  const caratsTouchedRef = useRef<boolean[]>([false]);
 
   const { data: pos = [], isLoading } = useQuery({
     queryKey: ['diamond-pos', { status: statusFilter }],
@@ -116,8 +126,16 @@ export default function DiamondPurchaseOrdersPage() {
     setNotes('');
     setSubmitAs('PLACED');
     setLines([emptyLine()]);
+    piecesTouchedRef.current = [false];
+    caratsTouchedRef.current = [false];
     setError(null);
   };
+
+  const sieveById = useMemo(() => {
+    const m = new Map<number, SieveSize>();
+    sieves.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [sieves]);
 
   const totals = useMemo(() => {
     let pieces = 0;
@@ -138,6 +156,70 @@ export default function DiamondPurchaseOrdersPage() {
     setLines((prev) =>
       prev.map((l, i) => (i === idx ? { ...l, ...patch } : l))
     );
+  };
+
+  const addLine = () => {
+    setLines((prev) => [...prev, emptyLine()]);
+    piecesTouchedRef.current.push(false);
+    caratsTouchedRef.current.push(false);
+  };
+
+  const removeLine = (idx: number) => {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+    piecesTouchedRef.current = piecesTouchedRef.current.filter((_, i) => i !== idx);
+    caratsTouchedRef.current = caratsTouchedRef.current.filter((_, i) => i !== idx);
+  };
+
+  /**
+   * Sieve-driven auto-calc: when the user picks/changes a sieve we re-suggest
+   * whichever side (pcs or cts) is still untouched. Once they type into a
+   * given field the touched-ref pins it and only that side stays put — the
+   * other still gets recomputed from the sieve. Same pattern lives in
+   * VendorFormModal's currency auto-fill.
+   */
+  const handleLineSieveChange = (idx: number, value: string) => {
+    const sieveId = value ? Number(value) : '';
+    const sieve = sieveId ? sieveById.get(sieveId) ?? null : null;
+    const line = lines[idx];
+    const patch: Partial<DraftLine> = { sieveSizeId: sieveId };
+    if (sieve && line) {
+      const cts = Number(line.expectedCarats) || 0;
+      const pcs = Number(line.expectedPieces) || 0;
+      if (cts > 0 && !piecesTouchedRef.current[idx]) {
+        patch.expectedPieces = String(piecesFromCarats(cts, sieve) || '');
+      } else if (pcs > 0 && !caratsTouchedRef.current[idx]) {
+        patch.expectedCarats = String(caratsFromPieces(pcs, sieve) || '');
+      }
+    }
+    updateLine(idx, patch);
+  };
+
+  const handleLineCaratsChange = (idx: number, value: string) => {
+    caratsTouchedRef.current[idx] = true;
+    const line = lines[idx];
+    const sieveId = line?.sieveSizeId ? Number(line.sieveSizeId) : null;
+    const sieve = sieveId ? sieveById.get(sieveId) ?? null : null;
+    const cts = Number(value) || 0;
+    const patch: Partial<DraftLine> = { expectedCarats: value };
+    if (sieve && cts > 0 && !piecesTouchedRef.current[idx]) {
+      const next = piecesFromCarats(cts, sieve);
+      if (next > 0) patch.expectedPieces = String(next);
+    }
+    updateLine(idx, patch);
+  };
+
+  const handleLinePiecesChange = (idx: number, value: string) => {
+    piecesTouchedRef.current[idx] = true;
+    const line = lines[idx];
+    const sieveId = line?.sieveSizeId ? Number(line.sieveSizeId) : null;
+    const sieve = sieveId ? sieveById.get(sieveId) ?? null : null;
+    const pcs = Number(value) || 0;
+    const patch: Partial<DraftLine> = { expectedPieces: value };
+    if (sieve && pcs > 0 && !caratsTouchedRef.current[idx]) {
+      const next = caratsFromPieces(pcs, sieve);
+      if (next > 0) patch.expectedCarats = String(next);
+    }
+    updateLine(idx, patch);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -403,7 +485,7 @@ export default function DiamondPurchaseOrdersPage() {
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setLines((prev) => [...prev, emptyLine()])}
+                    onClick={addLine}
                     className="text-xs text-azure-600 hover:underline font-semibold"
                   >
                     + Add line
@@ -422,13 +504,7 @@ export default function DiamondPurchaseOrdersPage() {
                         </label>
                         <select
                           value={l.sieveSizeId}
-                          onChange={(e) =>
-                            updateLine(idx, {
-                              sieveSizeId: e.target.value
-                                ? Number(e.target.value)
-                                : '',
-                            })
-                          }
+                          onChange={(e) => handleLineSieveChange(idx, e.target.value)}
                           className={inputCls}
                         >
                           <option value="">— sieve —</option>
@@ -442,6 +518,13 @@ export default function DiamondPurchaseOrdersPage() {
                             </option>
                           ))}
                         </select>
+                        {l.sieveSizeId && sieveById.get(Number(l.sieveSizeId)) && (
+                          <p className="mt-1 text-[10px] text-onyx-400">
+                            {describeSieve(
+                              sieveById.get(Number(l.sieveSizeId)) ?? null
+                            )}
+                          </p>
+                        )}
                       </div>
                       <div className="col-span-1">
                         <label className="block text-[10px] font-semibold text-onyx-500 uppercase mb-0.5">
@@ -495,7 +578,7 @@ export default function DiamondPurchaseOrdersPage() {
                           step="1"
                           value={l.expectedPieces}
                           onChange={(e) =>
-                            updateLine(idx, { expectedPieces: e.target.value })
+                            handleLinePiecesChange(idx, e.target.value)
                           }
                           className={inputCls}
                         />
@@ -510,7 +593,7 @@ export default function DiamondPurchaseOrdersPage() {
                           step="0.01"
                           value={l.expectedCarats}
                           onChange={(e) =>
-                            updateLine(idx, { expectedCarats: e.target.value })
+                            handleLineCaratsChange(idx, e.target.value)
                           }
                           className={inputCls}
                         />
@@ -534,11 +617,7 @@ export default function DiamondPurchaseOrdersPage() {
                         {lines.length > 1 && (
                           <button
                             type="button"
-                            onClick={() =>
-                              setLines((prev) =>
-                                prev.filter((_, i) => i !== idx)
-                              )
-                            }
+                            onClick={() => removeLine(idx)}
                             className="text-rose-500 hover:text-rose-700"
                             aria-label="Remove line"
                           >

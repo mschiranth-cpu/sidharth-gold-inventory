@@ -3,7 +3,7 @@
  * actions (Place / Cancel) for DRAFT/PLACED POs, and a receive panel that
  * creates Diamond + DiamondTransaction rows once placed.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,6 +22,11 @@ import {
   DIAMOND_PO_STATUS_LABEL,
   DIAMOND_PO_STATUS_CLS,
 } from '../../services/diamondPurchaseOrder.service';
+import {
+  caratsFromPieces,
+  describeSieve,
+  piecesFromCarats,
+} from '../../hooks/useSieveAutoCalc';
 import Button from '../../components/common/Button';
 
 const fmt = (n: number | null | undefined) =>
@@ -69,6 +74,11 @@ export default function DiamondPurchaseOrderDetailPage() {
   const [receiveLines, setReceiveLines] = useState<ReceiveDraftLine[]>([]);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [receiveNotes, setReceiveNotes] = useState('');
+  // Per-line touched flags for sieve-driven pcs↔cts auto-calc inside the
+  // receive modal. Sieve is fixed per PO line (not editable here), so the
+  // helpers infer the conversion factor from poLine.sieveSize.
+  const piecesTouchedRef = useRef<boolean[]>([]);
+  const caratsTouchedRef = useRef<boolean[]>([]);
 
   const { data: po, isLoading } = useQuery({
     queryKey: ['diamond-po', id],
@@ -135,6 +145,8 @@ export default function DiamondPurchaseOrderDetailPage() {
         (l.receivedCarats ?? 0) === 0
     );
     setReceiveLines(eligible.map(draftFromPoLine));
+    piecesTouchedRef.current = eligible.map(() => false);
+    caratsTouchedRef.current = eligible.map(() => false);
     setShowReceive(true);
     setError(null);
   };
@@ -150,6 +162,45 @@ export default function DiamondPurchaseOrderDetailPage() {
 
   const removeReceiveLine = (idx: number) => {
     setReceiveLines((prev) => prev.filter((_, i) => i !== idx));
+    piecesTouchedRef.current = piecesTouchedRef.current.filter((_, i) => i !== idx);
+    caratsTouchedRef.current = caratsTouchedRef.current.filter((_, i) => i !== idx);
+  };
+
+  /** Sieve for the receive line is fixed by the originating PO line. */
+  const sieveForReceiveLine = (poLineId: string) => {
+    const poLine = po?.lines.find((x) => x.id === poLineId);
+    return poLine?.sieveSize ?? null;
+  };
+
+  /**
+   * Bidirectional pcs↔cts auto-calc on the receive modal lines, driven by the
+   * PO line's sieve. Once a side is touched the touched-ref pins it; the other
+   * side keeps recomputing from sieve until the user touches it too.
+   */
+  const handleReceivePiecesChange = (idx: number, value: string) => {
+    piecesTouchedRef.current[idx] = true;
+    const line = receiveLines[idx];
+    const sieve = line ? sieveForReceiveLine(line.poLineId) : null;
+    const pcs = Number(value) || 0;
+    const patch: Partial<ReceiveDraftLine> = { pieces: value };
+    if (sieve && pcs > 0 && !caratsTouchedRef.current[idx]) {
+      const next = caratsFromPieces(pcs, sieve);
+      if (next > 0) patch.caratWeight = String(next);
+    }
+    updateReceiveLine(idx, patch);
+  };
+
+  const handleReceiveCaratsChange = (idx: number, value: string) => {
+    caratsTouchedRef.current[idx] = true;
+    const line = receiveLines[idx];
+    const sieve = line ? sieveForReceiveLine(line.poLineId) : null;
+    const cts = Number(value) || 0;
+    const patch: Partial<ReceiveDraftLine> = { caratWeight: value };
+    if (sieve && cts > 0 && !piecesTouchedRef.current[idx]) {
+      const next = piecesFromCarats(cts, sieve);
+      if (next > 0) patch.pieces = String(next);
+    }
+    updateReceiveLine(idx, patch);
   };
 
   const submitReceive = (e: React.FormEvent) => {
@@ -483,6 +534,7 @@ export default function DiamondPurchaseOrderDetailPage() {
                 <div className="space-y-3">
                   {receiveLines.map((l, idx) => {
                     const poLine = po.lines.find((x) => x.id === l.poLineId);
+                    const sieve = poLine?.sieveSize ?? null;
                     return (
                       <div
                         key={l.poLineId}
@@ -497,6 +549,7 @@ export default function DiamondPurchaseOrderDetailPage() {
                               {poLine?.varianceCarats != null
                                 ? ` (open ${fmt(Math.max(0, -(poLine.varianceCarats)))})`
                                 : ''}
+                              {sieve ? ` · ${describeSieve(sieve)}` : ''}
                             </span>
                           </span>
                           <button
@@ -547,9 +600,7 @@ export default function DiamondPurchaseOrderDetailPage() {
                               step="1"
                               value={l.pieces}
                               onChange={(e) =>
-                                updateReceiveLine(idx, {
-                                  pieces: e.target.value,
-                                })
+                                handleReceivePiecesChange(idx, e.target.value)
                               }
                               className={inputCls}
                             />
@@ -561,9 +612,7 @@ export default function DiamondPurchaseOrderDetailPage() {
                               step="0.01"
                               value={l.caratWeight}
                               onChange={(e) =>
-                                updateReceiveLine(idx, {
-                                  caratWeight: e.target.value,
-                                })
+                                handleReceiveCaratsChange(idx, e.target.value)
                               }
                               className={inputCls}
                             />
