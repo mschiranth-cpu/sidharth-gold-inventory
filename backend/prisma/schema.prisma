@@ -1272,6 +1272,10 @@ model DiamondPurchaseOrder {
   // Frozen at PLACED time — receives inherit this verbatim regardless of
   // the actual receipt date. Override allowed at PO creation only.
   dueDate               DateTime? @map("due_date")
+  // True when the user explicitly supplied dueDate at PO creation; the
+  // PLACE transition then preserves it. False (default) means dueDate was
+  // auto-computed and is recomputed against the real placedAt timestamp.
+  dueDateOverridden     Boolean  @default(false) @map("due_date_overridden")
   notes                 String?
   createdById           String   @map("created_by_id")
   createdBy             User     @relation("DiamondPurchaseOrdersCreated", fields: [createdById], references: [id])
