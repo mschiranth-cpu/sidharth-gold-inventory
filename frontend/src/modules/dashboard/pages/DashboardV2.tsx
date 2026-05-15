@@ -42,6 +42,7 @@ import { DepartmentWorkloadChart } from '../components/v2/DepartmentWorkloadChar
 import { OrderStatusDonut } from '../components/v2/OrderStatusDonut';
 import { SubmissionsQueueWidget } from '../components/v2/SubmissionsQueueWidget';
 import { VendorOutstandingWidget } from '../components/v2/VendorOutstandingWidget';
+import { VendorOverdueWidget } from '../components/v2/VendorOverdueWidget';
 import { InventorySnapshotWidget } from '../components/v2/InventorySnapshotWidget';
 import { AttendanceTodayWidget } from '../components/v2/AttendanceTodayWidget';
 import { NotificationsPeekWidget } from '../components/v2/NotificationsPeekWidget';
@@ -92,6 +93,7 @@ const ADMIN_DEFAULT_ORDER = [
   'orders-status',
   'workload-submissions',
   'inventory-vendors-notifications',
+  'vendors-overdue',
   'activity-actions',
 ];
 
@@ -101,6 +103,7 @@ const ADMIN_LABELS: Record<string, string> = {
   'orders-status': 'Order flow + Status mix',
   'workload-submissions': 'Department workload + Submissions',
   'inventory-vendors-notifications': 'Inventory + Vendors + Notifications',
+  'vendors-overdue': 'Overdue vendors',
   'activity-actions': 'Live activity + Quick actions',
 };
 
@@ -320,6 +323,18 @@ const AdminDashboard = ({
               dragHandleProps={dragProps}
               onHide={onHide}
               onOpen={() => navigate('/app/notifications')}
+            />
+          </div>
+        );
+
+      case 'vendors-overdue':
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <VendorOverdueWidget
+              editMode={editMode}
+              dragHandleProps={dragProps}
+              onHide={onHide}
+              onOpen={(vendorId) => navigate(vendorId ? `/app/vendors/${vendorId}` : '/app/vendors/aging')}
             />
           </div>
         );

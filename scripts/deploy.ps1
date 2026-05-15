@@ -9,12 +9,14 @@
     The script will:
         1. Verify you are on the 'main' branch
         2. Build the frontend (Vite) + copy sw.js
-        3. Build the backend (TypeScript)
-        4. Run any pending Prisma migrations
-        5. Restart the NSSM service (AtivaGoldInventoryBackend)
-        6. Ensure OpenSSH Server (sshd) is running
-        7. Ensure Cloudflare Tunnel is running AND connected to edge
-        8. Health-check local + public endpoints
+        3. Stop the NSSM backend service (releases Prisma engine DLL lock)
+        4. Regenerate the Prisma client (npx prisma generate)
+        5. Build the backend (TypeScript)
+        6. Run any pending Prisma migrations (npx prisma migrate deploy)
+        7. Start the NSSM service (AtivaGoldInventoryBackend)
+        8. Ensure OpenSSH Server (sshd) is running
+        9. Ensure Cloudflare Tunnel is running AND connected to edge
+       10. Health-check local + public endpoints
 #>
 
 Set-StrictMode -Version Latest
@@ -116,6 +118,41 @@ try {
     }
     finally { Pop-Location }
 
+    # ── Stop backend service before regenerating Prisma client ─────────
+    # The running NSSM service holds a file lock on
+    # `node_modules\.prisma\client\query_engine-windows.dll.node`. If we
+    # don't release that lock first, `prisma generate` fails with
+    # `EPERM: operation not permitted, rename ... .tmp* -> ...node`, which
+    # in turn leaves a stale client and makes `npm run build` (TypeScript)
+    # blow up against any newly added schema models. Stopping here also
+    # gives us a clean window for the migrate-deploy step below.
+    Write-Step "Stopping backend service '$BackendSvc' for build"
+    $svcStatusBefore = nssm status $BackendSvc 2>&1
+    if ($svcStatusBefore -match 'SERVICE_RUNNING') {
+        nssm stop $BackendSvc | Out-Null
+        Start-Sleep 2
+        Write-Ok "Backend service stopped"
+    } else {
+        Write-Ok "Backend service already $svcStatusBefore"
+    }
+
+    # ── Regenerate Prisma client ──────────────────────────────────────
+    # Must run BEFORE backend tsc build, otherwise newly added Prisma
+    # models (e.g. the sieve / PO migrations) appear absent on the
+    # `PrismaClient` type and the backend build fails. Idempotent —
+    # cheap to run on every deploy even when the schema is unchanged.
+    Write-Step 'Regenerating Prisma client (npx prisma generate)'
+    Push-Location "$ProjectRoot\backend"
+    try {
+        npx prisma generate
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail 'prisma generate failed — see log above'
+            throw 'Prisma client generation failed'
+        }
+        Write-Ok 'Prisma client regenerated'
+    }
+    finally { Pop-Location }
+
     # ── Build backend ──────────────────────────────────────────────────
     Write-Step 'Building backend (TypeScript)'
     Push-Location "$ProjectRoot\backend"
@@ -147,8 +184,9 @@ try {
     }
     finally { Pop-Location }
 
-    # ── Restart backend service ────────────────────────────────────────
-    Write-Step "Restarting backend service '$BackendSvc'"
+    # ── Start backend service ──────────────────────────────────────────
+    # Service was stopped before prisma generate; bring it back up.
+    Write-Step "Starting backend service '$BackendSvc'"
     $svcStatus = nssm status $BackendSvc 2>&1
     if ($svcStatus -match 'SERVICE_RUNNING') {
         nssm restart $BackendSvc | Out-Null
@@ -156,7 +194,7 @@ try {
         nssm start $BackendSvc | Out-Null
     }
     Start-Sleep 3
-    Write-Ok 'Backend service restarted'
+    Write-Ok 'Backend service running'
 
     # ── Ensure SSH server is up ────────────────────────────────────────
     Write-Step 'Ensuring OpenSSH Server is running'

@@ -8,6 +8,7 @@ import {
   StoneType,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { seedSieveSizes } from './seeds/sieve-sizes';
 
 const prisma = new PrismaClient();
 
@@ -427,6 +428,16 @@ async function main() {
   await prisma.order.deleteMany();
   await prisma.user.deleteMany();
   console.log('✅ Existing data cleared\n');
+
+  // Sieve master (idempotent — never deleted/cleared even on full re-seed
+  // because diamond_transactions / diamond_purchase_order_lines FK into it).
+  console.log('💎 Seeding sieve master rows...');
+  const sieveCounts = await seedSieveSizes(prisma);
+  console.log(
+    `   ✅ Sieve sizes: ${sieveCounts.mesh} MESH + ${sieveCounts.single} SINGLE = ${
+      sieveCounts.mesh + sieveCounts.single
+    } rows\n`
+  );
 
   // Create Users
   console.log('👤 Creating users...');
