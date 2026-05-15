@@ -1,7 +1,7 @@
 <!-- nexusgraphai:start -->
 # NexusGraphAI — Code Intelligence
 
-This project is indexed by NexusGraphAI as **sidharth-gold-inventory** (7157 symbols, 12465 relationships, 260 execution flows). Use the NexusGraphAI MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by NexusGraphAI as **sidharth-gold-inventory** (7164 symbols, 12455 relationships, 244 execution flows). Use the NexusGraphAI MCP tools to understand code, assess impact, and navigate safely.
 
 > If any NexusGraphAI tool warns the index is stale, run `npx nexus-graph-ai analyze` in terminal first.
 

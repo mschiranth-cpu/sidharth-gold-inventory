@@ -328,14 +328,19 @@ const AdminDashboard = ({
         );
 
       case 'vendors-overdue':
+        // Single-widget row: span 2/3 of the dashboard grid so it sits next
+        // to the other two-thirds widgets visually (e.g. RecentActivity)
+        // instead of looking sparse in a stretched 3-col grid.
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <VendorOverdueWidget
-              editMode={editMode}
-              dragHandleProps={dragProps}
-              onHide={onHide}
-              onOpen={(vendorId) => navigate(vendorId ? `/app/vendors/${vendorId}` : '/app/vendors/aging')}
-            />
+            <div className="lg:col-span-2">
+              <VendorOverdueWidget
+                editMode={editMode}
+                dragHandleProps={dragProps}
+                onHide={onHide}
+                onOpen={(vendorId) => navigate(vendorId ? `/app/vendors/${vendorId}` : '/app/vendors/aging')}
+              />
+            </div>
           </div>
         );
 

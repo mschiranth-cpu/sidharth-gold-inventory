@@ -125,9 +125,12 @@ export async function createDiamondPO(
     if (!vendor) throw new ApiError(404, 'Vendor not found');
 
     const placedAt = data.status === 'PLACED' ? new Date() : null;
-    // dueDate is computed against placedAt (or now if still DRAFT — recomputed
-    // on transition to PLACED). The computed value is the agreement that
-    // future receives inherit verbatim.
+    // dueDate is computed against placedAt (or now if still DRAFT). When the
+    // user supplies an explicit override, we mark dueDateOverridden=true so
+    // the PLACE transition leaves it untouched. Otherwise the auto-computed
+    // value is just a best-effort estimate and is recomputed on PLACE so the
+    // binding agreement runs from the real placedAt timestamp.
+    const hasOverride = !!(data.dueDate && data.dueDate.length > 0);
     const dueDate = computeDueDate(placedAt ?? new Date(), vendor, data.dueDate);
 
     const poNumber = await nextPoNumber(tx);
@@ -141,6 +144,7 @@ export async function createDiamondPO(
           ? new Date(data.expectedDeliveryDate)
           : null,
         dueDate,
+        dueDateOverridden: hasOverride,
         notes: data.notes,
         createdById,
         lines: {
@@ -270,7 +274,12 @@ export async function updateDiamondPO(id: string, data: UpdateDiamondPOInput) {
         : null;
     }
     if (data.dueDate !== undefined) {
+      // Editing dueDate on an existing PO is always treated as an explicit
+      // override — even when the user clears it back to vendor default,
+      // because the act of editing demonstrates intent. PLACE will then
+      // preserve this value verbatim.
       updates.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+      updates.dueDateOverridden = !!data.dueDate;
     }
     if (data.notes !== undefined) updates.notes = data.notes;
 
@@ -314,14 +323,19 @@ export async function placeDiamondPO(id: string) {
       throw new ApiError(409, `Can only place DRAFT POs (current: ${po.status})`);
     }
     const placedAt = new Date();
+    // If the user supplied an explicit override at creation/edit time,
+    // preserve dueDate verbatim. Otherwise the DRAFT-time value was a
+    // best-effort estimate against the draft creation date — recompute it
+    // now against the real placedAt so NET-N runs from PO placement.
+    const nextDueDate = po.dueDateOverridden
+      ? po.dueDate
+      : computeDueDate(placedAt, po.vendor);
     return tx.diamondPurchaseOrder.update({
       where: { id },
       data: {
         status: 'PLACED',
         placedAt,
-        // Recompute against placedAt unless an explicit override already exists
-        // (preserved by createDiamondPO above).
-        dueDate: po.dueDate ?? computeDueDate(placedAt, po.vendor),
+        dueDate: nextDueDate,
       },
     });
   });
@@ -503,16 +517,12 @@ export async function receiveAgainstPo(
       const got = l.receives.reduce((s, r) => s + (r.caratWeight ?? 0), 0);
       return got + RECEIVE_TOLERANCE_CT >= l.expectedCarats;
     });
-    const anyReceived = linesWithReceives.some(
-      (l) => l.receives.length > 0
-    );
+    // We've just inserted at least one receive in this transaction (early
+    // return at the top guards against empty data.lines), so the PO is
+    // guaranteed to be either fully or partially received from here on.
     const newStatus: PoStatus = allSatisfied
       ? 'FULLY_RECEIVED'
-      : anyReceived
-      ? 'PARTIALLY_RECEIVED'
-      : po.status === 'PARTIALLY_RECEIVED'
-      ? 'PARTIALLY_RECEIVED'
-      : po.status as PoStatus;
+      : 'PARTIALLY_RECEIVED';
 
     if (newStatus !== po.status) {
       await tx.diamondPurchaseOrder.update({

@@ -43,7 +43,7 @@ export const VendorOverdueWidget = ({
   // bloat that response for every dashboard tile. The aging endpoint is
   // small (one row per vendor) and cached for 60s on the client.
   const { data, isLoading } = useQuery<VendorAging[]>({
-    queryKey: ['vendors', 'aging'],
+    queryKey: ['vendor-aging'],
     queryFn: listVendorAging,
     staleTime: 60_000,
   });
