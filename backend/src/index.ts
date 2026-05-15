@@ -55,6 +55,8 @@ import { attendanceRoutes } from './modules/attendance';
 import { payrollRoutes } from './modules/payroll';
 import marketRatesRoutes from './routes/market-rates.routes';
 import vendorRoutes from './routes/vendors.routes';
+import sieveSizeRoutes from './routes/sieveSize.routes';
+import diamondPoRoutes from './modules/diamond-inventory/diamondPurchaseOrder.routes';
 import { dashboardRoutes } from './modules/dashboard';
 
 // Import Socket.io setup
@@ -187,6 +189,8 @@ app.use('/api/attendance', attendanceRoutes); // Attendance system (Phase 5)
 app.use('/api/payroll', payrollRoutes); // Payroll system (Phase 5)
 app.use('/api/market-rates', marketRatesRoutes); // Live Bangalore bullion rates (scraped from Ambicaa)
 app.use('/api/vendors', vendorRoutes); // Vendor master + GST realtime lookup
+app.use('/api/sieve-sizes', sieveSizeRoutes); // Diamond sieve master (read-only)
+app.use('/api/diamond-purchase-orders', diamondPoRoutes); // Diamond PO lifecycle
 app.use('/api/dashboard', dashboardRoutes); // Unified dashboard aggregator (admin/office + worker)
 
 // ============================================

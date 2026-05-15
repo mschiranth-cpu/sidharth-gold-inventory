@@ -113,6 +113,7 @@ model User {
   diamondRatesCreated     DiamondRate[]            @relation("DiamondRatesCreated")
   realStoneTransactions   RealStoneTransaction[]   @relation("RealStoneTransactionsCreated")
   stonePacketTransactions StonePacketTransaction[] @relation("StonePacketTransactionsCreated")
+  diamondPurchaseOrders   DiamondPurchaseOrder[]   @relation("DiamondPurchaseOrdersCreated")
 
   // Phase 3.1 — stone parity (rates + payment audit trail)
   realStoneRatesCreated       RealStoneRate[]      @relation("RealStoneRatesCreated")
@@ -894,6 +895,9 @@ model MetalTransaction {
   creditApplied   Float?    @map("credit_applied")
   // Excess paid on this purchase that was parked into Vendor.creditBalance.
   creditGenerated Float?    @map("credit_generated")
+  // Payment due date — derived from `transactionDate + vendor.paymentDueDays`
+  // at create time (override allowed). Powers Outstanding aging report.
+  dueDate         DateTime? @map("due_date")
 
   payments MetalPayment[] @relation("TransactionPayments")
 
@@ -904,6 +908,7 @@ model MetalTransaction {
   @@index([vendorId])
   @@index([isBillable])
   @@index([paymentStatus])
+  @@index([dueDate])
   @@map("metal_transactions")
 }
 
@@ -976,29 +981,35 @@ model MetalRate {
 // ============================================
 
 model Vendor {
-  id            String   @id @default(uuid())
-  name          String
-  uniqueCode    String   @unique @map("unique_code")
-  phone         String?
-  gstNumber     String?  @map("gst_number")
-  gstDetails    Json?    @map("gst_details")
-  address       String?
+  id             String   @id @default(uuid())
+  name           String
+  uniqueCode     String   @unique @map("unique_code")
+  phone          String?
+  gstNumber      String?  @map("gst_number")
+  gstDetails     Json?    @map("gst_details")
+  address        String?
   // Which inventory categories this vendor supplies. Drives the
   // VendorSelector filter on each Receive form. Tokens:
   // 'METAL' | 'DIAMOND' | 'REAL_STONE' | 'STONE_PACKET'.
   // Default `[]` is intentional (= soft-archived); the migration backfills
   // existing rows with all 4 so legacy vendors stay visible everywhere.
-  dealsIn       String[] @default([]) @map("deals_in")
+  dealsIn        String[] @default([]) @map("deals_in")
   // Vendor credit balance — over-payments on receipts are parked here and
   // auto-applied to the next billable purchase from the same vendor.
-  creditBalance Float    @default(0) @map("credit_balance")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  creditBalance  Float    @default(0) @map("credit_balance")
+  // Default credit period (in days) granted by this vendor on a PURCHASE
+  // invoice. dueDate = transactionDate + paymentDueDays (per-invoice override
+  // allowed at receive time). 0 = "due immediately / cash". Distinct from
+  // `creditBalance` (monetary balance) and `Order.paymentTerms` (customer enum).
+  paymentDueDays Int?     @default(0) @map("payment_due_days")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   metalTransactions       MetalTransaction[]       @relation("VendorMetalTransactions")
   diamondTransactions     DiamondTransaction[]     @relation("VendorDiamondTransactions")
   realStoneTransactions   RealStoneTransaction[]   @relation("VendorRealStoneTransactions")
   stonePacketTransactions StonePacketTransaction[] @relation("VendorStonePacketTransactions")
+  diamondPurchaseOrders   DiamondPurchaseOrder[]   @relation("VendorDiamondPurchaseOrders")
 
   @@index([name])
   @@index([gstNumber])
@@ -1109,6 +1120,10 @@ model Diamond {
   // For LOOSE parcels: number of pieces in the parcel. Decremented on partial issue.
   // For SOLITAIRE: null (treated as 1).
   totalPieces      Int?           @map("total_pieces")
+  // Sieve mesh / size bucket (LOOSE only). FK to SieveSize master table —
+  // populated when the receive form picks a sieve. SOLITAIRE rows leave NULL.
+  sieveSizeId      Int?           @map("sieve_size_id")
+  sieveSize        SieveSize?     @relation(fields: [sieveSizeId], references: [id])
   lotId            String?        @map("lot_id")
   lot              DiamondLot?    @relation(fields: [lotId], references: [id])
   status           String         @default("IN_STOCK")
@@ -1125,6 +1140,7 @@ model Diamond {
   @@index([category])
   @@index([shape, color, clarity])
   @@index([stockNumber])
+  @@index([sieveSizeId])
   @@map("diamonds")
 }
 
@@ -1169,6 +1185,22 @@ model DiamondTransaction {
   creditApplied   Float?    @map("credit_applied")
   // Excess paid on this purchase that was parked into Vendor.creditBalance.
   creditGenerated Float?    @map("credit_generated")
+  // Payment due date — see MetalTransaction.dueDate for semantics.
+  dueDate         DateTime? @map("due_date")
+
+  // Sieve snapshot at receive time. Mirrors `Diamond.sieveSizeId` but is
+  // intentionally duplicated on the transaction so historical receives stay
+  // pinned even if the underlying parcel is later re-sieved or merged.
+  sieveSizeId     Int?      @map("sieve_size_id")
+  sieveSize       SieveSize? @relation(fields: [sieveSizeId], references: [id])
+
+  // Optional back-link to a Diamond PO + the specific PO line this receive
+  // fulfills. Free receives leave both NULL. On PO cancel-with-force, these
+  // FKs are preserved (audit trail) — never NULLed.
+  purchaseOrderId     String?               @map("purchase_order_id")
+  purchaseOrder       DiamondPurchaseOrder? @relation("DiamondTransactionsByPO", fields: [purchaseOrderId], references: [id])
+  purchaseOrderLineId String?               @map("purchase_order_line_id")
+  purchaseOrderLine   DiamondPurchaseOrderLine? @relation("DiamondTransactionsByPOLine", fields: [purchaseOrderLineId], references: [id])
 
   payments DiamondPayment[] @relation("DiamondTransactionPayments")
 
@@ -1178,7 +1210,110 @@ model DiamondTransaction {
   @@index([vendorId])
   @@index([isBillable])
   @@index([paymentStatus])
+  @@index([dueDate])
+  @@index([sieveSizeId])
+  @@index([purchaseOrderId])
+  @@index([purchaseOrderLineId])
   @@map("diamond_transactions")
+}
+
+// Master table of diamond sieve sizes — populated from the user's chart
+// (33 MESH rows + 8 SINGLE rows). Used by Receive Diamond + future Diamond PO
+// flows to provide bidirectional pieces <-> carat auto-conversion.
+//
+// kind = MESH  — sieve mesh ranges like "+11/-11.5", with piecesPerCaratAvg
+//                driving the auto-calc and an mm-range for measurement hint.
+// kind = SINGLE — single-stone size buckets like "0.30 Cts", with full
+//                 weightPerPieceCt (pieces == carats / weightPerPieceCt).
+model SieveSize {
+  id                Int      @id @default(autoincrement())
+  kind              String   // 'MESH' | 'SINGLE'
+  code              String   @unique
+  sieveCodeFrom     String?  @map("sieve_code_from")
+  sieveCodeTo       String?  @map("sieve_code_to")
+  sizeLabel         String?  @map("size_label")
+  piecesPerCaratAvg Float?   @map("pieces_per_carat_avg")
+  weightPerPieceCt  Float?   @map("weight_per_piece_ct")
+  mmFrom            Float    @map("mm_from")
+  mmTo              Float    @map("mm_to")
+  displayOrder      Int      @default(0) @map("display_order")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  diamonds            Diamond[]
+  diamondTransactions DiamondTransaction[]
+  poLines             DiamondPurchaseOrderLine[]
+
+  @@index([kind, displayOrder])
+  @@index([isActive])
+  @@map("sieve_sizes")
+}
+
+// Diamond Purchase Order — captures the *expected* sieve mix and pricing
+// agreed with a vendor BEFORE the goods arrive. Receives (existing
+// DiamondTransaction PURCHASE rows) link back via `purchaseOrderId` so we
+// can compute variance (received vs ordered) and PO status transitions.
+//
+// Status (String, validated in service layer to avoid an enum migration):
+//   DRAFT | PLACED | PARTIALLY_RECEIVED | FULLY_RECEIVED | CANCELLED
+//
+// Inheritance rule: receives against a PO inherit `dueDate = po.dueDate`
+// (the binding agreement) — NOT recomputed from the receive date. Free
+// receives (no PO) use computeDueDate(receiveDate, vendor) per Phase 1.
+model DiamondPurchaseOrder {
+  id                    String   @id @default(uuid())
+  poNumber              String   @unique @map("po_number")
+  vendorId              String   @map("vendor_id")
+  vendor                Vendor   @relation("VendorDiamondPurchaseOrders", fields: [vendorId], references: [id])
+  status                String   @default("DRAFT") // see comment above
+  placedAt              DateTime? @map("placed_at")
+  expectedDeliveryDate  DateTime? @map("expected_delivery_date")
+  // Frozen at PLACED time — receives inherit this verbatim regardless of
+  // the actual receipt date. Override allowed at PO creation only.
+  dueDate               DateTime? @map("due_date")
+  notes                 String?
+  createdById           String   @map("created_by_id")
+  createdBy             User     @relation("DiamondPurchaseOrdersCreated", fields: [createdById], references: [id])
+  cancelledAt           DateTime? @map("cancelled_at")
+  cancelledById         String?   @map("cancelled_by_id")
+  cancelReason          String?   @map("cancel_reason")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  lines    DiamondPurchaseOrderLine[]
+  receives DiamondTransaction[]      @relation("DiamondTransactionsByPO")
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([placedAt])
+  @@map("diamond_purchase_orders")
+}
+
+model DiamondPurchaseOrderLine {
+  id              String               @id @default(uuid())
+  poId            String               @map("po_id")
+  po              DiamondPurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  sieveSizeId     Int                  @map("sieve_size_id")
+  sieveSize       SieveSize            @relation(fields: [sieveSizeId], references: [id])
+  shape           String?
+  color           String?
+  colorBand       String?              @map("color_band")
+  clarity         String?
+  expectedPieces  Int?                 @map("expected_pieces")
+  expectedCarats  Float                @map("expected_carats")
+  expectedRate    Float?               @map("expected_rate")
+  expectedTotal   Float?               @map("expected_total")
+  notes           String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  receives DiamondTransaction[] @relation("DiamondTransactionsByPOLine")
+
+  @@index([poId])
+  @@index([sieveSizeId])
+  @@map("diamond_purchase_order_lines")
 }
 
 model DiamondPayment {
@@ -1312,6 +1447,8 @@ model RealStoneTransaction {
   neftDate        DateTime? @map("neft_date")
   creditApplied   Float?    @map("credit_applied")
   creditGenerated Float?    @map("credit_generated")
+  // Payment due date — see MetalTransaction.dueDate for semantics.
+  dueDate         DateTime? @map("due_date")
 
   payments RealStonePayment[] @relation("RealStoneTransactionPayments")
 
@@ -1319,6 +1456,7 @@ model RealStoneTransaction {
   @@index([vendorId])
   @@index([isBillable])
   @@index([paymentStatus])
+  @@index([dueDate])
   @@map("real_stone_transactions")
 }
 
@@ -1443,6 +1581,8 @@ model StonePacketTransaction {
   neftDate        DateTime? @map("neft_date")
   creditApplied   Float?    @map("credit_applied")
   creditGenerated Float?    @map("credit_generated")
+  // Payment due date — see MetalTransaction.dueDate for semantics.
+  dueDate         DateTime? @map("due_date")
 
   payments StonePacketPayment[] @relation("StonePacketTransactionPayments")
 
@@ -1450,6 +1590,7 @@ model StonePacketTransaction {
   @@index([vendorId])
   @@index([isBillable])
   @@index([paymentStatus])
+  @@index([dueDate])
   @@map("stone_packet_transactions")
 }
 

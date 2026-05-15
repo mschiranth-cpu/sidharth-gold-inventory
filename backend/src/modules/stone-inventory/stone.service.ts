@@ -9,6 +9,7 @@ import { PrismaClient, RealStoneType, SyntheticStoneType } from '@prisma/client'
 import * as XLSX from 'xlsx';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../middleware/errorHandler';
+import { computeDueDate } from '../../utils/credit';
 import {
   CreateRealStoneRequest,
   CreateRealStonePurchaseRequest,
@@ -164,14 +165,19 @@ export async function createRealStonePurchase(
 
   const result = await prisma.$transaction(async (tx) => {
     let availableCredit = 0;
+    let vendorForCredit: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (data.vendorId) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${data.vendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: data.vendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
       availableCredit = vendor?.creditBalance ?? 0;
+      vendorForCredit = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
     }
+    const invoiceDueDate = computeDueDate(txnDate ?? new Date(), vendorForCredit, data.dueDate);
 
     const created: any[] = [];
     let runningBalanceDelta = 0;
@@ -251,6 +257,7 @@ export async function createRealStonePurchase(
           neftDate,
           creditApplied: billing.creditApplied > 0 ? billing.creditApplied : undefined,
           creditGenerated: billing.creditGenerated > 0 ? billing.creditGenerated : undefined,
+          dueDate: invoiceDueDate,
         },
         include: {
           stone: true,
@@ -479,12 +486,16 @@ export async function updateRealStoneTransaction(
     let creditGenerated = 0;
     let cachedAmountPaid = data.amountPaid ?? old.amountPaid ?? 0;
     let cachedStatus: string | null | undefined = data.paymentStatus ?? old.paymentStatus;
+    let newVendorForDue: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (isPurchase && newVendorId && newTotalValue && newTotalValue > 0) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${newVendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: newVendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
+      newVendorForDue = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
       const math = applyCreditMath(
         newTotalValue,
         data.amountPaid ?? old.amountPaid ?? 0,
@@ -506,6 +517,27 @@ export async function updateRealStoneTransaction(
     const neftDate = data.neftDate ? new Date(data.neftDate) : undefined;
     const txnDate = data.transactionDate ? new Date(data.transactionDate) : undefined;
 
+    // dueDate handling — see metal/diamond updateTransaction for shape.
+    let nextDueDate: Date | null = old.dueDate ?? null;
+    if (isPurchase) {
+      if (data.dueDate !== undefined) {
+        if (data.dueDate === null || data.dueDate === '') {
+          nextDueDate = null;
+        } else {
+          const d = new Date(data.dueDate);
+          if (!Number.isNaN(d.getTime())) nextDueDate = d;
+        }
+      } else if (
+        (data.vendorId !== undefined && data.vendorId !== old.vendorId) ||
+        txnDate !== undefined
+      ) {
+        const baseDate = txnDate ?? old.createdAt;
+        nextDueDate = computeDueDate(baseDate, newVendorForDue);
+      }
+    } else {
+      nextDueDate = null;
+    }
+
     const updated = await tx.realStoneTransaction.update({
       where: { id },
       data: {
@@ -526,6 +558,7 @@ export async function updateRealStoneTransaction(
         neftDate: isPurchase ? (data.neftDate !== undefined ? neftDate ?? null : old.neftDate) : null,
         creditApplied: isPurchase && creditApplied > 0 ? creditApplied : null,
         creditGenerated: isPurchase && creditGenerated > 0 ? creditGenerated : null,
+        dueDate: nextDueDate,
       },
       include: {
         stone: true,
@@ -994,14 +1027,19 @@ export async function createStonePacketPurchase(
 
   const result = await prisma.$transaction(async (tx) => {
     let availableCredit = 0;
+    let vendorForCredit: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (data.vendorId) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${data.vendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: data.vendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
       availableCredit = vendor?.creditBalance ?? 0;
+      vendorForCredit = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
     }
+    const invoiceDueDate = computeDueDate(txnDate ?? new Date(), vendorForCredit, data.dueDate);
 
     const created: any[] = [];
     let runningBalanceDelta = 0;
@@ -1080,6 +1118,7 @@ export async function createStonePacketPurchase(
           neftDate,
           creditApplied: billing.creditApplied > 0 ? billing.creditApplied : undefined,
           creditGenerated: billing.creditGenerated > 0 ? billing.creditGenerated : undefined,
+          dueDate: invoiceDueDate,
         },
         include: {
           packet: true,
@@ -1348,12 +1387,16 @@ export async function updateStonePacketTransaction(
     let creditGenerated = 0;
     let cachedAmountPaid = data.amountPaid ?? old.amountPaid ?? 0;
     let cachedStatus: string | null | undefined = data.paymentStatus ?? old.paymentStatus;
+    let newVendorForDue: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (isPurchase && newVendorId && newTotalValue && newTotalValue > 0) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${newVendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: newVendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
+      newVendorForDue = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
       const math = applyCreditMath(
         newTotalValue,
         data.amountPaid ?? old.amountPaid ?? 0,
@@ -1375,6 +1418,26 @@ export async function updateStonePacketTransaction(
     const neftDate = data.neftDate ? new Date(data.neftDate) : undefined;
     const txnDate = data.transactionDate ? new Date(data.transactionDate) : undefined;
 
+    let nextDueDate: Date | null = old.dueDate ?? null;
+    if (isPurchase) {
+      if (data.dueDate !== undefined) {
+        if (data.dueDate === null || data.dueDate === '') {
+          nextDueDate = null;
+        } else {
+          const d = new Date(data.dueDate);
+          if (!Number.isNaN(d.getTime())) nextDueDate = d;
+        }
+      } else if (
+        (data.vendorId !== undefined && data.vendorId !== old.vendorId) ||
+        txnDate !== undefined
+      ) {
+        const baseDate = txnDate ?? old.createdAt;
+        nextDueDate = computeDueDate(baseDate, newVendorForDue);
+      }
+    } else {
+      nextDueDate = null;
+    }
+
     const updated = await tx.stonePacketTransaction.update({
       where: { id },
       data: {
@@ -1395,6 +1458,7 @@ export async function updateStonePacketTransaction(
         neftDate: isPurchase ? (data.neftDate !== undefined ? neftDate ?? null : old.neftDate) : null,
         creditApplied: isPurchase && creditApplied > 0 ? creditApplied : null,
         creditGenerated: isPurchase && creditGenerated > 0 ? creditGenerated : null,
+        dueDate: nextDueDate,
       },
       include: {
         packet: true,

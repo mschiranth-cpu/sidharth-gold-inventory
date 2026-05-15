@@ -8,6 +8,7 @@ import { PrismaClient, MetalType, MetalForm, MetalTransactionType } from '@prism
 import * as XLSX from 'xlsx';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../middleware/errorHandler';
+import { computeDueDate } from '../../utils/credit';
 import {
   CreateMetalStockRequest,
   CreateMetalTransactionRequest,
@@ -148,15 +149,19 @@ export async function createMetalTransaction(
     let cachedAmountPaid = data.amountPaid ?? 0;
     let cachedStatus = data.paymentStatus;
 
+    let vendorForCredit: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (isPurchase && data.vendorId && totalValue !== undefined) {
       // Lock the vendor row for the rest of this transaction so concurrent
       // receipts can't double-spend the same credit balance.
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${data.vendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: data.vendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
       const availableCredit = vendor?.creditBalance ?? 0;
+      vendorForCredit = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
 
       // 1. Apply credit (clamp to available + remaining-after-cash-paid).
       const requestedCredit = Math.max(0, data.creditApplied ?? 0);
@@ -188,6 +193,11 @@ export async function createMetalTransaction(
         });
       }
     }
+
+    // dueDate computed only for PURCHASE rows. ISSUE / RETURN / etc. stay NULL.
+    const dueDate = isPurchase
+      ? computeDueDate(txnDate ?? new Date(), vendorForCredit, data.dueDate)
+      : undefined;
 
     const transaction = await tx.metalTransaction.create({
       data: {
@@ -224,6 +234,7 @@ export async function createMetalTransaction(
         creditApplied: isPurchase && creditApplied > 0 ? creditApplied : undefined,
         creditGenerated:
           isPurchase && creditGenerated > 0 ? creditGenerated : undefined,
+        dueDate,
       },
       include: {
         stock: true,
@@ -390,13 +401,17 @@ export async function updateMetalTransaction(
     let cachedStatus: string | null | undefined =
       data.paymentStatus ?? old.paymentStatus;
 
+    let newVendorForDue: { paymentDueDays: number | null; gstDetails: unknown } | null = null;
     if (isPurchase && newVendorId && newTotalValue !== null) {
       await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${newVendorId} FOR UPDATE`;
       const vendor = await tx.vendor.findUnique({
         where: { id: newVendorId },
-        select: { creditBalance: true },
+        select: { creditBalance: true, paymentDueDays: true, gstDetails: true },
       });
       const availableCredit = vendor?.creditBalance ?? 0;
+      newVendorForDue = vendor
+        ? { paymentDueDays: vendor.paymentDueDays, gstDetails: vendor.gstDetails }
+        : null;
 
       const requestedCredit = Math.max(0, data.creditApplied ?? 0);
       const remainingAfterPaid = Math.max(0, newTotalValue - (data.amountPaid ?? 0));
@@ -453,6 +468,28 @@ export async function updateMetalTransaction(
     const neftDate = data.neftDate ? new Date(data.neftDate) : undefined;
     const txnDate = data.transactionDate ? new Date(data.transactionDate) : undefined;
 
+    // dueDate handling — preserve manual override unless caller explicitly
+    // changed it, OR vendor / transactionDate changed.
+    let nextDueDate: Date | null = old.dueDate ?? null;
+    if (isPurchase) {
+      if (data.dueDate !== undefined) {
+        if (data.dueDate === null || data.dueDate === '') {
+          nextDueDate = null;
+        } else {
+          const d = new Date(data.dueDate);
+          if (!Number.isNaN(d.getTime())) nextDueDate = d;
+        }
+      } else if (
+        (data.vendorId !== undefined && data.vendorId !== old.vendorId) ||
+        txnDate !== undefined
+      ) {
+        const baseDate = txnDate ?? old.createdAt;
+        nextDueDate = computeDueDate(baseDate, newVendorForDue);
+      }
+    } else {
+      nextDueDate = null;
+    }
+
     const updated = await tx.metalTransaction.update({
       where: { id },
       data: {
@@ -504,6 +541,7 @@ export async function updateMetalTransaction(
         creditApplied: isPurchase && creditApplied > 0 ? creditApplied : null,
         creditGenerated:
           isPurchase && creditGenerated > 0 ? creditGenerated : null,
+        dueDate: nextDueDate,
       },
       include: {
         stock: true,

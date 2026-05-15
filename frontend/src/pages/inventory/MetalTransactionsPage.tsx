@@ -18,6 +18,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditMetalTransactionModal from '../../components/EditMetalTransactionModal';
+import { OverdueBadge } from '../../components/OverdueBadge';
 import {
   BulkDeleteModal,
   BulkSettleModal,
@@ -107,6 +108,7 @@ function PaymentCell({
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-2 flex-wrap">
         <PaymentBadge status={status} />
+        <OverdueBadge dueDate={txn.dueDate} paymentStatus={txn.paymentStatus} />
         {isNonBillable && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-champagne-100/60 text-onyx-500 whitespace-nowrap">
             Non-billable
@@ -122,6 +124,11 @@ function PaymentCell({
           </button>
         )}
       </div>
+      {txn.dueDate && (
+        <div className="text-[10px] text-onyx-300">
+          Due {formatIstDate(txn.dueDate)}
+        </div>
+      )}
       {/* Detail line — concise, no PII. */}
       <div className="text-xs text-onyx-400">
         {status === 'COMPLETE' && (

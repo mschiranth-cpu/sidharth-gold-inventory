@@ -143,6 +143,7 @@ export default function EditRealStoneTransactionModal({
       neftBank: txn.neftBank ?? '',
       neftDate: isoToDateInput(txn.neftDate),
       creditApplied: txn.creditApplied ?? 0,
+      dueDate: isoToDateInput(txn.dueDate),
     };
   });
 
@@ -203,6 +204,9 @@ export default function EditRealStoneTransactionModal({
         transactionDate: formData.transactionDate
           ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
           : undefined,
+        dueDate: formData.dueDate
+          ? combineDateWithCurrentIstTimeISO(formData.dueDate)
+          : null,
       };
 
       if (isPurchase) {
@@ -440,6 +444,25 @@ export default function EditRealStoneTransactionModal({
                   className={inputClass()}
                 />
               </div>
+
+              {isPurchase && (
+                <div>
+                  <label className="block text-sm font-semibold text-onyx-700 mb-2">
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dueDate: e.target.value })
+                    }
+                    className={inputClass()}
+                  />
+                  <p className="mt-1 text-[11px] text-onyx-400">
+                    Override the vendor's default. Clear to recompute.
+                  </p>
+                </div>
+              )}
 
               <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-onyx-700 mb-2">

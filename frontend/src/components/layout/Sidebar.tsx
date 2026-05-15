@@ -38,6 +38,7 @@ const getNavigation = (userRole: UserRole): NavItem[] => {
       children: [
         { name: 'Metal Inventory', href: '/app/inventory/metal' },
         { name: 'Diamond Inventory', href: '/app/inventory/diamonds' },
+        { name: 'Diamond Purchase Orders', href: '/app/diamonds/purchase-orders' },
         { name: 'Real Stone', href: '/app/inventory/real-stones' },
         { name: 'Stone Inventory', href: '/app/inventory/stone-packets' },
       ],
@@ -90,6 +91,10 @@ const getNavigation = (userRole: UserRole): NavItem[] => {
       href: '/app/vendors',
       icon: BuildingOfficeIcon,
       roles: [UserRole.ADMIN, UserRole.OFFICE_STAFF],
+      children: [
+        { name: 'All Vendors', href: '/app/vendors' },
+        { name: 'Aging Report', href: '/app/vendors/aging' },
+      ],
     },
     {
       name: 'Order Approvals',
@@ -144,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
   // Auto-expand the inventory group if we're on a child inventory page
   // (but NOT Factory Inventory, which is a separate sidebar item).
-  const inventoryChildPaths = ['/app/inventory/metal', '/app/inventory/diamonds', '/app/inventory/real-stones', '/app/inventory/stone-packets'];
+  const inventoryChildPaths = ['/app/inventory/metal', '/app/inventory/diamonds', '/app/diamonds/purchase-orders', '/app/inventory/real-stones', '/app/inventory/stone-packets'];
   const isInventoryActive = location.pathname === '/app/inventory' || inventoryChildPaths.some((p) => location.pathname.startsWith(p));
 
   const isGroupOpen = (name: string) => {

@@ -554,6 +554,10 @@ router.get('/outstanding', async (_req: Request, res: Response) => {
   // `is_billable` is now a pure tax-classification tag (used in Excel exports);
   // both billable and non-billable PURCHASE rows count toward what the vendor
   // is owed. Sums BOTH metal AND diamond purchases — vendors are cross-domain.
+  //
+  // NOTE on payment_status: historical rows may have NULL payment_status; we
+  // COALESCE to 'PENDING' so they're correctly counted as open obligations
+  // (the legacy filter `IN ('HALF','PENDING')` silently dropped NULL rows).
   const rows = await prisma.$queryRaw<VendorOutstandingRow[]>`
     WITH unified AS (
       SELECT vendor_id, total_value, amount_paid, payment_status
@@ -576,13 +580,189 @@ router.get('/outstanding', async (_req: Request, res: Response) => {
       COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
       COALESCE(SUM(COALESCE(u.amount_paid,0)), 0)::float AS "totalPaid",
       COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0)::float AS "outstanding",
-      COUNT(CASE WHEN u.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
+      COUNT(CASE WHEN COALESCE(u.payment_status, 'PENDING') IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
     FROM vendors v
     LEFT JOIN unified u ON u.vendor_id = v.id
     GROUP BY v.id, v.name, v.unique_code
     ORDER BY "outstanding" DESC, v.name ASC
   `;
   res.json({ success: true, data: rows });
+});
+
+// -----------------------------------------------------------------------------
+// Aging endpoints — added 2026-05-15 alongside dueDate columns.
+// Buckets (by today vs. due_date):
+//   current  — due_date >= today (or NULL → treated as due-on-receipt → today)
+//   d1_30    — 1 to 30 days overdue
+//   d31_60   — 31 to 60 days overdue
+//   d61_90   — 61 to 90 days overdue
+//   over_90  — > 90 days overdue
+// Only counts rows where COALESCE(payment_status,'PENDING') != 'COMPLETE'.
+// -----------------------------------------------------------------------------
+interface VendorAgingRow {
+  vendorId: string;
+  name: string;
+  uniqueCode: string;
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  over_90: number;
+  totalOpen: number;
+  openCount: number;
+}
+
+const AGING_UNIFIED_CTE = `
+  WITH unified AS (
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+      FROM metal_transactions
+      WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+    UNION ALL
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+      FROM diamond_transactions
+      WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+    UNION ALL
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+      FROM real_stone_transactions
+      WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+    UNION ALL
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+      FROM stone_packet_transactions
+      WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
+  ),
+  open_rows AS (
+    SELECT
+      vendor_id,
+      GREATEST(COALESCE(total_value,0) - COALESCE(amount_paid,0), 0)::float AS balance,
+      -- Days overdue: NULL due_date → treated as due today (0d overdue).
+      GREATEST(0, (CURRENT_DATE - COALESCE(due_date::date, CURRENT_DATE)))::int AS days_overdue
+    FROM unified
+    WHERE COALESCE(payment_status, 'PENDING') <> 'COMPLETE'
+      AND COALESCE(total_value,0) - COALESCE(amount_paid,0) > 0
+  )
+`;
+
+// GET /api/vendors/aging  — aggregate aging buckets across all vendors.
+router.get('/aging', async (_req: Request, res: Response) => {
+  const rows = await prisma.$queryRawUnsafe<VendorAgingRow[]>(`
+    ${AGING_UNIFIED_CTE}
+    SELECT
+      v.id AS "vendorId",
+      v.name,
+      v.unique_code AS "uniqueCode",
+      COALESCE(SUM(CASE WHEN o.days_overdue = 0 THEN o.balance END), 0)::float AS "current",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 1 AND 30 THEN o.balance END), 0)::float AS "d1_30",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 31 AND 60 THEN o.balance END), 0)::float AS "d31_60",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 61 AND 90 THEN o.balance END), 0)::float AS "d61_90",
+      COALESCE(SUM(CASE WHEN o.days_overdue > 90 THEN o.balance END), 0)::float AS "over_90",
+      COALESCE(SUM(o.balance), 0)::float AS "totalOpen",
+      COUNT(o.balance)::int AS "openCount"
+    FROM vendors v
+    LEFT JOIN open_rows o ON o.vendor_id = v.id
+    GROUP BY v.id, v.name, v.unique_code
+    HAVING COALESCE(SUM(o.balance), 0) > 0
+    ORDER BY "over_90" DESC, "d61_90" DESC, "d31_60" DESC, "totalOpen" DESC, v.name ASC
+  `);
+  res.json({ success: true, data: rows });
+});
+
+// GET /api/vendors/:id/aging  — per-vendor aging buckets + open line items.
+router.get('/:id/aging', async (req: Request, res: Response) => {
+  const vendorId = req.params.id;
+
+  // Bucket totals (single row).
+  const summaryRows = await prisma.$queryRawUnsafe<VendorAgingRow[]>(
+    `
+    ${AGING_UNIFIED_CTE}
+    SELECT
+      v.id AS "vendorId",
+      v.name,
+      v.unique_code AS "uniqueCode",
+      COALESCE(SUM(CASE WHEN o.days_overdue = 0 THEN o.balance END), 0)::float AS "current",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 1 AND 30 THEN o.balance END), 0)::float AS "d1_30",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 31 AND 60 THEN o.balance END), 0)::float AS "d31_60",
+      COALESCE(SUM(CASE WHEN o.days_overdue BETWEEN 61 AND 90 THEN o.balance END), 0)::float AS "d61_90",
+      COALESCE(SUM(CASE WHEN o.days_overdue > 90 THEN o.balance END), 0)::float AS "over_90",
+      COALESCE(SUM(o.balance), 0)::float AS "totalOpen",
+      COUNT(o.balance)::int AS "openCount"
+    FROM vendors v
+    LEFT JOIN open_rows o ON o.vendor_id = v.id
+    WHERE v.id = $1
+    GROUP BY v.id, v.name, v.unique_code
+  `,
+    vendorId
+  );
+
+  if (summaryRows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Vendor not found' });
+  }
+
+  // Per-row line items (each open transaction with its own due date / overdue
+  // days). Sourced from the same UNION ALL but with each row's `kind` so the
+  // UI can deep-link to the correct transactions page.
+  const lineItems = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      kind: 'METAL' | 'DIAMOND' | 'REAL_STONE' | 'STONE_PACKET';
+      reference: string | null;
+      transactionDate: Date;
+      dueDate: Date | null;
+      totalValue: number;
+      amountPaid: number;
+      balance: number;
+      daysOverdue: number;
+      paymentStatus: string | null;
+    }>
+  >(
+    `
+    SELECT * FROM (
+      SELECT id, 'METAL'::text AS kind, reference_number AS reference,
+             created_at AS "transactionDate", due_date AS "dueDate",
+             total_value AS "totalValue", amount_paid AS "amountPaid",
+             GREATEST(COALESCE(total_value,0)-COALESCE(amount_paid,0),0)::float AS balance,
+             GREATEST(0,(CURRENT_DATE - COALESCE(due_date::date, CURRENT_DATE)))::int AS "daysOverdue",
+             payment_status AS "paymentStatus"
+        FROM metal_transactions
+        WHERE transaction_type='PURCHASE' AND vendor_id=$1
+      UNION ALL
+      SELECT id, 'DIAMOND'::text, reference_number, created_at, due_date,
+             total_value, amount_paid,
+             GREATEST(COALESCE(total_value,0)-COALESCE(amount_paid,0),0)::float,
+             GREATEST(0,(CURRENT_DATE - COALESCE(due_date::date, CURRENT_DATE)))::int,
+             payment_status
+        FROM diamond_transactions
+        WHERE transaction_type='PURCHASE' AND vendor_id=$1
+      UNION ALL
+      SELECT id, 'REAL_STONE'::text, reference_number, created_at, due_date,
+             total_value, amount_paid,
+             GREATEST(COALESCE(total_value,0)-COALESCE(amount_paid,0),0)::float,
+             GREATEST(0,(CURRENT_DATE - COALESCE(due_date::date, CURRENT_DATE)))::int,
+             payment_status
+        FROM real_stone_transactions
+        WHERE transaction_type='PURCHASE' AND vendor_id=$1
+      UNION ALL
+      SELECT id, 'STONE_PACKET'::text, reference_number, created_at, due_date,
+             total_value, amount_paid,
+             GREATEST(COALESCE(total_value,0)-COALESCE(amount_paid,0),0)::float,
+             GREATEST(0,(CURRENT_DATE - COALESCE(due_date::date, CURRENT_DATE)))::int,
+             payment_status
+        FROM stone_packet_transactions
+        WHERE transaction_type='PURCHASE' AND vendor_id=$1
+    ) t
+    WHERE COALESCE(t."paymentStatus", 'PENDING') <> 'COMPLETE'
+      AND t.balance > 0
+    ORDER BY t."daysOverdue" DESC, t."dueDate" NULLS LAST, t."transactionDate" DESC
+  `,
+    vendorId
+  );
+
+  res.json({
+    success: true,
+    data: {
+      ...summaryRows[0],
+      lineItems,
+    },
+  });
 });
 
 // GET /api/vendors/:id/outstanding  — single vendor totals.
@@ -609,7 +789,7 @@ router.get('/:id/outstanding', async (req: Request, res: Response) => {
       COALESCE(SUM(u.total_value), 0)::float AS "totalBillable",
       COALESCE(SUM(COALESCE(u.amount_paid,0)), 0)::float AS "totalPaid",
       COALESCE(SUM(COALESCE(u.total_value,0) - COALESCE(u.amount_paid,0)), 0)::float AS "outstanding",
-      COUNT(CASE WHEN u.payment_status IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
+      COUNT(CASE WHEN COALESCE(u.payment_status, 'PENDING') IN ('HALF','PENDING') THEN 1 END)::int AS "openCount"
     FROM vendors v
     LEFT JOIN unified u ON u.vendor_id = v.id
     WHERE v.id = ${req.params.id}
@@ -729,12 +909,24 @@ router.post(
   '/',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput, paymentDueDays: paymentDueDaysRaw } = req.body || {};
     if (!name) {
       return res.status(400).json({ success: false, error: 'name is required' });
     }
     if (!phone || !String(phone).trim()) {
       return res.status(400).json({ success: false, error: 'phone is required' });
+    }
+    // Validate paymentDueDays (default credit period). 0 = "due immediately / cash".
+    let paymentDueDays: number | undefined;
+    if (paymentDueDaysRaw !== undefined && paymentDueDaysRaw !== null && paymentDueDaysRaw !== '') {
+      const n = Number(paymentDueDaysRaw);
+      if (!Number.isFinite(n) || n < 0 || n > 365 || !Number.isInteger(n)) {
+        return res.status(400).json({
+          success: false,
+          error: 'paymentDueDays must be a non-negative integer between 0 and 365',
+        });
+      }
+      paymentDueDays = n;
     }
     if (gstNumber && !GSTIN_REGEX.test(String(gstNumber).toUpperCase())) {
       return res.status(400).json({ success: false, error: 'Invalid GSTIN format' });
@@ -750,7 +942,7 @@ router.post(
       return res.status(400).json({ success: false, error: e?.message || 'Invalid foreignDetails' });
     }
     const dealsInResult = parseDealsIn(req.body?.dealsIn);
-    if (!dealsInResult.ok) {
+    if (dealsInResult.ok !== true) {
       return res.status(400).json({ success: false, error: dealsInResult.error });
     }
     // POST default: when caller omitted the field, ship all 4 categories
@@ -825,6 +1017,7 @@ router.post(
             gstDetails,
             address: address ? String(address).trim() : null,
             dealsIn,
+            ...(paymentDueDays !== undefined ? { paymentDueDays } : {}),
           },
         });
         return res.status(201).json({ success: true, data: vendor });
@@ -842,9 +1035,25 @@ router.put(
   '/:id',
   requireRoles(UserRole.ADMIN, UserRole.OFFICE_STAFF),
   async (req: Request, res: Response) => {
-    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput } = req.body || {};
+    const { name, phone, email, country, gstNumber, address, manualDetails, foreignDetails: foreignInput, paymentDueDays: paymentDueDaysRaw } = req.body || {};
     if (phone !== undefined && (!phone || !String(phone).trim())) {
       return res.status(400).json({ success: false, error: 'phone is required' });
+    }
+    // paymentDueDays — explicit `null` clears it back to default (0); a number sets it.
+    let paymentDueDaysUpdate: number | null | undefined = undefined;
+    if (paymentDueDaysRaw !== undefined) {
+      if (paymentDueDaysRaw === null || paymentDueDaysRaw === '') {
+        paymentDueDaysUpdate = null;
+      } else {
+        const n = Number(paymentDueDaysRaw);
+        if (!Number.isFinite(n) || n < 0 || n > 365 || !Number.isInteger(n)) {
+          return res.status(400).json({
+            success: false,
+            error: 'paymentDueDays must be a non-negative integer between 0 and 365',
+          });
+        }
+        paymentDueDaysUpdate = n;
+      }
     }
     if (gstNumber && !GSTIN_REGEX.test(String(gstNumber).toUpperCase())) {
       return res.status(400).json({ success: false, error: 'Invalid GSTIN format' });
@@ -864,7 +1073,7 @@ router.put(
       }
     }
     const dealsInResult = parseDealsIn(req.body?.dealsIn);
-    if (!dealsInResult.ok) {
+    if (dealsInResult.ok !== true) {
       return res.status(400).json({ success: false, error: dealsInResult.error });
     }
     // PUT semantics: only update `dealsIn` if the caller sent it.
@@ -988,6 +1197,7 @@ router.put(
             : {}),
           ...(address !== undefined ? { address: address ? String(address).trim() : null } : {}),
           ...(dealsInUpdate !== undefined ? { dealsIn: dealsInUpdate } : {}),
+          ...(paymentDueDaysUpdate !== undefined ? { paymentDueDays: paymentDueDaysUpdate } : {}),
         },
       });
       res.json({ success: true, data: vendor });

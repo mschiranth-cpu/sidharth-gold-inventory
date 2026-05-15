@@ -6,9 +6,9 @@
  * Mirrors ReceiveMetalPage's vendor-aware billing flow.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftIcon,
   ArrowDownTrayIcon,
@@ -18,6 +18,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { createDiamondPurchase } from '../../services/diamond.service';
 import { type Vendor } from '../../services/vendor.service';
+import { listSieveSizes, type SieveSize } from '../../services/sieveSize.service';
+import {
+  caratsFromPieces,
+  describeSieve,
+  piecesFromCarats,
+} from '../../hooks/useSieveAutoCalc';
 import Button from '../../components/common/Button';
 import LiveDiamondRatesCard from '../../components/LiveDiamondRatesCard';
 import { VendorSelector, BillingPaymentCard } from './ReceiveMetalPage';
@@ -71,6 +77,11 @@ interface PurchaseItem {
   certNumber?: string;
   certificationLab?: string;
   dueDate?: string; // LOOSE only — stored as YYYY-MM-DD; emitted into notes as [Due: ...]
+  /**
+   * FK to the sieve master row (LOOSE only). Drives bidirectional
+   * pieces ↔ carat auto-fill on this row. SOLITAIRE rows leave this null.
+   */
+  sieveSizeId?: number;
   notes?: string;
 }
 
@@ -92,7 +103,32 @@ export default function ReceiveDiamondPage() {
   const [transactionDate, setTransactionDate] = useState(
     nowIstDateString()
   );
+  // Invoice-level dueDate (NET-N override). Pre-fills from vendor.paymentDueDays;
+  // empty string = "use vendor default" (server computes from vendor).
+  const [dueDate, setDueDate] = useState<string>('');
+  // Whether the user has manually edited dueDate. If false, picking a vendor or
+  // changing transactionDate auto-updates dueDate; once touched we leave it alone.
+  const dueDateTouched = useRef<boolean>(false);
   const [items, setItems] = useState<PurchaseItem[]>([blankItem()]);
+  // Per-item touched flags for sieve auto-calc — once the user manually edits
+  // pieces or carats on a given row, sieve-driven re-suggestions stop touching
+  // that field. Mirrors the `lastAutoCurrency` pattern in VendorFormModal.
+  const piecesTouchedRef = useRef<boolean[]>([false]);
+  const caratsTouchedRef = useRef<boolean[]>([false]);
+
+  // Sieve master list — small + effectively immutable, so we cache for the
+  // session. Filter to MESH for the LOOSE picker (SINGLE bucket is reserved
+  // for the upcoming PO flow).
+  const sieveQ = useQuery({
+    queryKey: ['sieve-sizes', 'MESH'],
+    queryFn: () => listSieveSizes({ kind: 'MESH' }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const sieveById = useMemo(() => {
+    const m = new Map<number, SieveSize>();
+    (sieveQ.data ?? []).forEach((s) => m.set(s.id, s));
+    return m;
+  }, [sieveQ.data]);
   const [formData, setFormData] = useState({
     isBillable: true,
     paymentMode: 'CASH',
@@ -123,6 +159,28 @@ export default function ReceiveDiamondPage() {
       ),
     [items]
   );
+
+  // Auto-prefill dueDate from `selectedVendor.paymentDueDays` whenever the
+  // vendor or transactionDate changes, unless the user has manually edited it.
+  // Mirrors backend's `computeDueDate`: dueDate = transactionDate + N days.
+  useEffect(() => {
+    if (dueDateTouched.current) return;
+    if (!selectedVendor || !transactionDate) {
+      setDueDate('');
+      return;
+    }
+    const n = Math.max(0, Math.floor(Number(selectedVendor.paymentDueDays ?? 0)));
+    const base = new Date(transactionDate);
+    if (Number.isNaN(base.getTime())) {
+      setDueDate('');
+      return;
+    }
+    base.setDate(base.getDate() + n);
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, '0');
+    const dd = String(base.getDate()).padStart(2, '0');
+    setDueDate(`${yyyy}-${mm}-${dd}`);
+  }, [selectedVendor, transactionDate]);
 
   // Mirror ReceiveMetalPage: keep `amountPaid` in sync with the chosen status
   // for CASH/NEFT modes. HALF leaves it alone (user-controlled in CASH/NEFT;
@@ -162,9 +220,61 @@ export default function ReceiveDiamondPage() {
   const updateItem = (idx: number, patch: Partial<PurchaseItem>) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
-  const addItem = () => setItems((prev) => [...prev, blankItem()]);
-  const removeItem = (idx: number) =>
+  const addItem = () => {
+    setItems((prev) => [...prev, blankItem()]);
+    piecesTouchedRef.current.push(false);
+    caratsTouchedRef.current.push(false);
+  };
+  const removeItem = (idx: number) => {
     setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
+    piecesTouchedRef.current = piecesTouchedRef.current.filter((_, i) => i !== idx);
+    caratsTouchedRef.current = caratsTouchedRef.current.filter((_, i) => i !== idx);
+  };
+
+  /**
+   * Sieve-aware writer for the carat/pieces fields. Marks the edited side
+   * as "touched" so subsequent sieve switches (or edits to the other side)
+   * don't overwrite this value. The opposite side auto-fills only when it
+   * has not been touched, mirroring VendorFormModal's currency pattern.
+   */
+  const handleCaratChange = (idx: number, value: number) => {
+    caratsTouchedRef.current[idx] = true;
+    const it = items[idx];
+    const sieve = it?.sieveSizeId ? sieveById.get(it.sieveSizeId) ?? null : null;
+    const patch: Partial<PurchaseItem> = { caratWeight: value };
+    if (it?.category === 'LOOSE' && sieve && !piecesTouchedRef.current[idx]) {
+      patch.totalPieces = piecesFromCarats(value, sieve) || it.totalPieces;
+    }
+    updateItem(idx, patch);
+  };
+  const handlePiecesChange = (idx: number, value: number) => {
+    piecesTouchedRef.current[idx] = true;
+    const it = items[idx];
+    const sieve = it?.sieveSizeId ? sieveById.get(it.sieveSizeId) ?? null : null;
+    const patch: Partial<PurchaseItem> = { totalPieces: value };
+    if (it?.category === 'LOOSE' && sieve && !caratsTouchedRef.current[idx]) {
+      patch.caratWeight = caratsFromPieces(value, sieve) || it.caratWeight;
+    }
+    updateItem(idx, patch);
+  };
+  /**
+   * Sieve picker change — re-suggest both sides only if untouched. We
+   * preserve the side the user has already typed in.
+   */
+  const handleSieveChange = (idx: number, sieveSizeId: number | null) => {
+    const sieve = sieveSizeId ? sieveById.get(sieveSizeId) ?? null : null;
+    const it = items[idx];
+    const patch: Partial<PurchaseItem> = { sieveSizeId: sieveSizeId ?? undefined };
+    if (sieve && it) {
+      // If carats already entered & untouched-pieces, recompute pieces.
+      if (it.caratWeight > 0 && !piecesTouchedRef.current[idx]) {
+        patch.totalPieces = piecesFromCarats(it.caratWeight, sieve) || it.totalPieces;
+      } else if (it.totalPieces > 0 && !caratsTouchedRef.current[idx]) {
+        patch.caratWeight = caratsFromPieces(it.totalPieces, sieve) || it.caratWeight;
+      }
+    }
+    updateItem(idx, patch);
+  };
 
   const validate = () => {
     const e: typeof errors = {};
@@ -206,6 +316,11 @@ export default function ReceiveDiamondPage() {
       createDiamondPurchase({
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
+        // Per-invoice dueDate override. Empty string → omit so the backend
+        // falls back to `vendor.paymentDueDays`. We send a date-only string
+        // (YYYY-MM-DD) — the backend `computeDueDate` parses this into a
+        // local-tz Date that lines up with the user's pick.
+        dueDate: dueDate || undefined,
         transactionDate: transactionDate
           ? combineDateWithCurrentIstTimeISO(transactionDate)
           : undefined,
@@ -358,7 +473,7 @@ export default function ReceiveDiamondPage() {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-onyx-700 mb-1">
                   Reference / Invoice Number
@@ -382,6 +497,28 @@ export default function ReceiveDiamondPage() {
                   onChange={(e) => setTransactionDate(e.target.value)}
                   className={inputCls}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-onyx-700 mb-1">
+                  Due Date
+                  {selectedVendor?.paymentDueDays != null && selectedVendor.paymentDueDays > 0 ? (
+                    <span className="ml-2 text-[11px] font-normal text-onyx-400">
+                      (default: NET-{selectedVendor.paymentDueDays})
+                    </span>
+                  ) : null}
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    dueDateTouched.current = true;
+                    setDueDate(e.target.value);
+                  }}
+                  className={inputCls}
+                />
+                <p className="mt-1 text-[11px] text-onyx-400">
+                  Leave at vendor default unless this invoice has different terms.
+                </p>
               </div>
             </div>
           </div>
@@ -561,27 +698,70 @@ export default function ReceiveDiamondPage() {
                           step="0.001"
                           value={it.caratWeight || ''}
                           onChange={(e) =>
-                            updateItem(idx, {
-                              caratWeight: parseFloat(e.target.value) || 0,
-                            })
+                            handleCaratChange(idx, parseFloat(e.target.value) || 0)
                           }
                           className={inputCls}
                         />
                       </div>
                       {it.category === 'LOOSE' ? (
-                        <div>
-                          <label className="block text-xs font-medium text-onyx-600 mb-1">
-                            Due Date
-                          </label>
-                          <input
-                            type="date"
-                            value={it.dueDate ?? ''}
-                            onChange={(e) =>
-                              updateItem(idx, { dueDate: e.target.value })
-                            }
-                            className={inputCls}
-                          />
-                        </div>
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-onyx-600 mb-1">
+                              Pieces
+                            </label>
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              value={it.totalPieces || ''}
+                              onChange={(e) =>
+                                handlePiecesChange(idx, parseInt(e.target.value, 10) || 0)
+                              }
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-onyx-600 mb-1">
+                              Sieve Size
+                            </label>
+                            <select
+                              value={it.sieveSizeId ?? ''}
+                              onChange={(e) =>
+                                handleSieveChange(
+                                  idx,
+                                  e.target.value ? parseInt(e.target.value, 10) : null
+                                )
+                              }
+                              className={inputCls}
+                              disabled={sieveQ.isLoading}
+                            >
+                              <option value="">— select sieve —</option>
+                              {(sieveQ.data ?? []).map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.code}
+                                </option>
+                              ))}
+                            </select>
+                            {it.sieveSizeId && sieveById.get(it.sieveSizeId) && (
+                              <p className="mt-1 text-[10px] text-onyx-400">
+                                {describeSieve(sieveById.get(it.sieveSizeId) ?? null)}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-onyx-600 mb-1">
+                              Due Date
+                            </label>
+                            <input
+                              type="date"
+                              value={it.dueDate ?? ''}
+                              onChange={(e) =>
+                                updateItem(idx, { dueDate: e.target.value })
+                              }
+                              className={inputCls}
+                            />
+                          </div>
+                        </>
                       ) : (
                         <div>
                           <label className="block text-xs font-medium text-onyx-600 mb-1">

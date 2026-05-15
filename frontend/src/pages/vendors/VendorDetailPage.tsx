@@ -47,6 +47,7 @@ import type {
 import {
   getVendor,
   getVendorOutstanding,
+  getVendorAging,
   getVendorTransactions,
   getVendorDiamondTransactions,
   getVendorRealStoneTransactions,
@@ -312,6 +313,11 @@ export default function VendorDetailPage() {
     queryFn: () => getVendorOutstanding(id),
     enabled: Boolean(id),
   });
+  const agingQ = useQuery({
+    queryKey: ['vendor-aging', id],
+    queryFn: () => getVendorAging(id),
+    enabled: Boolean(id),
+  });
   const transactionsQ = useQuery({
     queryKey: ['vendor-transactions', id],
     queryFn: () => getVendorTransactions(id),
@@ -351,6 +357,7 @@ export default function VendorDetailPage() {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['vendor', id] });
     qc.invalidateQueries({ queryKey: ['vendor-outstanding', id] });
+    qc.invalidateQueries({ queryKey: ['vendor-aging', id] });
     qc.invalidateQueries({ queryKey: ['vendor-transactions', id] });
     qc.invalidateQueries({ queryKey: ['vendor-diamond-transactions', id] });
     qc.invalidateQueries({ queryKey: ['vendor-real-stone-transactions', id] });
@@ -785,6 +792,47 @@ export default function VendorDetailPage() {
             loading={outstandingQ.isLoading}
           />
         </div>
+
+        {/* Aging strip — only render when this vendor actually has any open
+            balance. The lineItems list is fed by /api/vendors/:id/aging. */}
+        {agingQ.data && agingQ.data.totalOpen > 0 && (
+          <div className="rounded-2xl bg-white shadow-sm p-4 mt-3">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-onyx-800">
+                Aging Buckets
+              </h3>
+              <Link
+                to="/app/vendors/aging"
+                className="text-xs text-champagne-700 hover:underline"
+              >
+                Full aging report →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {(
+                [
+                  { k: 'current', label: 'Current', cls: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+                  { k: 'd1_30', label: '1–30 d', cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
+                  { k: 'd31_60', label: '31–60 d', cls: 'bg-orange-50 text-orange-800 ring-orange-200' },
+                  { k: 'd61_90', label: '61–90 d', cls: 'bg-rose-50 text-rose-800 ring-rose-200' },
+                  { k: 'over_90', label: '90+ d', cls: 'bg-red-50 text-red-800 ring-red-200' },
+                ] as const
+              ).map((b) => {
+                const v = (agingQ.data as any)[b.k] as number;
+                return (
+                  <div key={b.k} className={`rounded-lg ring-1 px-3 py-2 ${b.cls}`}>
+                    <p className="text-[11px] font-medium uppercase tracking-wide opacity-80">
+                      {b.label}
+                    </p>
+                    <p className="text-base font-semibold tabular-nums mt-0.5">
+                      ₹{fmt(v)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Vendor info + GST */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

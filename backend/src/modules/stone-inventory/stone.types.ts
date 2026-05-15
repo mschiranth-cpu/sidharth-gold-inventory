@@ -49,6 +49,8 @@ export interface CreateRealStonePurchaseRequest {
   vendorId?: string;
   referenceNumber?: string;
   transactionDate?: string;
+  /** Optional invoice-level dueDate override (ISO). Falls back to vendor default. */
+  dueDate?: string;
   notes?: string;
   items: RealStonePurchaseItem[];
 }
@@ -113,6 +115,8 @@ export interface UpdateRealStoneTransactionRequest {
   neftBank?: string;
   neftDate?: string;
   creditApplied?: number;
+  /** Per-invoice due-date override (ISO). Admin-only edit affordance. */
+  dueDate?: string | null;
 }
 
 export interface SettleRealStonePaymentRequest {
@@ -193,6 +197,8 @@ export interface CreateStonePacketPurchaseRequest {
   vendorId?: string;
   referenceNumber?: string;
   transactionDate?: string;
+  /** Optional invoice-level dueDate override (ISO). Falls back to vendor default. */
+  dueDate?: string;
   notes?: string;
   items: StonePacketPurchaseItem[];
 }
@@ -263,6 +269,8 @@ export interface UpdateStonePacketTransactionRequest {
   neftBank?: string;
   neftDate?: string;
   creditApplied?: number;
+  /** Per-invoice due-date override (ISO). Admin-only edit affordance. */
+  dueDate?: string | null;
 }
 
 export interface SettleStonePacketPaymentRequest {

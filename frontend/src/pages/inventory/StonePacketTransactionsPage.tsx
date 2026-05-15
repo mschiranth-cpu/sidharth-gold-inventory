@@ -31,6 +31,7 @@ import {
 import Button from '../../components/common/Button';
 import SettlePaymentModal from '../../components/SettlePaymentModal';
 import EditStonePacketTransactionModal from '../../components/EditStonePacketTransactionModal';
+import { OverdueBadge } from '../../components/OverdueBadge';
 import {
   BulkDeleteModal,
   BulkSettleModal,
@@ -530,17 +531,25 @@ export default function StonePacketTransactionsPage() {
                         <td className="px-3 py-3">
                           {isPurchase ? (
                             <div className="space-y-1">
-                              <span
-                                className={`inline-block px-2 py-0.5 text-xs rounded-full border ${
-                                  PAYMENT_STATUS_CLS[t.paymentStatus ?? 'PENDING'] ??
-                                  'bg-onyx-50 text-onyx-700 border-onyx-200'
-                                }`}
-                              >
-                                {t.paymentStatus ?? 'PENDING'}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`inline-block px-2 py-0.5 text-xs rounded-full border ${
+                                    PAYMENT_STATUS_CLS[t.paymentStatus ?? 'PENDING'] ??
+                                    'bg-onyx-50 text-onyx-700 border-onyx-200'
+                                  }`}
+                                >
+                                  {t.paymentStatus ?? 'PENDING'}
+                                </span>
+                                <OverdueBadge dueDate={t.dueDate} paymentStatus={t.paymentStatus} />
+                              </div>
                               {balanceDue > 0 && (
                                 <div className="text-xs text-onyx-500">
                                   ₹{fmt(balanceDue)} due
+                                </div>
+                              )}
+                              {t.dueDate && (
+                                <div className="text-[10px] text-onyx-300">
+                                  Due {formatIstDate(t.dueDate)}
                                 </div>
                               )}
                             </div>

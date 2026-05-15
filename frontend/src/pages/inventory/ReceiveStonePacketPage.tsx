@@ -7,7 +7,7 @@
  * Mirror of ReceiveRealStonePage with packet-specific fields.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -72,6 +72,8 @@ export default function ReceiveStonePacketPage() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [transactionDate, setTransactionDate] = useState(nowIstDateString());
+  const [dueDate, setDueDate] = useState<string>('');
+  const dueDateTouched = useRef<boolean>(false);
   const [items, setItems] = useState<PurchaseItem[]>([blankItem()]);
   const [formData, setFormData] = useState({
     isBillable: true,
@@ -125,6 +127,26 @@ export default function ReceiveStonePacketPage() {
     );
   }, [formData.cashAmount, formData.neftAmount, formData.paymentMode, totalPrice]);
 
+  // Auto-prefill dueDate from vendor.paymentDueDays + transactionDate.
+  useEffect(() => {
+    if (dueDateTouched.current) return;
+    if (!selectedVendor || !transactionDate) {
+      setDueDate('');
+      return;
+    }
+    const n = Math.max(0, Math.floor(Number(selectedVendor.paymentDueDays ?? 0)));
+    const base = new Date(transactionDate);
+    if (Number.isNaN(base.getTime())) {
+      setDueDate('');
+      return;
+    }
+    base.setDate(base.getDate() + n);
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, '0');
+    const dd = String(base.getDate()).padStart(2, '0');
+    setDueDate(`${yyyy}-${mm}-${dd}`);
+  }, [selectedVendor, transactionDate]);
+
   const updateItem = (idx: number, patch: Partial<PurchaseItem>) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   const addItem = () => setItems((prev) => [...prev, blankItem()]);
@@ -172,6 +194,7 @@ export default function ReceiveStonePacketPage() {
         vendorId: selectedVendor!.id,
         referenceNumber: referenceNumber || undefined,
         transactionDate: transactionDate ? combineDateWithCurrentIstTimeISO(transactionDate) : undefined,
+        dueDate: dueDate || undefined,
         items: items.map((it) => {
           const { customShape, ...rest } = it;
           const finalShape =
@@ -262,7 +285,7 @@ export default function ReceiveStonePacketPage() {
                 <p className="text-xs text-onyx-400">Reference number is optional but recommended.</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-onyx-700 mb-1">
                   Reference / Invoice Number
@@ -282,6 +305,25 @@ export default function ReceiveStonePacketPage() {
                   value={transactionDate}
                   max={nowIstDateString()}
                   onChange={(e) => setTransactionDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-onyx-700 mb-1">
+                  Due Date
+                  {selectedVendor?.paymentDueDays != null && selectedVendor.paymentDueDays > 0 ? (
+                    <span className="ml-2 text-[11px] font-normal text-onyx-400">
+                      (default: NET-{selectedVendor.paymentDueDays})
+                    </span>
+                  ) : null}
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    dueDateTouched.current = true;
+                    setDueDate(e.target.value);
+                  }}
                   className={inputCls}
                 />
               </div>

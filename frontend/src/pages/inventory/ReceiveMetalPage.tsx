@@ -59,6 +59,10 @@ export default function ReceiveMetalPage() {
     creditApplied: 0,              // vendor credit to apply to this purchase
   });
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  // Invoice-level dueDate — pre-fills from vendor.paymentDueDays + transactionDate
+  // (matches backend's computeDueDate). Empty string → backend uses vendor default.
+  const [dueDate, setDueDate] = useState<string>('');
+  const dueDateTouched = useRef<boolean>(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showErrorModal, setShowErrorModal] = useState(false);
 
@@ -67,6 +71,27 @@ export default function ReceiveMetalPage() {
     const pureWeight = (formData.grossWeight * formData.purity) / 24;
     return pureWeight * formData.rate;
   }, [formData.grossWeight, formData.purity, formData.rate]);
+
+  // Auto-prefill dueDate from vendor.paymentDueDays whenever vendor or txn-date
+  // changes, until user manually edits it. Mirrors backend computeDueDate.
+  useEffect(() => {
+    if (dueDateTouched.current) return;
+    if (!selectedVendor || !formData.transactionDate) {
+      setDueDate('');
+      return;
+    }
+    const n = Math.max(0, Math.floor(Number(selectedVendor.paymentDueDays ?? 0)));
+    const base = new Date(formData.transactionDate);
+    if (Number.isNaN(base.getTime())) {
+      setDueDate('');
+      return;
+    }
+    base.setDate(base.getDate() + n);
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, '0');
+    const dd = String(base.getDate()).padStart(2, '0');
+    setDueDate(`${yyyy}-${mm}-${dd}`);
+  }, [selectedVendor, formData.transactionDate]);
 
   // When paymentStatus or totalPrice changes, sync amountPaid for COMPLETE/PENDING.
   // HALF leaves amountPaid alone (user-controlled).
@@ -170,6 +195,8 @@ export default function ReceiveMetalPage() {
       transactionDate: formData.transactionDate
         ? combineDateWithCurrentIstTimeISO(formData.transactionDate)
         : undefined,
+      // Empty string ⇒ omit so backend falls back to vendor.paymentDueDays.
+      dueDate: dueDate || undefined,
     };
     // Always send payment fields. `isBillable` is preserved on the row purely
     // as a tax-classification tag for Excel exports.
@@ -370,6 +397,32 @@ export default function ReceiveMetalPage() {
                 </div>
                 <p className="mt-1 text-xs text-onyx-400">
                   Defaults to today. Pick a past date to back-date the entry.
+                </p>
+              </div>
+            </div>
+
+            {/* Due Date — pre-fills from vendor's paymentDueDays + transactionDate. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-semibold text-onyx-700 mb-2">
+                  Payment Due Date
+                  {selectedVendor?.paymentDueDays != null && selectedVendor.paymentDueDays > 0 ? (
+                    <span className="ml-2 text-[11px] font-normal text-onyx-400">
+                      (default: NET-{selectedVendor.paymentDueDays})
+                    </span>
+                  ) : null}
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    dueDateTouched.current = true;
+                    setDueDate(e.target.value);
+                  }}
+                  className={inputClass()}
+                />
+                <p className="mt-1 text-xs text-onyx-400">
+                  Override only if this invoice has different terms.
                 </p>
               </div>
             </div>
