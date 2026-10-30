@@ -162,7 +162,7 @@ export default function LandingPage() {
                 className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-to-r from-champagne-300 via-champagne-400 to-champagne-600 text-onyx-900 font-semibold shadow-[0_10px_40px_-10px_rgba(232,198,132,0.6)] hover:from-champagne-200 hover:to-champagne-500 transition"
               >
                 <UserGroupIcon className="w-5 h-5" />
-                Register as Client
+                Request Registration
                 <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-0.5 transition" />
               </Link>
               <Link
@@ -339,7 +339,7 @@ export default function LandingPage() {
                 className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-to-r from-champagne-300 via-champagne-400 to-champagne-600 text-onyx-900 font-semibold shadow-lg hover:from-champagne-200 hover:to-champagne-500 transition"
               >
                 <UserGroupIcon className="w-5 h-5" />
-                Register as Client
+                Request Registration
               </Link>
               <Link
                 to="/login"
