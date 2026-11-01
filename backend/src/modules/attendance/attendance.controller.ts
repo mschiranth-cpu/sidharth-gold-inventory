@@ -103,7 +103,17 @@ export async function approveLeaveController(req: Request, res: Response) {
 export async function getLeavesController(req: Request, res: Response) {
   try {
     const { userId, status } = req.query;
-    const leaves = await getLeaves(userId as string, status as string);
+    if ((userId !== undefined && typeof userId !== 'string') || (status !== undefined && typeof status !== 'string')) {
+      return res.status(400).json({ success: false, error: { message: 'Invalid leave history filters.' } });
+    }
+    const { user } = req as AuthenticatedRequest;
+    const canViewAll = ['ADMIN', 'FACTORY_MANAGER'].includes(user.role);
+    if (!canViewAll && userId && userId !== user.userId) {
+      return res.status(403).json({ success: false, error: { message: 'You can view only your own leave history.' } });
+    }
+    const filteredUserId = typeof userId === 'string' ? userId : undefined;
+    const filteredStatus = typeof status === 'string' ? status : undefined;
+    const leaves = await getLeaves(canViewAll ? filteredUserId : user.userId, filteredStatus);
     res.json({ success: true, data: leaves });
   } catch (error) {
     logger.error('Get leaves error', { error });

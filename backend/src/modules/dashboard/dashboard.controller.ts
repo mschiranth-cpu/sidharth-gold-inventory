@@ -3,6 +3,8 @@ import type { AuthRequest } from '../../middleware/auth';
 import { logger } from '../../utils/logger';
 import { getDashboardOverview, getWorkerOverview } from './dashboard.service';
 import type { DashboardRange } from './dashboard.types';
+import { getUserFeatures } from '../features/features.service';
+import { filterDashboardFeatures, filterWorkerDashboardFeatures } from '../features/features.dashboard';
 
 const VALID_RANGES: DashboardRange[] = ['today', '7d', '30d', 'custom'];
 
@@ -21,7 +23,8 @@ export const handleGetOverview = async (req: AuthRequest, res: Response, _next: 
       req.query.to as string | undefined,
       req.user.userId
     );
-    return res.json({ success: true, data });
+    const features = await getUserFeatures(req.user.userId);
+    return res.json({ success: true, data: filterDashboardFeatures(data, features) });
   } catch (error: any) {
     logger.error('Dashboard overview failed', { error: error?.message });
     if (error?.message?.includes('Invalid') || error?.message?.includes('before')) {
@@ -41,7 +44,8 @@ export const handleGetWorkerOverview = async (
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
     const data = await getWorkerOverview(req.user.userId);
-    return res.json({ success: true, data });
+    const features = await getUserFeatures(req.user.userId);
+    return res.json({ success: true, data: filterWorkerDashboardFeatures(data, features) });
   } catch (error: any) {
     logger.error('Worker overview failed', { error: error?.message });
     return res.status(500).json({ success: false, message: 'Failed to load worker overview' });

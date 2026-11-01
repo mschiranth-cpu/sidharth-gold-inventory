@@ -4,7 +4,7 @@
  * ============================================
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteMetalTransaction,
@@ -26,6 +26,7 @@ import {
   useTxnSelection,
 } from '../../components/transactions/TxnBulkActions';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate, formatIstTime, istDayBoundsMs } from '../../lib/dateUtils';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
@@ -156,9 +157,10 @@ function PaymentCell({
 
 export default function MetalTransactionsPage() {
   const { user } = useAuth();
-  const canSettle = SETTLE_ROLES.has(String(user?.role ?? ''));
-  const canEdit = EDIT_ROLES.has(String(user?.role ?? ''));
-  const canDelete = DELETE_ROLES.has(String(user?.role ?? ''));
+  const { canPerform } = useFeatures();
+  const canSettle = SETTLE_ROLES.has(String(user?.role ?? '')) && canPerform('METAL_INVENTORY', 'write');
+  const canEdit = EDIT_ROLES.has(String(user?.role ?? '')) && canPerform('METAL_INVENTORY', 'write');
+  const canDelete = DELETE_ROLES.has(String(user?.role ?? '')) && canPerform('METAL_INVENTORY', 'delete');
   const [filters, setFilters] = useState({ metalType: '', transactionType: '' });
   // Client-side filters (the backend list endpoint only supports metalType +
   // transactionType, so we slice the rest in memory).
@@ -173,6 +175,12 @@ export default function MetalTransactionsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canSettle) { setSettleTxn(null); setBulkSettleOpen(false); }
+    if (!canEdit) setEditTxn(null);
+    if (!canDelete) { setDeleteTxn(null); setBulkDeleteOpen(false); }
+  }, [canSettle, canEdit, canDelete]);
 
   const queryClient = useQueryClient();
   const deleteMutation = useMutation({
@@ -749,20 +757,20 @@ export default function MetalTransactionsPage() {
           </div>
         </div>
       </div>
-      {settleTxn && (
+      {canSettle && settleTxn && (
         <SettlePaymentModal
           domain="metal"
           transaction={settleTxn}
           onClose={() => setSettleTxn(null)}
         />
       )}
-      {editTxn && (
+      {canEdit && editTxn && (
         <EditMetalTransactionModal
           transaction={editTxn}
           onClose={() => setEditTxn(null)}
         />
       )}
-      {deleteTxn && (
+      {canDelete && deleteTxn && (
         <DeleteConfirmModal
           transaction={deleteTxn}
           error={deleteError}
@@ -774,7 +782,7 @@ export default function MetalTransactionsPage() {
           onConfirm={() => deleteMutation.mutate(deleteTxn.id)}
         />
       )}
-      {bulkDeleteOpen && (
+      {canDelete && bulkDeleteOpen && (
         <BulkDeleteModal
           rows={filteredTransactions.filter((t: any) => selectedIds.has(t.id))}
           deleteFn={deleteMetalTransaction}
@@ -793,7 +801,7 @@ export default function MetalTransactionsPage() {
           }}
         />
       )}
-      {bulkSettleOpen && (
+      {canSettle && bulkSettleOpen && (
         <BulkSettleModal
           rows={filteredTransactions.filter(
             (t: any) =>

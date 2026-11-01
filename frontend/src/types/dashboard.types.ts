@@ -30,10 +30,10 @@ export interface InventoryLowStockItem {
 }
 
 export interface InventorySnapshot {
-  metalStockGrams: number;
-  diamondPieces: number;
-  stonePackets: number;
-  realStonePieces: number;
+  metalStockGrams: number | null;
+  diamondPieces: number | null;
+  stonePackets: number | null;
+  realStonePieces: number | null;
   lowStockItems: InventoryLowStockItem[];
 }
 
@@ -125,7 +125,7 @@ export interface DashboardOverview {
   metalsInProcess: MetalsInProcess;
   inventorySnapshot: InventorySnapshot;
   vendorOutstanding: VendorOutstandingRow[];
-  attendanceToday: AttendanceTodayBreakdown;
+  attendanceToday: AttendanceTodayBreakdown | null;
   submissionsQueue: SubmissionQueueItem[];
   ordersTrend: OrdersTrendBucket[];
   departmentWorkload: DepartmentWorkloadRow[];
@@ -168,7 +168,7 @@ export interface WorkerDashboardOverview {
     status: 'PRESENT' | 'CHECKED_OUT' | 'ABSENT' | 'ON_LEAVE';
     checkInTime: string | null;
     checkOutTime: string | null;
-  };
+  } | null;
   marketRates: MarketRatesPayload;
   meta: {
     generatedAt: string;

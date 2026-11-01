@@ -63,18 +63,6 @@ const UsersPage = lazy(() =>
   import('./modules/users').then((module) => ({ default: module.UsersPage }))
 );
 
-// Placeholder pages - will be expanded
-const InventoryPage = lazy(() =>
-  Promise.resolve({
-    default: () => (
-      <div className="card">
-        <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-        <p className="mt-2 text-gray-600">Track your gold inventory</p>
-      </div>
-    ),
-  })
-);
-
 const DepartmentsPage = lazy(() => import('./modules/departments/components/DepartmentsPage'));
 const DepartmentDetailPage = lazy(
   () => import('./modules/departments/components/DepartmentDetailPage')
@@ -349,7 +337,7 @@ function App() {
             element={
               <OfficeRoute>
                 <LazyRoute>
-                  <InventoryPage />
+                  <MainInventoryDashboard />
                 </LazyRoute>
               </OfficeRoute>
             }
@@ -573,20 +561,6 @@ function App() {
               <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF]}>
                 <LazyRoute>
                   <OrderApprovalPage />
-                </LazyRoute>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Main Inventory Dashboard */}
-          <Route
-            path="inventory"
-            element={
-              <ProtectedRoute
-                allowedRoles={[UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER]}
-              >
-                <LazyRoute>
-                  <MainInventoryDashboard />
                 </LazyRoute>
               </ProtectedRoute>
             }

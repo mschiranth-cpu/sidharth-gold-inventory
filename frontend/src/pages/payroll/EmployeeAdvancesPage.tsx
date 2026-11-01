@@ -8,8 +8,13 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createEmployeeAdvance } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 export default function EmployeeAdvancesPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('PAYROLL', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,6 +35,7 @@ export default function EmployeeAdvancesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     createMutation.mutate(formData);
   };
 
@@ -41,12 +47,12 @@ export default function EmployeeAdvancesPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Employee Advances</h1>
             <p className="text-gray-600">Manage salary advances</p>
           </div>
-          <Button variant="primary" onClick={() => setShowForm(!showForm)}>
+          <Button variant="primary" onClick={() => setShowForm(!showForm)} disabled={!canWrite}>
             {showForm ? 'Cancel' : 'Give Advance'}
           </Button>
         </div>
 
-        {showForm && (
+        {showForm && canWrite && (
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Give Advance</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -113,7 +119,7 @@ export default function EmployeeAdvancesPage() {
                 </div>
               )}
 
-              <Button type="submit" variant="primary" isLoading={createMutation.isPending}>
+              <Button type="submit" variant="primary" isLoading={createMutation.isPending} disabled={!canWrite}>
                 Give Advance
               </Button>
             </form>

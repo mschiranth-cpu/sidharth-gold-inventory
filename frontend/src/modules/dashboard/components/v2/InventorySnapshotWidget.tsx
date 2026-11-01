@@ -1,6 +1,7 @@
 import { Boxes, AlertTriangle } from 'lucide-react';
 import { WidgetCard } from './WidgetCard';
 import type { InventorySnapshot } from '../../../../types/dashboard.types';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 export interface InventorySnapshotWidgetProps {
   data: InventorySnapshot | undefined;
@@ -21,7 +22,15 @@ export const InventorySnapshotWidget = ({
   onHide,
   onOpen,
 }: InventorySnapshotWidgetProps) => {
-  const lows = data?.lowStockItems ?? [];
+  const { canUsePath, isChecking, isError } = useFeatures();
+  const allowed = {
+    METAL: canUsePath('/app/inventory/metal') && data?.metalStockGrams !== null,
+    DIAMOND: canUsePath('/app/inventory/diamonds') && data?.diamondPieces !== null,
+    REAL_STONE: canUsePath('/app/inventory/real-stones') && data?.realStonePieces !== null,
+    STONE_PACKET: canUsePath('/app/inventory/stone-packets') && data?.stonePackets !== null,
+  };
+  const lows = (data?.lowStockItems ?? []).filter((item) => allowed[item.type]);
+  if (isChecking || isError || !Object.values(allowed).some(Boolean)) return null;
   return (
     <WidgetCard
       tone="pearl"
@@ -40,10 +49,10 @@ export const InventorySnapshotWidget = ({
       }
     >
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Metal stock" value={`${num(Math.round(data?.metalStockGrams ?? 0))} g`} />
-        <Stat label="Diamonds" value={`${num(data?.diamondPieces ?? 0)} pcs`} />
-        <Stat label="Real stones" value={`${num(data?.realStonePieces ?? 0)} pcs`} />
-        <Stat label="Stone packets" value={`${num(data?.stonePackets ?? 0)}`} />
+        {allowed.METAL && <Stat label="Metal stock" value={`${num(Math.round(data?.metalStockGrams ?? 0))} g`} />}
+        {allowed.DIAMOND && <Stat label="Diamonds" value={`${num(data?.diamondPieces ?? 0)} pcs`} />}
+        {allowed.REAL_STONE && <Stat label="Real stones" value={`${num(data?.realStonePieces ?? 0)} pcs`} />}
+        {allowed.STONE_PACKET && <Stat label="Stone packets" value={`${num(data?.stonePackets ?? 0)}`} />}
       </div>
 
       {lows.length > 0 && (

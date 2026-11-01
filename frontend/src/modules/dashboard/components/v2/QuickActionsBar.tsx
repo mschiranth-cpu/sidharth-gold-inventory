@@ -1,6 +1,7 @@
 import { Plus, FileSpreadsheet, ClipboardCheck, Users, Boxes } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WidgetCard } from './WidgetCard';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 export interface QuickActionsBarProps {
   role: string;
@@ -62,7 +63,8 @@ export const QuickActionsBar = ({
   onHide,
 }: QuickActionsBarProps) => {
   const navigate = useNavigate();
-  const allowed = ACTIONS.filter((a) => a.roles.includes(role));
+  const { canUsePath, isChecking, isError } = useFeatures();
+  const allowed = ACTIONS.filter((a) => a.roles.includes(role) && (a.to !== '/app/inventory' || (!isChecking && !isError)) && canUsePath(a.to));
   return (
     <WidgetCard
       tone="onyx"

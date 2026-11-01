@@ -9,8 +9,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { processPayroll } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 export default function ProcessPayrollPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('PAYROLL', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -25,6 +30,7 @@ export default function ProcessPayrollPage() {
   });
 
   const handleProcess = () => {
+    if (!canWrite) return;
     if (!confirmed) {
       alert('Please confirm before processing');
       return;
@@ -92,7 +98,7 @@ export default function ProcessPayrollPage() {
               variant="primary"
               size="lg"
               onClick={handleProcess}
-              disabled={!confirmed}
+              disabled={!confirmed || !canWrite}
               isLoading={processMutation.isPending}
               className="flex-1"
             >

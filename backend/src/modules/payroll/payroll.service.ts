@@ -170,7 +170,7 @@ export async function getPayslip(payslipId: string) {
   return await prisma.payslip.findUnique({
     where: { id: payslipId },
     include: {
-      user: true,
+      user: { select: { id: true, name: true, email: true, role: true } },
       period: true,
     },
   });

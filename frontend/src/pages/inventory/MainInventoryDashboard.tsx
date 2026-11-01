@@ -9,6 +9,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMetalStockSummary } from '../../services/metal.service';
+import { useFeatures } from '../../hooks/useFeatures';
 
 const inventoryModules = [
   {
@@ -70,9 +71,13 @@ const inventoryModules = [
 ];
 
 export default function MainInventoryDashboard() {
+  const { canUsePath, isChecking, isError, refetch } = useFeatures();
+  const metalEnabled = !isChecking && !isError && canUsePath('/app/inventory/metal');
+  const visibleModules = inventoryModules.filter((module) => canUsePath(module.href));
   const { data: stockSummary = [] } = useQuery({
     queryKey: ['metal-stock-summary'],
     queryFn: getMetalStockSummary,
+    enabled: metalEnabled,
   });
 
   const totalMetalWeight = stockSummary.reduce((sum: number, s: any) => sum + s.totalGrossWeight, 0);
@@ -86,8 +91,10 @@ export default function MainInventoryDashboard() {
           <p className="text-gray-600">Manage all inventory modules — metals, diamonds, and stones</p>
         </div>
 
+        {isChecking ? <p role="status" className="mb-6 text-gray-600">Checking inventory access...</p> : isError ? <p role="alert" className="mb-6 text-red-700">Inventory access could not be checked. <button type="button" onClick={() => refetch()} className="font-semibold underline underline-offset-4">Try again</button></p> : <>
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className={'grid grid-cols-1 gap-4 mb-8 ' + (metalEnabled ? 'sm:grid-cols-3' : '')}>
+          {metalEnabled && <>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
@@ -114,6 +121,7 @@ export default function MainInventoryDashboard() {
               </div>
             </div>
           </div>
+          </>}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -123,7 +131,7 @@ export default function MainInventoryDashboard() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Inventory Modules</p>
-                <p className="text-xl font-bold text-gray-900">5</p>
+                <p className="text-xl font-bold text-gray-900">{visibleModules.length}</p>
               </div>
             </div>
           </div>
@@ -131,7 +139,7 @@ export default function MainInventoryDashboard() {
 
         {/* Inventory Modules Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {inventoryModules.map((mod) => (
+          {visibleModules.map((mod) => (
             <Link
               key={mod.name}
               to={mod.href}
@@ -161,6 +169,8 @@ export default function MainInventoryDashboard() {
             </Link>
           ))}
         </div>
+        {!visibleModules.length && <p className="rounded-xl border border-gray-200 bg-white p-6 text-gray-600">No inventory modules are enabled for you. Ask your administrator to review your feature permissions.</p>}
+        </>}
       </div>
     </div>
   );

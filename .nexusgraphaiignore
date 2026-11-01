@@ -1,0 +1,14 @@
+# Index application code, excluding production data and deployment snapshots.
+backups/
+**/backups/
+.deployments/
+**/node_modules/
+**/dist/
+**/uploads/
+**/logs/
+**/.env*
+**/id_ed25519*
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12

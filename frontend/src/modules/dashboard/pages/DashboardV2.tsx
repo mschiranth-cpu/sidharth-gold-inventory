@@ -244,7 +244,7 @@ const AdminDashboard = ({
               editMode={editMode}
               dragHandleProps={dragProps}
               onHide={onHide}
-              onOpen={() => navigate('/app/attendance')}
+              onOpen={() => navigate('/app/attendance/dashboard')}
             />
           </div>
         );
@@ -487,11 +487,7 @@ const WorkerDashboard = ({
       <WorkerHero
         userName={userName}
         attendance={
-          data?.myAttendanceToday ?? {
-            status: 'ABSENT',
-            checkInTime: null,
-            checkOutTime: null,
-          }
+          data?.myAttendanceToday ?? null
         }
         department={data?.myDepartmentRollup.department ?? null}
         rates={

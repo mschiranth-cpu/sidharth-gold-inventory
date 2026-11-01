@@ -16,6 +16,8 @@ import {
   type RealStoneRate,
 } from '../../services/stone.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate } from '../../lib/dateUtils';
 
 const STONE_TYPES = [
@@ -37,6 +39,9 @@ const fmt = (n: number) =>
   n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function RealStoneRateManagementPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('REAL_STONE_INVENTORY', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -73,6 +78,7 @@ export default function RealStoneRateManagementPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     setError(null);
     if (form.caratTo < form.caratFrom) {
       setError('Carat To must be ≥ Carat From');
@@ -105,14 +111,14 @@ export default function RealStoneRateManagementPage() {
             <Link to="/app/inventory/real-stones">
               <Button variant="secondary">Back to Dashboard</Button>
             </Link>
-            <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button variant="primary" onClick={() => setShowForm(true)} disabled={!canWrite}>
               <PlusIcon className="h-4 w-4 mr-1" />
               Add Rate
             </Button>
           </div>
         </div>
 
-        {showForm && (
+        {showForm && canWrite && (
           <form
             onSubmit={handleSubmit}
             noValidate
@@ -205,7 +211,7 @@ export default function RealStoneRateManagementPage() {
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" isLoading={create.isPending}>
+              <Button type="submit" variant="primary" isLoading={create.isPending} disabled={!canWrite}>
                 <SparklesIcon className="h-4 w-4 mr-1" />
                 Save Rate
               </Button>

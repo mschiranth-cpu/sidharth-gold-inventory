@@ -8,9 +8,14 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPayrollPeriods } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate } from '../../lib/dateUtils';
 
 export default function PayrollDashboard() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('PAYROLL', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const { data: periods = [], isLoading } = useQuery({
     queryKey: ['payroll-periods'],
     queryFn: getPayrollPeriods,
@@ -32,7 +37,7 @@ export default function PayrollDashboard() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Payroll Management</h1>
             <p className="text-gray-600">Process monthly payroll and manage salaries</p>
           </div>
-          <Button variant="primary">Create Payroll Period</Button>
+          <Button variant="primary" disabled={!canWrite}>Create Payroll Period</Button>
         </div>
 
         {/* Payroll Periods */}
@@ -107,7 +112,7 @@ export default function PayrollDashboard() {
 
               <div className="mt-4 flex gap-3">
                 {period.status === 'DRAFT' && (
-                  <Button variant="primary" size="sm">
+                  <Button variant="primary" size="sm" disabled={!canWrite}>
                     Process Payroll
                   </Button>
                 )}

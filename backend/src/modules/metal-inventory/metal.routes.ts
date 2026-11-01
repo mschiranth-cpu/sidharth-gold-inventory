@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * METAL INVENTORY ROUTES
@@ -26,6 +27,9 @@ import {
 } from './metal.controller';
 
 const router = Router();
+
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('METAL_INVENTORY'));
 
 // Stock routes
 router.get(

@@ -17,6 +17,49 @@ import {
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 12;
+const publicUserSelect = { id: true, name: true, email: true, role: true } as const;
+
+export interface ClientCommentActor {
+  userId: string;
+  role: UserRole;
+}
+
+export class ClientCommentAccessError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'ClientCommentAccessError';
+  }
+}
+
+function canUseInternalComments(role: UserRole) {
+  return ([UserRole.ADMIN, UserRole.OFFICE_STAFF, UserRole.FACTORY_MANAGER] as UserRole[]).includes(role);
+}
+
+async function assertOrderCommentAccess(orderId: string, actor: ClientCommentActor) {
+  if (!actor?.userId) {
+    throw new ClientCommentAccessError(401, 'Authentication required.');
+  }
+  if (typeof orderId !== 'string' || !orderId.trim()) {
+    throw new ClientCommentAccessError(400, 'Invalid order ID.');
+  }
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      client: { select: { userId: true } },
+      departmentTracking: {
+        where: { assignedToId: actor.userId },
+        select: { assignedToId: true },
+      },
+    },
+  });
+  if (!order) {
+    throw new ClientCommentAccessError(404, 'Order not found.');
+  }
+  if (canUseInternalComments(actor.role)) return;
+  if (actor.role === UserRole.CLIENT && order.client?.userId === actor.userId) return;
+  if (actor.role === UserRole.DEPARTMENT_WORKER && order.departmentTracking.some((row) => row.assignedToId === actor.userId)) return;
+  throw new ClientCommentAccessError(403, 'You do not have access to this order conversation.');
+}
 
 /**
  * Create a new client account
@@ -198,7 +241,7 @@ export async function approveClient(data: ApproveClientRequest, approvedById: st
       rejectionReason: data.approved ? null : data.rejectionReason,
     },
     include: {
-      user: true,
+      user: { select: publicUserSelect },
     },
   });
 }
@@ -368,7 +411,7 @@ export async function approveClientOrder(
       orderDetails: true,
       client: {
         include: {
-          user: true,
+          user: { select: publicUserSelect },
         },
       },
     },
@@ -378,11 +421,20 @@ export async function approveClientOrder(
 /**
  * Add comment to order
  */
-export async function addOrderComment(userId: string, data: OrderCommentRequest) {
+export async function addOrderComment(actor: ClientCommentActor, data: OrderCommentRequest) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) || typeof data.message !== 'string' || !data.message.trim()
+      || (data.isInternal !== undefined && typeof data.isInternal !== 'boolean')
+      || (data.attachments !== undefined && (!Array.isArray(data.attachments) || data.attachments.some((attachment) => typeof attachment !== 'string')))) {
+    throw new ClientCommentAccessError(400, 'Invalid order comment.');
+  }
+  await assertOrderCommentAccess(data.orderId, actor);
+  if (data.isInternal && !canUseInternalComments(actor.role)) {
+    throw new ClientCommentAccessError(403, 'Only staff can create internal comments.');
+  }
   return await prisma.orderComment.create({
     data: {
       orderId: data.orderId,
-      userId: userId,
+      userId: actor.userId,
       message: data.message,
       attachments: data.attachments || [],
       isInternal: data.isInternal || false,
@@ -401,10 +453,11 @@ export async function addOrderComment(userId: string, data: OrderCommentRequest)
 /**
  * Get order comments
  */
-export async function getOrderComments(orderId: string, includeInternal: boolean = false) {
+export async function getOrderComments(orderId: string, actor: ClientCommentActor, includeInternal: boolean = false) {
+  await assertOrderCommentAccess(orderId, actor);
   const where: any = { orderId };
 
-  if (!includeInternal) {
+  if (!includeInternal || !canUseInternalComments(actor.role)) {
     where.isInternal = false;
   }
 
@@ -426,7 +479,18 @@ export async function getOrderComments(orderId: string, includeInternal: boolean
 /**
  * Mark comment as read
  */
-export async function markCommentAsRead(commentId: string) {
+export async function markCommentAsRead(commentId: string, actor: ClientCommentActor) {
+  const comment = await prisma.orderComment.findUnique({
+    where: { id: commentId },
+    select: { id: true, orderId: true, isInternal: true },
+  });
+  if (!comment) {
+    throw new ClientCommentAccessError(404, 'Comment not found.');
+  }
+  await assertOrderCommentAccess(comment.orderId, actor);
+  if (comment.isInternal && !canUseInternalComments(actor.role)) {
+    throw new ClientCommentAccessError(403, 'Only staff can access internal comments.');
+  }
   return await prisma.orderComment.update({
     where: { id: commentId },
     data: {

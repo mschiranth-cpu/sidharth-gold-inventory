@@ -9,8 +9,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createSalaryStructure, getSalaryStructure } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 export default function SalaryStructurePage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('PAYROLL', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -45,6 +50,7 @@ export default function SalaryStructurePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     createMutation.mutate({
       ...formData,
       effectiveFrom: new Date(formData.effectiveFrom),
@@ -244,6 +250,7 @@ export default function SalaryStructurePage() {
                 variant="primary"
                 size="lg"
                 isLoading={createMutation.isPending}
+                disabled={!canWrite}
                 className="flex-1"
               >
                 Save Salary Structure

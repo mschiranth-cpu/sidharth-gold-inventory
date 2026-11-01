@@ -17,6 +17,7 @@ import { cn } from '../../utils/helpers';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/auth.types';
 import BrandMark from '../common/BrandMark';
+import { useFeatures } from '../../hooks/useFeatures';
 
 // Navigation items with role-based visibility
 type NavItem = {
@@ -27,7 +28,7 @@ type NavItem = {
   children?: { name: string; href: string }[];
 };
 
-const getNavigation = (userRole: UserRole): NavItem[] => {
+const getNavigation = (userRole: UserRole, canUsePath: (path: string) => boolean): NavItem[] => {
   const allItems: NavItem[] = [
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: 'all' },
     {
@@ -131,7 +132,10 @@ const getNavigation = (userRole: UserRole): NavItem[] => {
   return allItems.filter((item) => {
     if (item.roles === 'all') return true;
     return (item.roles as UserRole[]).includes(userRole);
-  });
+  }).map((item) => item.children
+    ? { ...item, children: item.children.filter((child) => canUsePath(child.href)) }
+    : item
+  ).filter((item) => item.children ? item.children.length > 0 : canUsePath(item.href));
 };
 
 interface SidebarProps {
@@ -141,8 +145,9 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const { user, logout } = useAuth();
+  const { canUsePath } = useFeatures();
   const navigate = useNavigate();
-  const navigation = getNavigation(user?.role || UserRole.DEPARTMENT_WORKER);
+  const navigation = getNavigation(user?.role || UserRole.DEPARTMENT_WORKER, canUsePath);
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean | undefined>>({});
   const location = useLocation();

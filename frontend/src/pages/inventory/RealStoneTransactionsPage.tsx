@@ -7,7 +7,7 @@
  * and Excel export. Mirrors DiamondTransactionsPage in structure.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -38,6 +38,7 @@ import {
   useTxnSelection,
 } from '../../components/transactions/TxnBulkActions';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 const TXN_META: Record<string, { label: string; cls: string }> = {
@@ -69,8 +70,10 @@ const fmtInt = (n: number) =>
 export default function RealStoneTransactionsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canSettle = ['ADMIN', 'OFFICE_STAFF'].includes(String(user?.role ?? ''));
-  const canDelete = String(user?.role ?? '') === 'ADMIN';
+  const { canPerform } = useFeatures();
+  const canSettle = ['ADMIN', 'OFFICE_STAFF'].includes(String(user?.role ?? '')) && canPerform('REAL_STONE_INVENTORY', 'write');
+  const canEdit = canSettle;
+  const canDelete = String(user?.role ?? '') === 'ADMIN' && canPerform('REAL_STONE_INVENTORY', 'delete');
   const [filters, setFilters] = useState<{
     transactionType?: string;
     isBillable?: boolean;
@@ -85,6 +88,12 @@ export default function RealStoneTransactionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canSettle) { setSettleTxn(null); setBulkSettleOpen(false); }
+    if (!canEdit) setEditTxn(null);
+    if (!canDelete) { setConfirmDelete(null); setBulkDeleteOpen(false); }
+  }, [canSettle, canEdit, canDelete]);
 
   const { data: txns = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['real-stone-transactions', filters],
@@ -209,21 +218,21 @@ export default function RealStoneTransactionsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Link to="/app/inventory/real-stones/receive">
+              {canSettle && <Link to="/app/inventory/real-stones/receive">
                 <Button variant="primary">
                   <ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Receive
                 </Button>
-              </Link>
-              <Link to="/app/inventory/real-stones/issue">
+              </Link>}
+              {canSettle && <Link to="/app/inventory/real-stones/issue">
                 <Button variant="secondary">
                   <ArrowUpTrayIcon className="h-4 w-4 mr-1" /> Issue
                 </Button>
-              </Link>
-              <Link to="/app/inventory/real-stones/transfer">
+              </Link>}
+              {canSettle && <Link to="/app/inventory/real-stones/transfer">
                 <Button variant="ghost">
                   <ArrowsRightLeftIcon className="h-4 w-4 mr-1" /> Transfer
                 </Button>
-              </Link>
+              </Link>}
               <Button type="button" variant="secondary" onClick={handleExport}>
                 <ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Export Excel
               </Button>
@@ -557,7 +566,7 @@ export default function RealStoneTransactionsPage() {
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-2">
-                            {isPurchase && balanceDue > 0 && (
+                            {canSettle && isPurchase && balanceDue > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setSettleTxn(t)}
@@ -567,22 +576,22 @@ export default function RealStoneTransactionsPage() {
                                 <CurrencyRupeeIcon className="h-3.5 w-3.5" /> Settle
                               </button>
                             )}
-                            <button
+                            {canEdit && <button
                               type="button"
                               onClick={() => setEditTxn(t)}
                               className="px-2.5 py-1 rounded-lg text-champagne-800 bg-champagne-50 hover:bg-champagne-100 text-xs font-medium inline-flex items-center gap-1"
                               title="Edit"
                             >
                               <PencilSquareIcon className="h-3.5 w-3.5" /> Edit
-                            </button>
-                            <button
+                            </button>}
+                            {canDelete && <button
                               type="button"
                               onClick={() => setConfirmDelete(t)}
                               className="px-2.5 py-1 rounded-lg text-accent-ruby bg-rose-50 hover:bg-rose-100 text-xs font-medium inline-flex items-center gap-1"
                               title="Delete"
                             >
                               <TrashIcon className="h-3.5 w-3.5" /> Delete
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
@@ -595,7 +604,7 @@ export default function RealStoneTransactionsPage() {
         </div>
       </div>
 
-      {settleTxn && (
+      {canSettle && settleTxn && (
         <SettlePaymentModal
           domain="realStone"
           transaction={settleTxn as any}
@@ -606,7 +615,7 @@ export default function RealStoneTransactionsPage() {
         />
       )}
 
-      {editTxn && (
+      {canEdit && editTxn && (
         <EditRealStoneTransactionModal
           transaction={editTxn}
           onClose={() => setEditTxn(null)}
@@ -616,7 +625,7 @@ export default function RealStoneTransactionsPage() {
         />
       )}
 
-      {confirmDelete && (
+      {canDelete && confirmDelete && (
         <div
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
@@ -651,7 +660,7 @@ export default function RealStoneTransactionsPage() {
         </div>
       )}
 
-      {bulkDeleteOpen && (
+      {canDelete && bulkDeleteOpen && (
         <BulkDeleteModal
           rows={visibleTxns.filter((t) => selectedIds.has(t.id))}
           deleteFn={deleteRealStoneTransaction}
@@ -669,7 +678,7 @@ export default function RealStoneTransactionsPage() {
           }}
         />
       )}
-      {bulkSettleOpen && (
+      {canSettle && bulkSettleOpen && (
         <BulkSettleModal
           rows={visibleTxns.filter(
             (t) =>

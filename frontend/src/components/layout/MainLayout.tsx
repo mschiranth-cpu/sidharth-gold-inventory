@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import FeatureAccessBoundary from '../auth/FeatureAccessBoundary';
 
 const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,7 +23,7 @@ const MainLayout: React.FC = () => {
 
         <main className="py-8">
           <div className="px-4 sm:px-6 lg:px-8">
-            <Outlet />
+            <FeatureAccessBoundary><Outlet /></FeatureAccessBoundary>
           </div>
         </main>
       </div>

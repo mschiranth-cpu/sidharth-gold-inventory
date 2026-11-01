@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchOverview, fetchWorkerOverview } from '../../../services/dashboard.service';
 import type { DashboardRange } from '../../../types/dashboard.types';
 import { useRefreshInterval } from '../../../contexts/RefreshIntervalContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const FALLBACK_MS = 30_000;
 
@@ -21,26 +22,29 @@ export const overviewKeys = {
 };
 
 export const useOverview = ({ range, from, to, enabled = true, paused = false }: UseOverviewParams) => {
+  const { user } = useAuth();
   const intervalMs = useRefreshInterval();
   const effective = intervalMs === false ? false : intervalMs;
   return useQuery({
-    queryKey: overviewKeys.byRange(range, from, to),
+    queryKey: [...overviewKeys.byRange(range, from, to), user?.id, user?.role, user?.department],
     queryFn: () => fetchOverview({ range, from, to }),
     staleTime: Math.min(25_000, effective === false ? FALLBACK_MS : Math.max(1_000, effective - 1_000)),
     refetchInterval: paused ? false : effective,
     refetchIntervalInBackground: false,
-    enabled,
+    enabled: enabled && !!user,
   });
 };
 
 export const useWorkerOverview = (paused = false) => {
+  const { user } = useAuth();
   const intervalMs = useRefreshInterval();
   const effective = intervalMs === false ? false : intervalMs;
   return useQuery({
-    queryKey: overviewKeys.worker,
+    queryKey: [...overviewKeys.worker, user?.id, user?.role, user?.department],
     queryFn: fetchWorkerOverview,
     staleTime: Math.min(25_000, effective === false ? FALLBACK_MS : Math.max(1_000, effective - 1_000)),
     refetchInterval: paused ? false : effective,
     refetchIntervalInBackground: false,
+    enabled: user?.role === 'DEPARTMENT_WORKER',
   });
 };

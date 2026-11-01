@@ -28,6 +28,13 @@ const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_KEY = 'user';
 
+export class AuthSessionChangedError extends Error {
+  constructor() {
+    super('Authentication session changed while the request was pending.');
+    this.name = 'AuthSessionChangedError';
+  }
+}
+
 /**
  * Stores authentication tokens
  * Also stores with legacy keys for compatibility
@@ -91,8 +98,13 @@ export function getStoredUser(): AuthUser | null {
 /**
  * Logs in a user
  */
-export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
+export async function login(credentials: LoginCredentials, isCurrent: () => boolean = () => true): Promise<AuthResponse> {
+  if (!isCurrent()) throw new AuthSessionChangedError();
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
   const response = await apiPost<AuthResponse>('/auth/login', credentials);
+
+  if (!isCurrent() || getAccessToken() !== accessToken || getRefreshToken() !== refreshToken) throw new AuthSessionChangedError();
 
   if (response.success && response.data) {
     const { tokens, user } = response.data;
@@ -118,24 +130,27 @@ export async function register(data: RegisterData): Promise<AuthResponse> {
  * Logs out the current user
  */
 export async function logout(): Promise<void> {
+  const refreshToken = getRefreshToken();
+  const accessToken = getAccessToken();
+  // Clear this local session before the server request. Its eventual response
+  // must not clear credentials belonging to a subsequent login.
+  clearTokens();
+  delete api.defaults.headers.common['Authorization'];
   try {
-    const refreshToken = getRefreshToken();
     if (refreshToken) {
-      await apiPost('/auth/logout', { refreshToken });
+      await apiPost('/auth/logout', { refreshToken }, { headers: { Authorization: accessToken ? `Bearer ${accessToken}` : '' } });
     }
   } catch (error) {
     // Continue with local logout even if API call fails
     console.error('Logout API error:', error);
-  } finally {
-    clearTokens();
-    delete api.defaults.headers.common['Authorization'];
   }
 }
 
 /**
  * Refreshes the access token
  */
-export async function refreshAccessToken(): Promise<RefreshResponse> {
+export async function refreshAccessToken(isCurrent: () => boolean = () => true): Promise<RefreshResponse> {
+  if (!isCurrent()) throw new AuthSessionChangedError();
   const refreshToken = getRefreshToken();
 
   if (!refreshToken) {
@@ -143,6 +158,8 @@ export async function refreshAccessToken(): Promise<RefreshResponse> {
   }
 
   const response = await apiPost<RefreshResponse>('/auth/refresh-token', { refreshToken });
+
+  if (!isCurrent() || getRefreshToken() !== refreshToken) throw new AuthSessionChangedError();
 
   if (response.success && response.data?.tokens) {
     const { tokens } = response.data;
@@ -156,8 +173,12 @@ export async function refreshAccessToken(): Promise<RefreshResponse> {
 /**
  * Gets the current user's profile
  */
-export async function getCurrentUser(): Promise<UserResponse> {
+export async function getCurrentUser(isCurrent: () => boolean = () => true): Promise<UserResponse> {
+  if (!isCurrent()) throw new AuthSessionChangedError();
+  const accessToken = getAccessToken();
   const response = await apiGet<UserResponse>('/auth/me');
+
+  if (!isCurrent() || getAccessToken() !== accessToken) throw new AuthSessionChangedError();
 
   if (response.success && response.data) {
     setStoredUser(response.data);

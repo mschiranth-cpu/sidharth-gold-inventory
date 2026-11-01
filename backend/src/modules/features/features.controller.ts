@@ -1,119 +1,46 @@
-/**
- * ============================================
- * FEATURE TOGGLE CONTROLLER
- * ============================================
- */
-
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../auth/auth.types';
-import {
-  getAllFeatureModules,
-  getFeatureModuleByName,
-  createFeatureModule,
-  updateFeaturePermission,
-  getUserFeatures,
-  getFeaturePermissions,
-  deleteFeaturePermission,
-} from './features.service';
+import { FeatureRequestError, getAllFeatureModules, createFeatureModule, updateFeaturePermission, bulkUpdateFeaturePermissions, getUserFeatures, getFeaturePermissions, deleteFeaturePermission, getFeatureSubjects, getFeatureAudit, parseFeatureScope } from './features.service';
 import { logger } from '../../utils/logger';
 
-/**
- * Get all feature modules (Admin only)
- */
+async function respond(res: Response, operation: () => Promise<unknown>, status = 200) {
+  try { res.status(status).json({ success: true, data: await operation() }); }
+  catch (error) {
+    if (error instanceof FeatureRequestError) {
+      res.status(error.status).json({ success: false, error: { code: 'INVALID_FEATURE_REQUEST', message: error.message } });
+    } else if (error && typeof error === 'object' && 'code' in error && ['P2002', 'P2034'].includes(String(error.code))) {
+      res.status(409).json({ success: false, error: { code: 'FEATURE_CONFLICT', message: 'Feature settings changed concurrently. Reload and try again.' } });
+    } else {
+      logger.error('Feature operation failed', { error });
+      res.status(500).json({ success: false, error: { code: 'FEATURE_OPERATION_FAILED', message: 'Unable to complete the feature operation. Please try again.' } });
+    }
+  }
+}
+
 export async function getAllFeaturesController(req: Request, res: Response) {
-  try {
-    const features = await getAllFeatureModules();
-    res.json({ success: true, data: features });
-  } catch (error) {
-    logger.error('Get all features error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch features' },
-    });
-  }
+  return respond(res, () => getAllFeatureModules(parseFeatureScope(req.query.scope, req.query.target)));
 }
-
-/**
- * Get features accessible by current user
- */
 export async function getMyFeaturesController(req: Request, res: Response) {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const features = await getUserFeatures(authReq.user.userId);
-    res.json({ success: true, data: features });
-  } catch (error) {
-    logger.error('Get user features error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch user features' },
-    });
-  }
+  return respond(res, () => getUserFeatures((req as AuthenticatedRequest).user.userId));
 }
-
-/**
- * Create a new feature module (Admin only)
- */
 export async function createFeatureController(req: Request, res: Response) {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const feature = await createFeatureModule(req.body, authReq.user.userId);
-    res.status(201).json({ success: true, data: feature });
-  } catch (error) {
-    logger.error('Create feature error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to create feature' },
-    });
-  }
+  return respond(res, () => createFeatureModule(req.body, (req as AuthenticatedRequest).user.userId), 201);
 }
-
-/**
- * Update feature permission (Admin only)
- */
 export async function updateFeaturePermissionController(req: Request, res: Response) {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const permission = await updateFeaturePermission(req.body, authReq.user.userId);
-    res.json({ success: true, data: permission });
-  } catch (error) {
-    logger.error('Update feature permission error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to update feature permission' },
-    });
-  }
+  return respond(res, () => updateFeaturePermission(req.body, (req as AuthenticatedRequest).user.userId));
 }
-
-/**
- * Get permissions for a feature (Admin only)
- */
+export async function bulkUpdateFeaturePermissionsController(req: Request, res: Response) {
+  return respond(res, () => bulkUpdateFeaturePermissions(req.body, (req as AuthenticatedRequest).user.userId));
+}
 export async function getFeaturePermissionsController(req: Request, res: Response) {
-  try {
-    const { featureId } = req.params;
-    const permissions = await getFeaturePermissions(featureId);
-    res.json({ success: true, data: permissions });
-  } catch (error) {
-    logger.error('Get feature permissions error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch feature permissions' },
-    });
-  }
+  return respond(res, () => getFeaturePermissions(req.params.featureId));
 }
-
-/**
- * Delete a feature permission (Admin only)
- */
 export async function deleteFeaturePermissionController(req: Request, res: Response) {
-  try {
-    const { permissionId } = req.params;
-    await deleteFeaturePermission(permissionId);
-    res.json({ success: true, message: 'Permission deleted successfully' });
-  } catch (error) {
-    logger.error('Delete feature permission error', { error });
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to delete feature permission' },
-    });
-  }
+  return respond(res, () => deleteFeaturePermission(req.params.permissionId, (req as AuthenticatedRequest).user.userId));
+}
+export async function getFeatureSubjectsController(_req: Request, res: Response) {
+  return respond(res, getFeatureSubjects);
+}
+export async function getFeatureAuditController(req: Request, res: Response) {
+  return respond(res, () => getFeatureAudit({ limit: req.query.limit, cursor: req.query.cursor }));
 }

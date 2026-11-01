@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * DIAMOND INVENTORY ROUTES
@@ -29,6 +30,9 @@ import {
 } from './diamond.controller';
 
 const router = Router();
+
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('DIAMOND_INVENTORY'));
 
 // ============================================================================
 // PARITY-WITH-METAL ROUTES (registered BEFORE legacy `/:diamondId` so Express

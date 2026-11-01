@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * Diamond Purchase Order routes — mounted at /api/diamond-purchase-orders.
  *
@@ -28,7 +29,8 @@ import { ApiError } from '../../middleware/errorHandler';
 
 const router = Router();
 
-router.use(authenticate);
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('DIAMOND_INVENTORY'));
 
 const requireAdminOrOffice = requireRoles(
   UserRole.ADMIN,

@@ -7,6 +7,8 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireRoles } from '../modules/auth/auth.middleware';
 import { UserRole } from '@prisma/client';
+import { requireFeature } from '../modules/features/features.middleware';
+import { asyncHandler } from '../middleware/errorHandler';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -614,19 +616,19 @@ interface VendorAgingRow {
 
 const AGING_UNIFIED_CTE = `
   WITH unified AS (
-    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date
       FROM metal_transactions
       WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
     UNION ALL
-    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date
       FROM diamond_transactions
       WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
     UNION ALL
-    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date
       FROM real_stone_transactions
       WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
     UNION ALL
-    SELECT vendor_id, total_value, amount_paid, payment_status, due_date, transaction_type
+    SELECT vendor_id, total_value, amount_paid, payment_status, due_date
       FROM stone_packet_transactions
       WHERE transaction_type = 'PURCHASE' AND vendor_id IS NOT NULL
   ),
@@ -643,7 +645,7 @@ const AGING_UNIFIED_CTE = `
 `;
 
 // GET /api/vendors/aging  — aggregate aging buckets across all vendors.
-router.get('/aging', async (_req: Request, res: Response) => {
+router.get('/aging', asyncHandler(async (_req: Request, res: Response) => {
   const rows = await prisma.$queryRawUnsafe<VendorAgingRow[]>(`
     ${AGING_UNIFIED_CTE}
     SELECT
@@ -664,10 +666,10 @@ router.get('/aging', async (_req: Request, res: Response) => {
     ORDER BY "over_90" DESC, "d61_90" DESC, "d31_60" DESC, "totalOpen" DESC, v.name ASC
   `);
   res.json({ success: true, data: rows });
-});
+}));
 
 // GET /api/vendors/:id/aging  — per-vendor aging buckets + open line items.
-router.get('/:id/aging', async (req: Request, res: Response) => {
+router.get('/:id/aging', asyncHandler(async (req: Request, res: Response) => {
   const vendorId = req.params.id;
 
   // Bucket totals (single row).
@@ -763,7 +765,7 @@ router.get('/:id/aging', async (req: Request, res: Response) => {
       lineItems,
     },
   });
-});
+}));
 
 // GET /api/vendors/:id/outstanding  — single vendor totals.
 router.get('/:id/outstanding', async (req: Request, res: Response) => {
@@ -803,7 +805,7 @@ router.get('/:id/outstanding', async (req: Request, res: Response) => {
 
 // GET /api/vendors/:id/transactions  — vendor's full purchase history
 // (billable + non-billable; isBillable is a tax-classification tag).
-router.get('/:id/transactions', async (req: Request, res: Response) => {
+router.get('/:id/transactions', requireFeature('METAL_INVENTORY'), async (req: Request, res: Response) => {
   const transactions = await prisma.metalTransaction.findMany({
     where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
     include: {
@@ -819,7 +821,7 @@ router.get('/:id/transactions', async (req: Request, res: Response) => {
 });
 
 // GET /api/vendors/:id/diamond-transactions  — vendor's diamond purchase history.
-router.get('/:id/diamond-transactions', async (req: Request, res: Response) => {
+router.get('/:id/diamond-transactions', requireFeature('DIAMOND_INVENTORY'), async (req: Request, res: Response) => {
   const transactions = await prisma.diamondTransaction.findMany({
     where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
     include: {
@@ -845,7 +847,7 @@ router.get('/:id/diamond-transactions', async (req: Request, res: Response) => {
 });
 
 // GET /api/vendors/:id/real-stone-transactions  — vendor's real-stone purchase history.
-router.get('/:id/real-stone-transactions', async (req: Request, res: Response) => {
+router.get('/:id/real-stone-transactions', requireFeature('REAL_STONE_INVENTORY'), async (req: Request, res: Response) => {
   const transactions = await prisma.realStoneTransaction.findMany({
     where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
     include: {
@@ -871,7 +873,7 @@ router.get('/:id/real-stone-transactions', async (req: Request, res: Response) =
 });
 
 // GET /api/vendors/:id/stone-packet-transactions  — vendor's stone-packet purchase history.
-router.get('/:id/stone-packet-transactions', async (req: Request, res: Response) => {
+router.get('/:id/stone-packet-transactions', requireFeature('STONE_INVENTORY'), async (req: Request, res: Response) => {
   const transactions = await prisma.stonePacketTransaction.findMany({
     where: { vendorId: req.params.id, transactionType: 'PURCHASE' },
     include: {

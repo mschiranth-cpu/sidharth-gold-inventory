@@ -38,6 +38,8 @@ import { useRefreshInterval } from '../../contexts/RefreshIntervalContext';
 import LiveMetalRatesCard from '../../components/LiveMetalRatesCard';
 import RefreshIntervalPicker from '../../components/RefreshIntervalPicker';
 import { formatIstDate } from '../../lib/dateUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 const METAL_OPTIONS = [
   { value: 'GOLD', label: 'Gold', symbol: 'Au', tint: 'from-amber-400 via-amber-500 to-yellow-600', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -65,6 +67,9 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
 }
 
 export default function RateManagementPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('METAL_INVENTORY', 'write') && user?.role === 'ADMIN';
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -157,6 +162,7 @@ export default function RateManagementPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     setSubmitError(null);
     if (errorCount > 0) {
       setShowAllErrors(true);
@@ -231,6 +237,7 @@ export default function RateManagementPage() {
             <button
               type="button"
               onClick={() => setShowForm((v) => !v)}
+              disabled={!canWrite}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-champagne-700 via-champagne-800 to-onyx-800 hover:from-champagne-800 hover:to-onyx-900 text-white text-sm font-semibold inline-flex items-center gap-1.5 shadow-md shadow-onyx-700/20 focus:outline-none focus:ring-2 focus:ring-champagne-400 transition"
             >
               {showForm ? (
@@ -294,7 +301,7 @@ export default function RateManagementPage() {
         </div>
 
         {/* Inline add-rate panel */}
-        {showForm && (
+        {showForm && canWrite && (
           <form
             noValidate
             onSubmit={handleSubmit}
@@ -494,7 +501,7 @@ export default function RateManagementPage() {
               ) : filtered.length === 0 ? (
                 <EmptyState
                   filtered={!!search || metalFilter !== 'ALL'}
-                  onAdd={() => setShowForm(true)}
+                  onAdd={canWrite ? () => setShowForm(true) : undefined}
                   onClear={() => {
                     setSearch('');
                     setMetalFilter('ALL');
@@ -621,7 +628,7 @@ function EmptyState({
   onClear,
 }: {
   filtered: boolean;
-  onAdd: () => void;
+  onAdd?: () => void;
   onClear: () => void;
 }) {
   return (
@@ -645,7 +652,7 @@ function EmptyState({
         >
           Clear filters
         </button>
-      ) : (
+      ) : onAdd ? (
         <button
           type="button"
           onClick={onAdd}
@@ -653,7 +660,7 @@ function EmptyState({
         >
           <PlusIcon className="w-3.5 h-3.5" /> Add a rate
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

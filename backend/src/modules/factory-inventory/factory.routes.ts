@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * FACTORY INVENTORY ROUTES
@@ -21,6 +22,9 @@ import {
 } from './factory.controller';
 
 const router = Router();
+
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('FACTORY_INVENTORY'));
 
 router.get(
   '/categories',

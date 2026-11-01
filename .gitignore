@@ -74,3 +74,6 @@ backend/logs/
 # Cursor AI artifacts
 .cursor/
 assets/
+
+# Local deployment snapshots, staging output, and production baseline
+.deployments/

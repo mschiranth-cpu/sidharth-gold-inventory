@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * STONE INVENTORY ROUTES — Real Stone + Stone Packet
@@ -39,6 +40,9 @@ import {
 } from './stone.controller';
 
 const router = Router();
+
+router.use('/real', authenticate, requireFeature('REAL_STONE_INVENTORY'));
+router.use('/packets', authenticate, requireFeature('STONE_INVENTORY'));
 
 // ============================================================================
 // REAL STONE ROUTES

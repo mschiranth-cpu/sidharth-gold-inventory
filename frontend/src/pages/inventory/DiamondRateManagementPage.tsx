@@ -19,6 +19,8 @@ import {
   type DiamondRate,
 } from '../../services/diamond.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate } from '../../lib/dateUtils';
 
 const SHAPES = [
@@ -40,6 +42,9 @@ const fmt = (n: number) =>
   n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function DiamondRateManagementPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('DIAMOND_INVENTORY', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -77,6 +82,7 @@ export default function DiamondRateManagementPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     setError(null);
     if (form.caratTo < form.caratFrom) {
       setError('Carat To must be ≥ Carat From');
@@ -106,13 +112,13 @@ export default function DiamondRateManagementPage() {
               carat-range.
             </p>
           </div>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button variant="primary" onClick={() => setShowForm(true)} disabled={!canWrite}>
             <PlusIcon className="h-4 w-4 mr-1" />
             Add Rate
           </Button>
         </div>
 
-        {showForm && (
+        {showForm && canWrite && (
           <form
             onSubmit={handleSubmit}
             noValidate
@@ -246,7 +252,7 @@ export default function DiamondRateManagementPage() {
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" isLoading={create.isPending}>
+              <Button type="submit" variant="primary" isLoading={create.isPending} disabled={!canWrite}>
                 <SparklesIcon className="h-4 w-4 mr-1" />
                 Save Rate
               </Button>

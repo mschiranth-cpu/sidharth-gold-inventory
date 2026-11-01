@@ -20,8 +20,15 @@ import {
   addOrderComment,
   getOrderComments,
   markCommentAsRead,
+  ClientCommentAccessError,
 } from './clients.service';
 import { logger } from '../../utils/logger';
+
+function sendCommentAccessError(res: Response, error: unknown) {
+  if (!(error instanceof ClientCommentAccessError)) return false;
+  res.status(error.status).json({ success: false, error: { message: error.message } });
+  return true;
+}
 
 /**
  * Create new client (Admin/Office Staff)
@@ -139,6 +146,18 @@ export async function getClientByIdController(req: Request, res: Response) {
 export async function updateClientController(req: Request, res: Response) {
   try {
     const { clientId } = req.params;
+    const authReq = req as AuthenticatedRequest;
+    if (authReq.user.role === 'CLIENT') {
+      const ownProfile = await getClientByUserId(authReq.user.userId);
+      if (!ownProfile || ownProfile.id !== clientId) {
+        return res.status(403).json({ success: false, error: { message: 'You can update only your own client profile.' } });
+      }
+      // Client profile editing cannot reassign ownership or self-approve.
+      const allowedFields = ['businessName', 'businessType', 'gstNumber', 'panNumber', 'contactPerson', 'phone', 'alternatePhone', 'address', 'city', 'state', 'pincode', 'notifyByEmail', 'notifyBySms', 'notifyByWhatsApp'];
+      if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).some((key) => !allowedFields.includes(key))) {
+        return res.status(400).json({ success: false, error: { message: 'Invalid client profile fields.' } });
+      }
+    }
     const client = await updateClient(clientId, req.body);
     res.json({ success: true, data: client });
   } catch (error) {
@@ -273,9 +292,10 @@ export async function approveClientOrderController(req: Request, res: Response) 
 export async function addOrderCommentController(req: Request, res: Response) {
   try {
     const authReq = req as AuthenticatedRequest;
-    const comment = await addOrderComment(authReq.user.userId, req.body);
+    const comment = await addOrderComment(authReq.user, req.body);
     res.status(201).json({ success: true, data: comment });
   } catch (error) {
+    if (sendCommentAccessError(res, error)) return;
     logger.error('Add comment error', { error });
     res.status(500).json({
       success: false,
@@ -296,10 +316,11 @@ export async function getOrderCommentsController(req: Request, res: Response) {
     // Only staff can see internal comments
     const canSeeInternal = ['ADMIN', 'OFFICE_STAFF', 'FACTORY_MANAGER'].includes(authReq.user.role);
 
-    const comments = await getOrderComments(orderId, includeInternal === 'true' && canSeeInternal);
+    const comments = await getOrderComments(orderId, authReq.user, includeInternal === 'true' && canSeeInternal);
 
     res.json({ success: true, data: comments });
   } catch (error) {
+    if (sendCommentAccessError(res, error)) return;
     logger.error('Get comments error', { error });
     res.status(500).json({
       success: false,
@@ -314,9 +335,10 @@ export async function getOrderCommentsController(req: Request, res: Response) {
 export async function markCommentAsReadController(req: Request, res: Response) {
   try {
     const { commentId } = req.params;
-    const comment = await markCommentAsRead(commentId);
+    const comment = await markCommentAsRead(commentId, (req as AuthenticatedRequest).user);
     res.json({ success: true, data: comment });
   } catch (error) {
+    if (sendCommentAccessError(res, error)) return;
     logger.error('Mark comment as read error', { error });
     res.status(500).json({
       success: false,

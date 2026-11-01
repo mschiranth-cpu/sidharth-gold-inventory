@@ -7,9 +7,12 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClientRoute } from '../auth';
+import FeatureAccessBoundary from '../auth/FeatureAccessBoundary';
+import { useFeatures } from '../../hooks/useFeatures';
 
 export default function ClientPortalLayout() {
   const { logout } = useAuth();
+  const { canUsePath } = useFeatures();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -27,18 +30,18 @@ export default function ClientPortalLayout() {
                 Client Portal
               </h1>
               <div className="flex items-center gap-4">
-                <Link
+                {canUsePath('/client/dashboard') && <Link
                   to="/client/dashboard"
                   className="text-gray-700 hover:text-indigo-600 font-medium transition-colors"
                 >
                   Dashboard
-                </Link>
-                <Link
+                </Link>}
+                {canUsePath('/client/orders') && <Link
                   to="/client/orders"
                   className="text-gray-700 hover:text-indigo-600 font-medium transition-colors"
                 >
                   Orders
-                </Link>
+                </Link>}
                 <Link
                   to="/client/profile"
                   className="text-gray-700 hover:text-indigo-600 font-medium transition-colors"
@@ -55,7 +58,7 @@ export default function ClientPortalLayout() {
             </div>
           </div>
         </nav>
-        <Outlet />
+        <FeatureAccessBoundary><Outlet /></FeatureAccessBoundary>
       </div>
     </ClientRoute>
   );

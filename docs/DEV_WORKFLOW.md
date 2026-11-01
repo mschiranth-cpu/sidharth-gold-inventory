@@ -1,5 +1,10 @@
 # Development Workflow - Ativa Jewels
 
+> **Current workflow on this production PC:** edit the workspace and use
+> `scripts/deploy-workspace.ps1` to preview, validate, deploy, and roll back.
+> Follow [Workspace Deployment](WORKSPACE_DEPLOYMENT.md). The SSH/Git helpers
+> below are older reference material; do not mix them with this workflow.
+
 Complete guide for developing on a separate machine and deploying fixes to the
 production PC over SSH (via Cloudflare Tunnel).
 

@@ -91,6 +91,10 @@ export async function getPayslipController(req: Request, res: Response) {
     if (!payslip) {
       return res.status(404).json({ success: false, error: { message: 'Payslip not found' } });
     }
+    const { user } = req as AuthenticatedRequest;
+    if (!['ADMIN', 'FACTORY_MANAGER'].includes(user.role) && payslip.userId !== user.userId) {
+      return res.status(403).json({ success: false, error: { message: 'You can view only your own payslips.' } });
+    }
     res.json({ success: true, data: payslip });
   } catch (error) {
     logger.error('Get payslip error', { error });

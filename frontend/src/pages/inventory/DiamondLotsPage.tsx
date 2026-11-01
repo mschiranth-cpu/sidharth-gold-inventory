@@ -14,11 +14,16 @@ import {
   type DiamondLot,
 } from '../../services/diamond.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 const fmt = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export default function DiamondLotsPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('DIAMOND_INVENTORY', 'write') && ["ADMIN","OFFICE_STAFF"].includes(user?.role ?? '');
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -61,6 +66,7 @@ export default function DiamondLotsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     setError(null);
     if (!form.lotNumber.trim()) {
       setError('Lot number is required');
@@ -93,13 +99,13 @@ export default function DiamondLotsPage() {
               Manage diamond parcels and lot-level inventory aggregates.
             </p>
           </div>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button variant="primary" onClick={() => setShowForm(true)} disabled={!canWrite}>
             <PlusIcon className="h-4 w-4 mr-1" />
             Create Lot
           </Button>
         </div>
 
-        {showForm && (
+        {showForm && canWrite && (
           <form
             onSubmit={handleSubmit}
             noValidate
@@ -186,7 +192,7 @@ export default function DiamondLotsPage() {
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" isLoading={create.isPending}>
+              <Button type="submit" variant="primary" isLoading={create.isPending} disabled={!canWrite}>
                 Create Lot
               </Button>
             </div>

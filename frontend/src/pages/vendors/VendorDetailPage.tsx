@@ -10,7 +10,7 @@
  * table, sticky thead, zebra rows, payment progress bars.
  */
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -60,6 +60,7 @@ import SettlePaymentModal from '../../components/SettlePaymentModal';
 import GstInfoCard from '../../components/GstInfoCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatIstDate } from '../../lib/dateUtils';
+import { useFeatures } from '../../hooks/useFeatures';
 
 const SETTLE_ROLES = new Set(['ADMIN', 'OFFICE_STAFF']);
 
@@ -294,13 +295,28 @@ function PayProgress({
 export default function VendorDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { canUsePath, isChecking: checkingFeatures, isError: featureError } = useFeatures();
+  const ready = !checkingFeatures && !featureError;
+  const readable = {
+    metal: ready && canUsePath('/app/inventory/metal'),
+    diamond: ready && canUsePath('/app/inventory/diamonds'),
+    realStone: ready && canUsePath('/app/inventory/real-stones'),
+    stonePacket: ready && canUsePath('/app/inventory/stone-packets'),
+  };
   const qc = useQueryClient();
   const canSettle = SETTLE_ROLES.has(String(user?.role ?? ''));
   const [settleTxn, setSettleTxn] = useState<MetalTransaction | null>(null);
   const [settleDiamondTxn, setSettleDiamondTxn] = useState<DiamondTransaction | null>(null);
+  const writableMetal = ready && canUsePath('/app/inventory/metal/receive');
+  const writableDiamond = ready && canUsePath('/app/inventory/diamonds/receive');
+  useEffect(() => {
+    if (!writableMetal) setSettleTxn(null);
+    if (!writableDiamond) setSettleDiamondTxn(null);
+  }, [writableMetal, writableDiamond]);
 
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState<DomainFilter>('all');
+  const activeDomainFilter = domainFilter !== 'all' && !readable[domainFilter] ? 'all' : domainFilter;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const vendorQ = useQuery({
@@ -319,32 +335,32 @@ export default function VendorDetailPage() {
     enabled: Boolean(id),
   });
   const transactionsQ = useQuery({
-    queryKey: ['vendor-transactions', id],
+    queryKey: ['vendor-transactions', id, user?.id, user?.role],
     queryFn: () => getVendorTransactions(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && readable.metal,
   });
   const diamondTransactionsQ = useQuery({
-    queryKey: ['vendor-diamond-transactions', id],
+    queryKey: ['vendor-diamond-transactions', id, user?.id, user?.role],
     queryFn: () => getVendorDiamondTransactions(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && readable.diamond,
   });
   const realStoneTransactionsQ = useQuery({
-    queryKey: ['vendor-real-stone-transactions', id],
+    queryKey: ['vendor-real-stone-transactions', id, user?.id, user?.role],
     queryFn: () => getVendorRealStoneTransactions(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && readable.realStone,
   });
   const stonePacketTransactionsQ = useQuery({
-    queryKey: ['vendor-stone-packet-transactions', id],
+    queryKey: ['vendor-stone-packet-transactions', id, user?.id, user?.role],
     queryFn: () => getVendorStonePacketTransactions(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && readable.stonePacket,
   });
 
   const vendor = vendorQ.data;
   const outstanding = outstandingQ.data;
-  const transactions = transactionsQ.data ?? [];
-  const diamondTransactions = diamondTransactionsQ.data ?? [];
-  const realStoneTransactions = realStoneTransactionsQ.data ?? [];
-  const stonePacketTransactions = stonePacketTransactionsQ.data ?? [];
+  const transactions = readable.metal ? transactionsQ.data ?? [] : [];
+  const diamondTransactions = readable.diamond ? diamondTransactionsQ.data ?? [] : [];
+  const realStoneTransactions = readable.realStone ? realStoneTransactionsQ.data ?? [] : [];
+  const stonePacketTransactions = readable.stonePacket ? stonePacketTransactionsQ.data ?? [] : [];
 
   const isFetching =
     vendorQ.isFetching ||
@@ -577,12 +593,12 @@ export default function VendorDetailPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return unified.filter((r) => {
-      if (domainFilter !== 'all' && r.domain !== domainFilter) return false;
+      if (activeDomainFilter !== 'all' && r.domain !== activeDomainFilter) return false;
       if (statusFilter !== 'all' && r.paymentStatus !== statusFilter) return false;
       if (q && !r.description.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [unified, search, domainFilter, statusFilter]);
+  }, [unified, search, activeDomainFilter, statusFilter]);
 
   const exportCsv = () => {
     const rows: (string | number)[][] = [
@@ -951,10 +967,13 @@ export default function VendorDetailPage() {
                   Purchase Transactions
                 </h2>
                 <p className="text-[11px] text-onyx-500 mt-0.5">
-                  {transactions.length} metal · {diamondTransactions.length} diamond ·{' '}
-                  {realStoneTransactions.length} real stone · {stonePacketTransactions.length} stone packet ·{' '}
+                  {readable.metal && <>{transactions.length} metal · </>}
+                  {readable.diamond && <>{diamondTransactions.length} diamond · </>}
+                  {readable.realStone && <>{realStoneTransactions.length} real stone · </>}
+                  {readable.stonePacket && <>{stonePacketTransactions.length} stone packet · </>}
                   {filtered.length} shown
                 </p>
+                {!Object.values(readable).every(Boolean) && <p className="mt-1 text-xs text-onyx-600">{checkingFeatures ? 'Checking transaction permissions...' : featureError ? 'Transaction permissions could not be checked. Refresh the page to try again.' : 'Only transactions from enabled inventory modules are shown.'}</p>}
               </div>
               <div className="relative w-full sm:w-72">
                 <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-onyx-400" />
@@ -979,27 +998,27 @@ export default function VendorDetailPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setDomainFilter('all')} className={filterChip(domainFilter === 'all')}>
+              <button onClick={() => setDomainFilter('all')} className={filterChip(activeDomainFilter === 'all')}>
                 All <span className="opacity-70">· {counts.all}</span>
               </button>
-              <button onClick={() => setDomainFilter('metal')} className={filterChip(domainFilter === 'metal')}>
+              {readable.metal && <button onClick={() => setDomainFilter('metal')} className={filterChip(activeDomainFilter === 'metal')}>
                 Metal <span className="opacity-70">· {counts.metal}</span>
-              </button>
-              <button onClick={() => setDomainFilter('diamond')} className={filterChip(domainFilter === 'diamond')}>
+              </button>}
+              {readable.diamond && <button onClick={() => setDomainFilter('diamond')} className={filterChip(activeDomainFilter === 'diamond')}>
                 Diamond <span className="opacity-70">· {counts.diamond}</span>
-              </button>
-              <button
+              </button>}
+              {readable.realStone && <button
                 onClick={() => setDomainFilter('realStone')}
-                className={filterChip(domainFilter === 'realStone')}
+                className={filterChip(activeDomainFilter === 'realStone')}
               >
                 Real Stone <span className="opacity-70">· {counts.realStone}</span>
-              </button>
-              <button
+              </button>}
+              {readable.stonePacket && <button
                 onClick={() => setDomainFilter('stonePacket')}
-                className={filterChip(domainFilter === 'stonePacket')}
+                className={filterChip(activeDomainFilter === 'stonePacket')}
               >
                 Stone Packet <span className="opacity-70">· {counts.stonePacket}</span>
-              </button>
+              </button>}
               <span className="w-px h-6 bg-gray-200 mx-1 self-center" />
               <button onClick={() => setStatusFilter('all')} className={filterChip(statusFilter === 'all')}>
                 Any status
@@ -1020,10 +1039,12 @@ export default function VendorDetailPage() {
             <div className="px-6 py-16 text-center">
               <CubeTransparentIcon className="w-10 h-10 mx-auto text-onyx-300 mb-3" />
               <p className="text-sm font-semibold text-onyx-700">
-                {unified.length === 0 ? 'No purchases yet' : 'No matching transactions'}
+                {!ready ? 'Checking transaction access' : !Object.values(readable).some(Boolean) ? 'Inventory transaction access is disabled' : unified.length === 0 ? 'No purchases yet' : 'No matching transactions'}
               </p>
               <p className="text-xs text-onyx-500 mt-1">
-                {unified.length === 0
+                {!Object.values(readable).some(Boolean)
+                  ? 'Vendor balances remain available. Inventory purchase details require module access.'
+                  : unified.length === 0
                   ? 'New receipts from this vendor will appear here.'
                   : 'Try a different filter or clear the search.'}
               </p>
@@ -1052,6 +1073,7 @@ export default function VendorDetailPage() {
                     const paid = row.amountPaid ?? 0;
                     const showSettle =
                       canSettle &&
+                      (row.domain === 'metal' ? writableMetal : row.domain === 'diamond' ? writableDiamond : false) &&
                       (row.paymentStatus === 'HALF' || row.paymentStatus === 'PENDING') &&
                       row.isBillable !== false;
                     const isExpanded = expandedId === row.id;
@@ -1332,11 +1354,11 @@ export default function VendorDetailPage() {
         </div>
       </div>
 
-      {settleTxn && (
+      {settleTxn && writableMetal && (
         <SettlePaymentModal domain="metal" transaction={settleTxn} onClose={() => setSettleTxn(null)} />
       )}
 
-      {settleDiamondTxn && (
+      {settleDiamondTxn && writableDiamond && (
         <SettlePaymentModal
           domain="diamond"
           transaction={settleDiamondTxn as any}

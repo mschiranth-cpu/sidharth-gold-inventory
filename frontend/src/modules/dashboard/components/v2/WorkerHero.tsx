@@ -1,6 +1,7 @@
 import { Briefcase, CheckCircle2 } from 'lucide-react';
 import type { WorkerDashboardOverview, MarketRatesPayload } from '../../../../types/dashboard.types';
 import { formatIstTime } from '../../../../lib/dateUtils';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -14,7 +15,7 @@ export interface WorkerHeroProps {
   onCheckIn?: () => void;
 }
 
-const STATUS_LABEL: Record<WorkerDashboardOverview['myAttendanceToday']['status'], { text: string; color: string }> = {
+const STATUS_LABEL: Record<NonNullable<WorkerDashboardOverview['myAttendanceToday']>['status'], { text: string; color: string }> = {
   PRESENT: { text: 'Checked in', color: 'text-accent-emerald' },
   CHECKED_OUT: { text: 'Checked out', color: 'text-onyx-400' },
   ABSENT: { text: 'Not checked in', color: 'text-accent-ruby' },
@@ -28,7 +29,9 @@ export const WorkerHero = ({
   rates,
   generatedAt,
 }: WorkerHeroProps) => {
-  const s = STATUS_LABEL[attendance.status];
+  const { canUsePath, isChecking, isError } = useFeatures();
+  const s = attendance ? STATUS_LABEL[attendance.status] : null;
+  const showAttendance = !isChecking && !isError && canUsePath('/app/attendance/dashboard');
   return (
     <section className="rounded-2xl bg-onyx-gradient text-pearl shadow-onyx p-5 md:p-6 border border-onyx-700">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5">
@@ -47,7 +50,7 @@ export const WorkerHero = ({
             )}
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+          {showAttendance && attendance && s && <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
             {attendance.status === 'CHECKED_OUT' ? (
               <CheckCircle2 className="w-4 h-4 text-accent-emerald" />
             ) : (
@@ -66,7 +69,7 @@ export const WorkerHero = ({
                 {formatIstTime(attendance.checkOutTime)}
               </span>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="flex flex-col gap-1.5 min-w-0">

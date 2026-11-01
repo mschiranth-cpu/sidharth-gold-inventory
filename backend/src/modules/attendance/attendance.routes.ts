@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * ATTENDANCE ROUTES
@@ -21,6 +22,9 @@ import {
 } from './attendance.controller';
 
 const router = Router();
+
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('ATTENDANCE'));
 
 router.post('/check-in', authenticate, checkInController);
 router.post('/check-out', authenticate, checkOutController);

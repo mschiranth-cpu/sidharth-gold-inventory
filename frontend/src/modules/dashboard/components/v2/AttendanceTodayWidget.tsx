@@ -1,9 +1,10 @@
 import { Users } from 'lucide-react';
 import { WidgetCard } from './WidgetCard';
 import type { AttendanceTodayBreakdown } from '../../../../types/dashboard.types';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 export interface AttendanceTodayWidgetProps {
-  data: AttendanceTodayBreakdown | undefined;
+  data: AttendanceTodayBreakdown | null | undefined;
   isLoading?: boolean;
   editMode?: boolean;
   dragHandleProps?: Record<string, unknown>;
@@ -19,6 +20,8 @@ export const AttendanceTodayWidget = ({
   onHide,
   onOpen,
 }: AttendanceTodayWidgetProps) => {
+  const { canUsePath, isChecking, isError } = useFeatures();
+  if (isChecking || isError || data === null || !canUsePath('/app/attendance/dashboard')) return null;
   const present = data?.present ?? 0;
   const absent = data?.absent ?? 0;
   const onLeave = data?.onLeave ?? 0;

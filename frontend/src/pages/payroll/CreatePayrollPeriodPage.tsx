@@ -9,8 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPayrollPeriod } from '../../services/payroll.service';
 import Button from '../../components/common/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 
 export default function CreatePayrollPeriodPage() {
+  const { user } = useAuth();
+  const { canPerform } = useFeatures();
+  const canWrite = canPerform('PAYROLL', 'write') && ["ADMIN"].includes(user?.role ?? '');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
@@ -31,6 +36,7 @@ export default function CreatePayrollPeriodPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) return;
     createMutation.mutate({
       month: formData.month,
       year: formData.year,
@@ -141,6 +147,7 @@ export default function CreatePayrollPeriodPage() {
                 variant="primary"
                 size="lg"
                 isLoading={createMutation.isPending}
+                disabled={!canWrite}
                 className="flex-1"
               >
                 Create Period

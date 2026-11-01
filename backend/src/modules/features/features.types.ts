@@ -41,13 +41,24 @@ export interface CreateFeatureModuleRequest {
 
 export interface UpdateFeaturePermissionRequest {
   featureId: string;
+  scope?: FeatureScope;
   userId?: string;
   role?: UserRole;
   departmentId?: string;
-  isEnabled: boolean;
+  isEnabled?: boolean;
   canRead?: boolean;
   canWrite?: boolean;
   canDelete?: boolean;
+  inherit?: boolean;
+}
+
+export interface FeatureScope {
+  type: 'role' | 'user' | 'department';
+  id: string;
+}
+
+export interface BulkFeaturePermissionRequest extends Omit<UpdateFeaturePermissionRequest, 'featureId'> {
+  featureIds: string[];
 }
 
 export interface FeatureAccessCheck {
@@ -55,6 +66,7 @@ export interface FeatureAccessCheck {
   canRead: boolean;
   canWrite: boolean;
   canDelete: boolean;
+  source?: 'admin' | 'user' | 'department' | 'role' | 'global' | 'default';
 }
 
 export interface UserFeatures {

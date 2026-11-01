@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * CLIENT PORTAL ROUTES
@@ -28,7 +29,16 @@ import {
 const router = Router();
 
 // Public routes
-router.post('/register', selfRegisterController);
+router.post('/register', requireFeature('CLIENT_PORTAL', { publicRole: UserRole.CLIENT }), selfRegisterController);
+
+const clientPortalPolicy = requireFeature('CLIENT_PORTAL');
+// Profile and account recovery stay available when portal operations are disabled.
+router.use(authenticate, (req, res, next) => {
+  const profileRead = req.method === 'GET' && /^\/profile\/?$/i.test(req.path);
+  const profileUpdate = req.method === 'PUT' && /^\/profile\/[^/]+\/?$/i.test(req.path);
+  if (profileRead || profileUpdate) return next();
+  return clientPortalPolicy(req, res, next);
+});
 
 // Client routes (authenticated clients)
 router.get('/profile', authenticate, requireRoles(UserRole.CLIENT), getMyProfileController);

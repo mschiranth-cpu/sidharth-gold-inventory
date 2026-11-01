@@ -1,3 +1,4 @@
+import { requireFeature } from '../features/features.middleware';
 /**
  * ============================================
  * PAYROLL ROUTES
@@ -21,6 +22,9 @@ import {
 } from './payroll.controller';
 
 const router = Router();
+
+// Module policy supplements the existing route authentication and role checks.
+router.use(authenticate, requireFeature('PAYROLL'));
 
 router.post(
   '/salary-structure/:userId',

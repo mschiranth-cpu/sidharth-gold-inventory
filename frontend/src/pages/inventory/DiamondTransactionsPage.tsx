@@ -7,7 +7,7 @@
  * and Excel export. Mirrors MetalTransactionsPage in structure.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -38,6 +38,7 @@ import {
   useTxnSelection,
 } from '../../components/transactions/TxnBulkActions';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeatures } from '../../hooks/useFeatures';
 import { formatIstDate, formatIstTime } from '../../lib/dateUtils';
 
 const TXN_META: Record<string, { label: string; cls: string }> = {
@@ -80,8 +81,10 @@ const fmtInt = (n: number) =>
 export default function DiamondTransactionsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canSettle = ['ADMIN', 'OFFICE_STAFF'].includes(String(user?.role ?? ''));
-  const canDelete = String(user?.role ?? '') === 'ADMIN';
+  const { canPerform } = useFeatures();
+  const canSettle = ['ADMIN', 'OFFICE_STAFF'].includes(String(user?.role ?? '')) && canPerform('DIAMOND_INVENTORY', 'write');
+  const canEdit = canSettle;
+  const canDelete = String(user?.role ?? '') === 'ADMIN' && canPerform('DIAMOND_INVENTORY', 'delete');
   const [filters, setFilters] = useState<{
     transactionType?: string;
     isBillable?: boolean;
@@ -96,6 +99,12 @@ export default function DiamondTransactionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canSettle) { setSettleTxn(null); setBulkSettleOpen(false); }
+    if (!canEdit) setEditTxn(null);
+    if (!canDelete) { setConfirmDelete(null); setBulkDeleteOpen(false); }
+  }, [canSettle, canEdit, canDelete]);
 
   const { data: txns = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['diamond-transactions', filters],
@@ -221,24 +230,24 @@ export default function DiamondTransactionsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Link to="/app/inventory/diamonds/receive">
+              {canSettle && <Link to="/app/inventory/diamonds/receive">
                 <Button variant="primary">
                   <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
                   Receive
                 </Button>
-              </Link>
-              <Link to="/app/inventory/diamonds/issue">
+              </Link>}
+              {canSettle && <Link to="/app/inventory/diamonds/issue">
                 <Button variant="secondary">
                   <ArrowUpTrayIcon className="h-4 w-4 mr-1" />
                   Issue
                 </Button>
-              </Link>
-              <Link to="/app/inventory/diamonds/transfer">
+              </Link>}
+              {canSettle && <Link to="/app/inventory/diamonds/transfer">
                 <Button variant="ghost">
                   <ArrowsRightLeftIcon className="h-4 w-4 mr-1" />
                   Transfer
                 </Button>
-              </Link>
+              </Link>}
               <Button type="button" variant="secondary" onClick={handleExport}>
                 <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
                 Export Excel
@@ -603,7 +612,7 @@ export default function DiamondTransactionsPage() {
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-2">
-                            {isPurchase && balanceDue > 0 && (
+                            {canSettle && isPurchase && balanceDue > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setSettleTxn(t)}
@@ -614,7 +623,7 @@ export default function DiamondTransactionsPage() {
                                 Settle
                               </button>
                             )}
-                            <button
+                            {canEdit && <button
                               type="button"
                               onClick={() => setEditTxn(t)}
                               className="px-2.5 py-1 rounded-lg text-champagne-800 bg-champagne-50 hover:bg-champagne-100 text-xs font-medium inline-flex items-center gap-1"
@@ -622,8 +631,8 @@ export default function DiamondTransactionsPage() {
                             >
                               <PencilSquareIcon className="h-3.5 w-3.5" />
                               Edit
-                            </button>
-                            <button
+                            </button>}
+                            {canDelete && <button
                               type="button"
                               onClick={() => setConfirmDelete(t)}
                               className="px-2.5 py-1 rounded-lg text-accent-ruby bg-rose-50 hover:bg-rose-100 text-xs font-medium inline-flex items-center gap-1"
@@ -631,7 +640,7 @@ export default function DiamondTransactionsPage() {
                             >
                               <TrashIcon className="h-3.5 w-3.5" />
                               Delete
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
@@ -644,7 +653,7 @@ export default function DiamondTransactionsPage() {
         </div>
       </div>
 
-      {settleTxn && (
+      {canSettle && settleTxn && (
         <SettlePaymentModal
           domain="diamond"
           transaction={settleTxn as any}
@@ -655,7 +664,7 @@ export default function DiamondTransactionsPage() {
         />
       )}
 
-      {editTxn && (
+      {canEdit && editTxn && (
         <EditDiamondTransactionModal
           transaction={editTxn}
           onClose={() => setEditTxn(null)}
@@ -665,7 +674,7 @@ export default function DiamondTransactionsPage() {
         />
       )}
 
-      {confirmDelete && (
+      {canDelete && confirmDelete && (
         <div
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
@@ -700,7 +709,7 @@ export default function DiamondTransactionsPage() {
         </div>
       )}
 
-      {bulkDeleteOpen && (
+      {canDelete && bulkDeleteOpen && (
         <BulkDeleteModal
           rows={visibleTxns.filter((t) => selectedIds.has(t.id))}
           deleteFn={deleteDiamondTransaction}
@@ -718,7 +727,7 @@ export default function DiamondTransactionsPage() {
           }}
         />
       )}
-      {bulkSettleOpen && (
+      {canSettle && bulkSettleOpen && (
         <BulkSettleModal
           rows={visibleTxns.filter(
             (t) =>

@@ -10,7 +10,8 @@
  * @version 1.0.0
  */
 
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   AuthState,
   AuthContextType,
@@ -131,71 +132,151 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+type SessionValidation = { status: 'valid'; user: AuthUser } | { status: 'offline' | 'denied' | 'stale' };
+
+function sameAccessIdentity(previous: AuthUser | null, next: AuthUser) {
+  return previous?.id === next.id && previous.role === next.role
+    && (previous.department ?? null) === (next.department ?? null);
+}
+
+// Initialization and foreground refresh share the same denial/expiry policy.
+async function validateSession(isCurrent: () => boolean): Promise<SessionValidation> {
+  const readProfile = async (): Promise<SessionValidation> => {
+    const response = await getCurrentUser(isCurrent);
+    if (!isCurrent()) return { status: 'stale' };
+    return response.success && response.data && response.data.isActive !== false
+      ? { status: 'valid', user: response.data }
+      : { status: 'denied' };
+  };
+  try {
+    return await readProfile();
+  } catch (error) {
+    if (!isCurrent() || (error as Error | null)?.name === 'AuthSessionChangedError') return { status: 'stale' };
+    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+    if (status === 403) return { status: 'denied' };
+    if (status !== 401) return { status: 'offline' };
+    try {
+      const refreshed = await refreshAccessToken(isCurrent);
+      if (!isCurrent()) return { status: 'stale' };
+      if (!refreshed.success) return { status: 'denied' };
+      return await readProfile();
+    } catch (refreshError) {
+      if (!isCurrent() || (refreshError as Error | null)?.name === 'AuthSessionChangedError') return { status: 'stale' };
+      // Once the existing token is known to be invalid, a failed renewal cannot
+      // restore its cached administrator/role privileges.
+      return { status: 'denied' };
+    }
+  }
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const sessionVersion = useRef(0);
+  const currentState = useRef(state);
+  currentState.current = state;
+  const queryClient = useQueryClient();
+  const clearPrivateCache = useCallback(() => {
+    // Cancellation prevents even query functions that ignore AbortSignal from
+    // committing a late response into a subsequent account's cache.
+    void queryClient.cancelQueries();
+    queryClient.clear();
+  }, [queryClient]);
 
   // Initialize auth state from storage
   useEffect(() => {
+    let active = true;
+    const version = ++sessionVersion.current;
+    const isCurrent = () => active && version === sessionVersion.current;
     const initAuth = async () => {
       dispatch({ type: 'AUTH_INIT_START' });
 
       const hasTokens = initializeAuth();
       if (!hasTokens) {
+        clearPrivateCache();
         dispatch({ type: 'AUTH_INIT_FAILURE' });
         return;
       }
 
-      // Try to get stored user first for faster initial render
+      // Keep cached roles out of authorized UI until the session is validated.
       const storedUser = getStoredUser();
-      if (storedUser) {
-        // Use stored user immediately - we have valid tokens
+
+      const result = await validateSession(isCurrent);
+      if (!isCurrent() || result.status === 'stale') return;
+      if (result.status === 'valid') {
+        clearPrivateCache();
+        dispatch({ type: 'AUTH_INIT_SUCCESS', payload: result.user });
+      } else if (result.status === 'offline' && storedUser && storedUser.isActive !== false) {
+        console.warn('Could not validate token, using stored user');
         dispatch({ type: 'AUTH_INIT_SUCCESS', payload: storedUser });
-      }
-
-      // Validate token by fetching current user (in background, don't block)
-      try {
-        const response = await getCurrentUser();
-        if (response.success && response.data) {
-          dispatch({ type: 'AUTH_INIT_SUCCESS', payload: response.data });
-        } else if (!storedUser) {
-          // Only clear if we don't have stored user
-          clearTokens();
-          dispatch({ type: 'AUTH_INIT_FAILURE' });
-        }
-        // If we have stored user but API fails, keep using stored user
-      } catch (error) {
-        // If we have stored user, keep them logged in
-        if (storedUser) {
-          console.warn('Could not validate token, using stored user');
-          return;
-        }
-
-        // Try to refresh token only if no stored user
-        try {
-          await refreshAccessToken();
-          const response = await getCurrentUser();
-          if (response.success && response.data) {
-            dispatch({ type: 'AUTH_INIT_SUCCESS', payload: response.data });
-          } else {
-            clearTokens();
-            dispatch({ type: 'AUTH_INIT_FAILURE' });
-          }
-        } catch {
-          clearTokens();
-          dispatch({ type: 'AUTH_INIT_FAILURE' });
-        }
+      } else {
+        clearPrivateCache();
+        clearTokens();
+        dispatch({ type: 'AUTH_INIT_FAILURE' });
       }
     };
 
-    initAuth();
-  }, []);
+    void initAuth();
+    return () => { active = false; };
+  }, [clearPrivateCache]);
+
+  // Keep role/department/activity current for an open page. Only the visible
+  // browser client calls /auth/me; authorization is enforced by every API call.
+  useEffect(() => {
+    if (!state.isAuthenticated || !state.user || state.isLoading) return;
+    let active = true;
+    let checking = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const version = sessionVersion.current;
+    const userId = state.user.id;
+    const isCurrent = () => active && version === sessionVersion.current;
+    const check = async () => {
+      if (!isCurrent() || checking || document.visibilityState !== 'visible') return;
+      checking = true;
+      try {
+        const result = await validateSession(isCurrent);
+        if (!isCurrent() || result.status === 'stale' || result.status === 'offline') return;
+        if (result.status === 'valid' && result.user.id === userId) {
+          if (!sameAccessIdentity(currentState.current.user, result.user)) clearPrivateCache();
+          dispatch({ type: 'AUTH_INIT_SUCCESS', payload: result.user });
+        } else {
+          ++sessionVersion.current;
+          clearPrivateCache();
+          clearTokens();
+          dispatch({ type: 'AUTH_INIT_FAILURE' });
+        }
+      } finally {
+        checking = false;
+      }
+    };
+    const schedule = () => {
+      if (interval !== undefined) clearInterval(interval);
+      interval = document.visibilityState === 'visible' ? setInterval(() => { void check(); }, 30_000) : undefined;
+    };
+    const onFocus = () => { void check(); };
+    const onVisibility = () => {
+      schedule();
+      if (document.visibilityState === 'visible') void check();
+    };
+    schedule();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      active = false;
+      if (interval !== undefined) clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [state.isAuthenticated, state.user?.id, state.user?.role, state.user?.department, state.isLoading, clearPrivateCache]);
 
   // Login
   const login = useCallback(async (credentials: LoginCredentials) => {
+    const version = ++sessionVersion.current;
+    clearPrivateCache();
     dispatch({ type: 'LOGIN_START' });
 
     try {
-      const response = await apiLogin(credentials);
+      const response = await apiLogin(credentials, () => version === sessionVersion.current);
+      if (version !== sessionVersion.current) return;
 
       if (response.success && response.data) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user });
@@ -203,6 +284,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         dispatch({ type: 'LOGIN_FAILURE', payload: response.message || 'Login failed' });
       }
     } catch (error: any) {
+      if (version !== sessionVersion.current) return;
       const message =
         error.response?.data?.error?.message ||
         error.response?.data?.message ||
@@ -211,14 +293,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       dispatch({ type: 'LOGIN_FAILURE', payload: message });
       throw error;
     }
-  }, []);
+  }, [clearPrivateCache]);
 
   // Register
   const register = useCallback(async (data: RegisterData) => {
+    const version = ++sessionVersion.current;
+    clearPrivateCache();
     dispatch({ type: 'LOGIN_START' });
 
     try {
       const response = await apiRegister(data);
+      if (version !== sessionVersion.current) return;
 
       if (!response.success) {
         dispatch({ type: 'LOGIN_FAILURE', payload: response.message || 'Registration failed' });
@@ -228,6 +313,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Registration successful, but user needs to login
       dispatch({ type: 'AUTH_INIT_FAILURE' });
     } catch (error: any) {
+      if (version !== sessionVersion.current) return;
       const message =
         error.response?.data?.error?.message ||
         error.response?.data?.message ||
@@ -236,26 +322,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       dispatch({ type: 'LOGIN_FAILURE', payload: message });
       throw error;
     }
-  }, []);
+  }, [clearPrivateCache]);
 
   // Logout
   const logout = useCallback(async () => {
-    try {
-      await apiLogout();
-    } finally {
-      dispatch({ type: 'LOGOUT' });
-    }
-  }, []);
+    ++sessionVersion.current;
+    clearPrivateCache();
+    dispatch({ type: 'LOGOUT' });
+    await apiLogout();
+  }, [clearPrivateCache]);
 
   // Refresh token
   const refreshToken = useCallback(async () => {
+    const version = sessionVersion.current;
+    const isCurrent = () => version === sessionVersion.current;
     try {
-      await refreshAccessToken();
+      await refreshAccessToken(isCurrent);
     } catch (error) {
+      if (!isCurrent() || (error as Error).name === 'AuthSessionChangedError') return;
+      ++sessionVersion.current;
+      clearPrivateCache();
+      clearTokens();
       dispatch({ type: 'LOGOUT' });
       throw error;
     }
-  }, []);
+  }, [clearPrivateCache]);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -264,8 +355,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Update user
   const updateUser = useCallback((user: AuthUser) => {
+    if (!sameAccessIdentity(currentState.current.user, user) || user.isActive === false) {
+      ++sessionVersion.current;
+      clearPrivateCache();
+    }
+    if (user.isActive === false) {
+      clearTokens();
+      dispatch({ type: 'AUTH_INIT_FAILURE' });
+      return;
+    }
     dispatch({ type: 'UPDATE_USER', payload: user });
-  }, []);
+  }, [clearPrivateCache]);
 
   const value: AuthContextType = {
     ...state,

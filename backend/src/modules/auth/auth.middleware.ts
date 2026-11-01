@@ -71,11 +71,11 @@ function extractToken(req: Request): string | null {
  * });
  * ```
  */
-export function authenticate(
+export async function authenticate(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   try {
     const token = extractToken(req);
 
@@ -94,12 +94,16 @@ export function authenticate(
 
     // Verify and decode the token
     const decoded = verifyAccessToken(token);
+    // Signed claims identify a session; current account status controls access.
+    const user = await getUserById(decoded.userId);
+    if (!user) throw new AuthError(AuthErrorCode.USER_NOT_FOUND, 'User account not found', 401);
+    if (!user.isActive) throw new AuthError(AuthErrorCode.USER_INACTIVE, 'Your account has been deactivated', 403);
 
     // Attach user info to request
     (req as AuthenticatedRequest).user = {
-      userId: decoded.userId,
-      email: decoded.email,
-      role: decoded.role,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
     };
 
     logger.debug('Request authenticated', {
@@ -151,28 +155,46 @@ export function authenticate(
  * });
  * ```
  */
-export function optionalAuth(
+export async function optionalAuth(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   try {
     const token = extractToken(req);
 
     if (token) {
-      const decoded = verifyAccessToken(token);
+      let decoded;
+      try {
+        decoded = verifyAccessToken(token);
+      } catch {
+        // Invalid optional credentials continue anonymously as before.
+        next();
+        return;
+      }
+      const user = await getUserById(decoded.userId);
+      if (!user) throw new AuthError(AuthErrorCode.USER_NOT_FOUND, 'User account not found', 401);
+      if (!user.isActive) throw new AuthError(AuthErrorCode.USER_INACTIVE, 'Your account has been deactivated', 403);
       (req as OptionalAuthRequest).user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
+        userId: user.id,
+        email: user.email,
+        role: user.role,
       };
     }
 
     next();
-  } catch {
-    // Token is invalid, but that's okay for optional auth
-    // Just continue without user info
-    next();
+  } catch (error) {
+    // Account lookup failures must not turn an authenticated request anonymous.
+    const statusCode = error instanceof AuthError ? error.statusCode : 500;
+    res.status(statusCode).json({
+      success: false,
+      error: {
+        code: error instanceof AuthError ? error.code : 'INTERNAL_ERROR',
+        message: error instanceof AuthError ? error.message : 'Unable to verify account status',
+        statusCode,
+      },
+      timestamp: new Date().toISOString(),
+    });
   }
 }
 
