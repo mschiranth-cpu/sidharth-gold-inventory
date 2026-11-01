@@ -99,3 +99,12 @@ To check whether embeddings exist, inspect `.nexusgraphai/meta.json` — the `st
 | Index, status, clean, wiki CLI commands | `.claude/skills/nexusgraphai/nexusgraphai-cli/SKILL.md` |
 
 <!-- nexusgraphai:end -->
+
+## Production release completion
+
+- The user gives standing authorization to commit reviewed release changes and push to `main` after production is healthy and verified. Do not ask again for routine release commits or pushes.
+- Follow [Workspace Deployment](docs/WORKSPACE_DEPLOYMENT.md). Use the supported deployment helper, verify its successful manifest, public health/readiness, frontend and changed behavior, then commit and push the release source with its related tests and documentation.
+- Stage the reviewed release files explicitly. Preserve unrelated user work; exclude credentials, `.env`, customer data, uploads, logs, `.deployments/`, and the local graph index.
+- Reconcile remote changes while preserving the verified release content. If reconciliation changes application behavior, validate and deploy that change through the helper before declaring the release complete. Never force-push, rewrite published history or bypass branch protections.
+- Verify that local `main` and the actual remote `main` SHA match, and record the deployment ID, commit SHA and push evidence before the final completion reply. Reuse an existing release commit instead of creating an empty or duplicate commit.
+- If Git publication fails after a healthy deployment, record and report that exact remaining step. Resume Git publication without repeating or rolling back the successful deployment merely because Git failed.

@@ -58,6 +58,36 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-workspa
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-workspace.ps1 -ProductionRoot 'D:\path\to\production' -Apply
 ```
 
+## Required Git publication after production is healthy
+
+The user gives standing authorization for routine release commits and pushes to
+`main`. Every production release follows this order:
+
+1. Apply through the supported helper and retain its successful deployment ID
+   and manifest.
+2. Verify public health/readiness, frontend assets and the changed behavior with
+   non-destructive live checks. Record the required screenshot evidence.
+3. Commit the reviewed release source, related tests and documentation, then
+   push normally to `main`. If those changes are already committed, reuse that
+   commit instead of making an empty or duplicate commit.
+4. Verify the actual remote `main` SHA matches local `main`, record the release
+   ID, commit SHA and push result, then send the final completion reply.
+
+This is an agent/operator release step after the helper succeeds; the helper
+itself remains responsible only for production deployment. No additional
+confirmation is required for these routine commits and pushes. Stage explicit
+reviewed paths, preserve unrelated user changes, and exclude credentials,
+`.env`, customer data, uploads, logs, `.deployments/` and the local graph index.
+
+Fetch and reconcile remote history safely, preserving the verified release
+content. Never force-push, rewrite published history or bypass branch
+protections. If reconciliation changes application behavior, validate and
+deploy that change through the helper before treating the release as complete.
+
+If Git publication fails after production is healthy, report the exact Git
+blocker and retain the request as awaiting Git publication. Resume that step;
+do not repeat or roll back a healthy deployment merely because Git failed.
+
 ## Deployment scope
 
 The helper uses an explicit allowlist for application source, frontend public files, supported manifests/configuration, and project scripts/documentation. It does not mirror the entire repository. Secrets, `.env` files, databases, uploaded files, runtime logs, dependencies, and Git metadata remain outside source syncing.
